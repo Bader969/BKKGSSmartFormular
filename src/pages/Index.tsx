@@ -18,14 +18,10 @@ const Index = () => {
   };
   
   const handleExport = async () => {
-    // Validierung
+    // Validierung - nur Name und Vorname erforderlich
+    // Die Unterschrift wird automatisch aus dem Nachnamen generiert
     if (!formData.mitgliedName || !formData.mitgliedVorname) {
       toast.error('Bitte geben Sie mindestens Name und Vorname des Mitglieds ein.');
-      return;
-    }
-    
-    if (!formData.unterschrift) {
-      toast.error('Bitte unterschreiben Sie das Formular.');
       return;
     }
     
