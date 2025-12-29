@@ -2,8 +2,9 @@ import React from 'react';
 import { FormSection } from './FormSection';
 import { FormField } from './FormField';
 import { SignaturePad } from './SignaturePad';
-import { FormData, RundumSicherPaketData, ArztDaten, createEmptyArztDaten } from '@/types/form';
+import { FormData, RundumSicherPaketData, ArztDaten, createEmptyArztDaten, ZUSATZVERSICHERUNG_OPTIONS, ZusatzversicherungOption } from '@/types/form';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 
 interface RundumSicherPaketSectionProps {
@@ -230,15 +231,51 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
       {/* Zusatzversicherung */}
       <div className="space-y-4 mb-6">
         <h4 className="font-medium text-foreground">Zusatzversicherung</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            type="text"
-            label="Art der Zusatzversicherung"
-            id="artZusatzversicherung"
-            value={formData.rundumSicherPaket.artZusatzversicherung}
-            onChange={(value) => updateRundumSicherPaket({ artZusatzversicherung: value })}
-            placeholder="z.B. Zahnzusatz"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Pflicht-Dropdown */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">
+              Zusatzversicherung 1 <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              value={formData.rundumSicherPaket.zusatzversicherung1}
+              onValueChange={(value) => updateRundumSicherPaket({ zusatzversicherung1: value as ZusatzversicherungOption })}
+            >
+              <SelectTrigger className="bg-card">
+                <SelectValue placeholder="Bitte wählen (Pflicht)" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover z-50">
+                {ZUSATZVERSICHERUNG_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Optional-Dropdown */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">
+              Zusatzversicherung 2 (optional)
+            </Label>
+            <Select
+              value={formData.rundumSicherPaket.zusatzversicherung2}
+              onValueChange={(value) => updateRundumSicherPaket({ zusatzversicherung2: value as ZusatzversicherungOption })}
+            >
+              <SelectTrigger className="bg-card">
+                <SelectValue placeholder="Bitte wählen (optional)" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover z-50">
+                {ZUSATZVERSICHERUNG_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <FormField
             type="text"
             label="Jahresbeitrag"
