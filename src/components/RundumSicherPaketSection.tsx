@@ -42,21 +42,53 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
         }
       </p>
 
-      {/* Versichertennummern - automatisch von Mitglied kopiert */}
+      {/* Versichertennummern - für jede Person separat */}
       <div className="space-y-4 mb-6">
         <h4 className="font-medium text-foreground">Versichertennummern</h4>
         <p className="text-xs text-muted-foreground">
-          {!isNurRundumMode && 'KV-Nummer und Versichertennummer werden automatisch vom Mitglied übernommen.'}
+          Geben Sie für jede Person die individuelle Versichertennummer ein.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Mitglied */}
           <FormField
             type="text"
             label="Versichertennr. Mitglied"
             id="mitgliedVersichertennummer"
             value={formData.mitgliedVersichertennummer}
             onChange={(value) => updateFormData({ mitgliedVersichertennummer: value })}
-            placeholder="Versichertennummer"
+            placeholder="Versichertennummer Mitglied"
           />
+          
+          {/* Ehegatte - nur anzeigen wenn vorhanden und nicht nur Rundum-Modus */}
+          {!isNurRundumMode && (formData.ehegatte.name || formData.ehegatte.vorname) && (
+            <FormField
+              type="text"
+              label="Versichertennr. Ehegatte"
+              id="ehegatteVersichertennummer"
+              value={formData.ehegatte.versichertennummer || ''}
+              onChange={(value) => updateFormData({
+                ehegatte: { ...formData.ehegatte, versichertennummer: value }
+              })}
+              placeholder="Versichertennummer Ehegatte"
+            />
+          )}
+          
+          {/* Kinder - nur anzeigen wenn vorhanden und nicht nur Rundum-Modus */}
+          {!isNurRundumMode && formData.kinder.map((kind, index) => (
+            <FormField
+              key={`kind-versichertennummer-${index}`}
+              type="text"
+              label={`Versichertennr. Kind ${index + 1}`}
+              id={`kindVersichertennummer${index}`}
+              value={kind.versichertennummer || ''}
+              onChange={(value) => {
+                const newKinder = [...formData.kinder];
+                newKinder[index] = { ...newKinder[index], versichertennummer: value };
+                updateFormData({ kinder: newKinder });
+              }}
+              placeholder={`Versichertennummer Kind ${index + 1}`}
+            />
+          ))}
         </div>
       </div>
 
