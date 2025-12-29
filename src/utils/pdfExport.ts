@@ -125,19 +125,20 @@ const fillSpouseFields = (
     setTextField('Ehegatte - letzte Vers endet am', endDate);
     setTextField('Ehegatte - letzte Vers KK', formData.ehegatteKrankenkasse || '');
     
-    // Vor- und Nachname des Antragstellers für Ehegatte (pre-filled)
-    setTextField('Ehegatte - letzte Vers KK Vorname', formData.mitgliedVorname || '');
-    setTextField('Ehegatte - letzte Vers KK Nachname', formData.mitgliedName || '');
+    // Vor- und Nachname des Antragstellers für Ehegatte (bearbeitbar, aber pre-filled)
+    setTextField('Ehegatte - letzte Vers KK Vorname', formData.ehegatte.bisherigVorname || formData.mitgliedVorname || '');
+    setTextField('Ehegatte - letzte Vers KK Nachname', formData.ehegatte.bisherigNachname || formData.mitgliedName || '');
     
-    // Geburtsname = Nachname des Ehegatten (pre-filled)
+    // Geburtsname = Nachname des Ehegatten (bearbeitbar, aber pre-filled)
     setTextField('Ehegatte Geburtsname', formData.ehegatte.geburtsname || formData.ehegatte.name || '');
     setTextField('Ehegatte Geburtsnort', formData.ehegatte.geburtsort || '');
     setTextField('Ehegatte Geburtsland', formData.ehegatte.geburtsland || '');
     setTextField('Ehegatte Staatsangh', formData.ehegatte.staatsangehoerigkeit || '');
 
-    setCheckbox('Ehegatte Fami', true);
-    setCheckbox('Ehegatte MG', false);
-    setCheckbox('Ehegatte nicht gesetzlich', false);
+    // Versicherungsart Checkboxen basierend auf der Auswahl im Formular
+    setCheckbox('Ehegatte MG', formData.ehegatte.bisherigArt === 'mitgliedschaft');
+    setCheckbox('Ehegatte Fami', formData.ehegatte.bisherigArt === 'familienversicherung');
+    setCheckbox('Ehegatte nicht gesetzlich', formData.ehegatte.bisherigArt === 'nicht_gesetzlich');
 
     if (formData.ehegatte.bisherigBestehtWeiter && formData.ehegatte.bisherigBestehtWeiterBei) {
       setTextField('KK bleibt', formData.ehegatte.bisherigBestehtWeiterBei);
