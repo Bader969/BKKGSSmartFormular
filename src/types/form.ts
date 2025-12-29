@@ -20,6 +20,8 @@ export interface FamilyMember {
   staatsangehoerigkeit: string;
   // Rundum-Sicher-Paket Felder
   versichertennummer: string;
+  // Bearbeitbare Felder
+  familienversichert: boolean;
 }
 
 // Arzt-Daten für Rundum-Sicher-Paket
@@ -134,6 +136,7 @@ export const createEmptyFamilyMember = (): FamilyMember => ({
   geburtsland: '',
   staatsangehoerigkeit: '',
   versichertennummer: '',
+  familienversichert: true,
 });
 
 export const createInitialFormData = (): FormData => {

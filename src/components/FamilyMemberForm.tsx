@@ -130,15 +130,14 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
       
       {/* Bisherige Versicherung - automatisch ausgefüllt */}
       <div className="p-4 bg-card/50 rounded-lg border mt-4">
-        <h4 className="font-medium mb-3 text-sm">Bisherige Versicherung (automatisch):</h4>
+        <h4 className="font-medium mb-3 text-sm">Bisherige Versicherung (vorausgefüllt - bearbeitbar):</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
-            type="text"
+            type="date"
             label="Bisherige Versicherung endete am"
             id={`${prefix}-endeteAm`}
-            value={endDate}
-            onChange={() => {}}
-            disabled
+            value={member.bisherigEndeteAm || endDate}
+            onChange={(value) => updateMember({ bisherigEndeteAm: value })}
           />
           <div className="space-y-2">
             <FormField
@@ -163,9 +162,8 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
             type="checkbox"
             label="Familienversichert"
             id={`${prefix}-familienversichert`}
-            checked={true}
-            onChange={() => {}}
-            disabled
+            checked={member.familienversichert !== false}
+            onChange={(checked) => updateMember({ familienversichert: checked })}
           />
         </div>
       </div>
