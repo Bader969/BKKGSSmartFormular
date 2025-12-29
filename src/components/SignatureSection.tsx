@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { FormSection } from './FormSection';
 import { FormField } from './FormField';
-import { SignaturePad } from './SignaturePad';
 import { FormData } from '@/types/form';
 import { generateSignatureImage } from '@/utils/signatureGenerator';
 
@@ -12,20 +11,28 @@ interface SignatureSectionProps {
 
 export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, updateFormData }) => {
   const isNurRundumMode = formData.mode === 'nur_rundum';
-  const [generatedSignature, setGeneratedSignature] = useState<string>('');
   
-  // Generiere automatisch eine Unterschrift aus dem Nachnamen
+  // Generiere automatisch Unterschriften aus den Nachnamen
   useEffect(() => {
-    const generateAutoSignature = async () => {
+    const generateAutoSignatures = async () => {
       if (formData.mitgliedName && !formData.unterschrift) {
         const sig = await generateSignatureImage(formData.mitgliedName);
-        setGeneratedSignature(sig);
-        // Setze die generierte Unterschrift als Standard
         updateFormData({ unterschrift: sig });
       }
     };
-    generateAutoSignature();
+    generateAutoSignatures();
   }, [formData.mitgliedName]);
+
+  // Generiere Unterschrift für Ehegatte
+  useEffect(() => {
+    const generateSpouseSignature = async () => {
+      if (formData.ehegatte?.name && !formData.unterschriftFamilie) {
+        const sig = await generateSignatureImage(formData.ehegatte.name);
+        updateFormData({ unterschriftFamilie: sig });
+      }
+    };
+    generateSpouseSignature();
+  }, [formData.ehegatte?.name]);
   
   return (
     <FormSection title="Ort, Datum und Unterschriften" variant="signature">
@@ -47,46 +54,53 @@ export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, up
         />
       </div>
       
-      {/* Generierte Handschrift-Vorschau */}
-      {formData.mitgliedName && (
-        <div className="mb-6 p-4 bg-card/50 rounded-lg border border-border/50">
-          <p className="text-sm text-muted-foreground mb-2">
-            Automatisch generierte Unterschrift (basierend auf Nachname):
-          </p>
-          <div className="flex items-center gap-4">
-            <p 
-              className="font-signature text-3xl italic"
-              style={{ color: '#1a4d80' }}
-            >
-              {formData.mitgliedName}
-            </p>
-            <span className="text-xs text-muted-foreground">
-              (Diese wird verwendet, falls keine manuelle Unterschrift erfolgt)
-            </span>
-          </div>
-        </div>
-      )}
-      
+      {/* Unterschriften Vorschau */}
       <div className={`grid gap-6 ${isNurRundumMode ? 'grid-cols-1 max-w-md' : 'grid-cols-1 md:grid-cols-2'}`}>
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Unterschrift des Mitglieds (optional - oder manuelle Unterschrift)
+        {/* Unterschrift Mitglied */}
+        <div className="p-4 bg-card rounded-lg border border-border">
+          <label className="block text-sm font-medium mb-3">
+            Unterschrift des Mitglieds
           </label>
-          <SignaturePad
-            signature={formData.unterschrift}
-            onSignatureChange={(sig) => updateFormData({ unterschrift: sig })}
-          />
+          {formData.mitgliedName ? (
+            <div className="bg-white p-4 rounded border border-border/50 min-h-[80px] flex items-center">
+              <p 
+                className="font-signature text-3xl italic"
+                style={{ color: '#1a4d80' }}
+              >
+                {formData.mitgliedName}
+              </p>
+            </div>
+          ) : (
+            <div className="bg-muted/50 p-4 rounded border border-dashed border-border min-h-[80px] flex items-center justify-center">
+              <p className="text-sm text-muted-foreground">
+                Bitte Nachname des Mitglieds eingeben
+              </p>
+            </div>
+          )}
         </div>
         
+        {/* Unterschrift Familienangehörige (Ehegatte) */}
         {!isNurRundumMode && (
-          <div>
-            <label className="block text-sm font-medium mb-2">
+          <div className="p-4 bg-card rounded-lg border border-border">
+            <label className="block text-sm font-medium mb-3">
               ggf. Unterschrift der Familienangehörigen
             </label>
-            <SignaturePad
-              signature={formData.unterschriftFamilie}
-              onSignatureChange={(sig) => updateFormData({ unterschriftFamilie: sig })}
-            />
+            {formData.ehegatte?.name ? (
+              <div className="bg-white p-4 rounded border border-border/50 min-h-[80px] flex items-center">
+                <p 
+                  className="font-signature text-3xl italic"
+                  style={{ color: '#1a4d80' }}
+                >
+                  {formData.ehegatte.name}
+                </p>
+              </div>
+            ) : (
+              <div className="bg-muted/50 p-4 rounded border border-dashed border-border min-h-[80px] flex items-center justify-center">
+                <p className="text-sm text-muted-foreground">
+                  Bitte Nachname des Ehegatten eingeben
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
