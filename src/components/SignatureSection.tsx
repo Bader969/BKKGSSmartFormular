@@ -1,7 +1,7 @@
 import React from 'react';
 import { FormSection } from './FormSection';
 import { FormField } from './FormField';
-import { SignaturePreview } from './SignaturePreview';
+import { SignaturePad } from './SignaturePad';
 import { FormData } from '@/types/form';
 
 interface SignatureSectionProps {
@@ -31,42 +31,28 @@ export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, up
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Unterschrift des Mitglieds */}
         <div>
-          <FormField
-            type="text"
-            label="Nachname des Mitglieds (für Unterschrift)"
-            id="unterschriftMitgliedName"
-            value={formData.mitgliedName}
-            onChange={(value) => updateFormData({ mitgliedName: value })}
-            placeholder="Nachname eingeben"
-          />
-          <SignaturePreview 
-            name={formData.mitgliedName} 
-            label="Unterschrift des Mitglieds" 
+          <label className="block text-sm font-medium mb-2">
+            Unterschrift des Mitglieds
+          </label>
+          <SignaturePad
+            signature={formData.unterschrift}
+            onSignatureChange={(sig) => updateFormData({ unterschrift: sig })}
           />
         </div>
         
-        {/* Unterschrift der Familienangehörigen */}
         <div>
-          <FormField
-            type="text"
-            label="Nachname des Ehegatten (für Unterschrift)"
-            id="unterschriftEhegatteName"
-            value={formData.ehegatte.name}
-            onChange={(value) => updateFormData({ 
-              ehegatte: { ...formData.ehegatte, name: value } 
-            })}
-            placeholder="Nachname eingeben"
-          />
-          <SignaturePreview 
-            name={formData.ehegatte.name} 
-            label="Unterschrift der Familienangehörigen" 
+          <label className="block text-sm font-medium mb-2">
+            ggf. Unterschrift der Familienangehörigen
+          </label>
+          <SignaturePad
+            signature={formData.unterschriftFamilie}
+            onSignatureChange={(sig) => updateFormData({ unterschriftFamilie: sig })}
           />
         </div>
       </div>
       
-      <p className="mt-6 text-xs text-muted-foreground leading-relaxed">
+      <p className="mt-4 text-xs text-muted-foreground leading-relaxed">
         Mit der Unterschrift erkläre ich, die Zustimmung der Familienangehörigen zur Abgabe 
         der erforderlichen Daten erhalten zu haben. Ich bestätige die Richtigkeit der Angaben 
         und werde über Änderungen umgehend informieren.
@@ -74,4 +60,3 @@ export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, up
     </FormSection>
   );
 };
-

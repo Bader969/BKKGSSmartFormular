@@ -1,7 +1,6 @@
 import { PDFDocument } from 'pdf-lib';
 import { FormData, FamilyMember } from '@/types/form';
 import { calculateDates } from './dateUtils';
-import { generateHandwrittenSignature } from './signatureGenerator';
 
 const formatInputDate = (dateStr: string): string => {
   if (!dateStr) return '';
@@ -224,20 +223,16 @@ const embedSignature = async (
   try {
     const pages = pdfDoc.getPages();
     const page = pages[pageIndex];
+    const { height } = page.getSize();
 
     const signatureImage = await pdfDoc.embedPng(signatureData);
-    // Kleinere Skalierung für bessere Passform
-    const sigDims = signatureImage.scale(0.18);
-    
-    const sigWidth = Math.min(sigDims.width, 100);
-    const sigHeight = Math.min(sigDims.height, 28);
+    const sigDims = signatureImage.scale(0.25);
 
-    // Y-Koordinate direkt verwenden (von unten gemessen)
     page.drawImage(signatureImage, {
       x,
-      y,
-      width: sigWidth,
-      height: sigHeight,
+      y: height - y,
+      width: Math.min(sigDims.width, 140),
+      height: Math.min(sigDims.height, 45),
     });
   } catch (e) {
     console.error('Could not embed signature:', e);
@@ -264,19 +259,14 @@ const createFilledPDF = async (
   // Fill spouse fields
   fillSpouseFields(formData, helpers, endDate);
 
-  // Generiere und bette Unterschriften ein
-  // Die Unterschriftslinie liegt bei Y=682, Unterschrift muss darüber bei Y≈697
-  // Unterschrift des Mitglieds (aus Nachname generiert)
-  if (formData.mitgliedName) {
-    const memberSignature = await generateHandwrittenSignature(formData.mitgliedName);
-    await embedSignature(pdfDoc, memberSignature, 85, 697, 1);
-  }
-  
-  // Unterschrift der Familienangehörigen (aus Ehegatte-Nachname generiert)
-  if (formData.ehegatte.name) {
-    const spouseSignature = await generateHandwrittenSignature(formData.ehegatte.name);
-    await embedSignature(pdfDoc, spouseSignature, 320, 697, 1);
-  }
+  // Fill children fields (max 3 per PDF)
+  childrenForThisPDF.forEach((kind, index) => {
+    fillChildFields(kind, index, helpers, endDate, formData);
+  });
+
+  // Embed signatures
+  await embedSignature(pdfDoc, formData.unterschrift, 200, 715, 1);
+  await embedSignature(pdfDoc, formData.unterschriftFamilie, 400, 715, 1);
 
   return await pdfDoc.save();
 };

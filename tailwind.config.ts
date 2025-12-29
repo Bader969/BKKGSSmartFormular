@@ -70,7 +70,6 @@ export default {
       },
       fontFamily: {
         sans: ['"Source Sans 3"', 'system-ui', 'sans-serif'],
-        signature: ['Caveat', 'cursive'],
       },
       borderRadius: {
         lg: "var(--radius)",
