@@ -23,6 +23,24 @@ export const validateName = (value: string): ValidationResult => {
   return { isValid: true };
 };
 
+// Arzt-Name-Validierung (erlaubt zusätzliche Zeichen wie . , - / etc.)
+export const validateArztName = (value: string): ValidationResult => {
+  if (!value.trim()) {
+    return { isValid: false, message: 'Dieses Feld ist erforderlich' };
+  }
+  const regex = /^[a-zA-ZäöüÄÖÜßéèêëàâáåãæçíìîïñóòôõøúùûýÿžšđ0-9\s\-\.\,\/\'\(\)]+$/;
+  if (!regex.test(value)) {
+    return { isValid: false, message: 'Ungültige Zeichen enthalten' };
+  }
+  if (value.length < 2) {
+    return { isValid: false, message: 'Mindestens 2 Zeichen erforderlich' };
+  }
+  if (value.length > 100) {
+    return { isValid: false, message: 'Maximal 100 Zeichen erlaubt' };
+  }
+  return { isValid: true };
+};
+
 // Ort-Validierung (ähnlich wie Name, aber auch Zahlen erlaubt für Postleitzahl)
 export const validateOrt = (value: string): ValidationResult => {
   if (!value.trim()) {

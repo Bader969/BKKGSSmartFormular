@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { 
   validateVersichertennummer, 
   validateIBAN, 
-  validateName, 
+  validateName,
+  validateArztName, 
   validateDate, 
   validateJahresbeitrag,
   validateOrt,
@@ -191,7 +192,7 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
               arztMitglied: { ...(formData.rundumSicherPaket.arztMitglied || { name: '', ort: '' }), name: value }
             })}
             placeholder="Name des Arztes"
-            validate={validateName}
+            validate={validateArztName}
           />
           <FormField
             type="text"
@@ -218,7 +219,7 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
                 arztEhegatte: { ...(formData.rundumSicherPaket.arztEhegatte || { name: '', ort: '' }), name: value }
               })}
               placeholder="Name des Arztes"
-              validate={validateName}
+              validate={validateArztName}
             />
             <FormField
               type="text"
@@ -244,7 +245,7 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
               value={formData.rundumSicherPaket.aerzteKinder[index]?.name || ''}
               onChange={(value) => updateArztKind(index, { name: value })}
               placeholder="Name des Arztes"
-              validate={validateName}
+              validate={validateArztName}
             />
             <FormField
               type="text"
