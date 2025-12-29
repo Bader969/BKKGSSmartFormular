@@ -22,6 +22,7 @@ export interface FormData {
   mitgliedGeburtsdatum: string;
   mitgliedAnschrift: string;
   mitgliedKvNummer: string;
+  mitgliedKrankenkasse: string;
   
   familienstand: 'ledig' | 'verheiratet' | 'getrennt' | 'geschieden' | 'verwitwet' | '';
   
@@ -40,12 +41,16 @@ export interface FormData {
   
   // Ehegatte
   ehegatte: FamilyMember;
+  ehegatteKrankenkasse: string;
   
-  // Kinder (bis zu 3)
+  // Kinder (beliebig viele)
   kinder: FamilyMember[];
   
-  // Unterschrift als Base64
+  // Unterschrift des Mitglieds
   unterschrift: string;
+  
+  // Unterschrift der Familienangehörigen
+  unterschriftFamilie: string;
 }
 
 export const createEmptyFamilyMember = (): FamilyMember => ({
@@ -90,6 +95,7 @@ export const createInitialFormData = (): FormData => {
     mitgliedGeburtsdatum: '',
     mitgliedAnschrift: '',
     mitgliedKvNummer: '',
+    mitgliedKrankenkasse: '',
     familienstand: '',
     telefon: '',
     email: '',
@@ -97,7 +103,9 @@ export const createInitialFormData = (): FormData => {
     datum: formatDateForInput(today),
     ort: '',
     ehegatte: createEmptyFamilyMember(),
-    kinder: [createEmptyFamilyMember()],
+    ehegatteKrankenkasse: '',
+    kinder: [],
     unterschrift: '',
+    unterschriftFamilie: '',
   };
 };

@@ -45,7 +45,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
         />
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
         <FormField
           type="text"
           label="Anschrift"
@@ -61,6 +61,14 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           value={formData.mitgliedKvNummer}
           onChange={(value) => updateFormData({ mitgliedKvNummer: value })}
           placeholder="Krankenversicherungsnummer"
+        />
+        <FormField
+          type="text"
+          label="Name der Krankenkasse"
+          id="mitgliedKrankenkasse"
+          value={formData.mitgliedKrankenkasse}
+          onChange={(value) => updateFormData({ mitgliedKrankenkasse: value })}
+          placeholder="z.B. BKK GS"
         />
       </div>
       

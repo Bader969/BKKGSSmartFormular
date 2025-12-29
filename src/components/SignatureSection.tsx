@@ -11,7 +11,7 @@ interface SignatureSectionProps {
 
 export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, updateFormData }) => {
   return (
-    <FormSection title="Ort, Datum und Unterschrift" variant="signature">
+    <FormSection title="Ort, Datum und Unterschriften" variant="signature">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <FormField
           type="text"
@@ -30,14 +30,26 @@ export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, up
         />
       </div>
       
-      <div>
-        <label className="block text-sm font-medium mb-2">
-          Unterschrift des Mitglieds
-        </label>
-        <SignaturePad
-          signature={formData.unterschrift}
-          onSignatureChange={(sig) => updateFormData({ unterschrift: sig })}
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label className="block text-sm font-medium mb-2">
+            Unterschrift des Mitglieds
+          </label>
+          <SignaturePad
+            signature={formData.unterschrift}
+            onSignatureChange={(sig) => updateFormData({ unterschrift: sig })}
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium mb-2">
+            ggf. Unterschrift der Familienangehörigen
+          </label>
+          <SignaturePad
+            signature={formData.unterschriftFamilie}
+            onSignatureChange={(sig) => updateFormData({ unterschriftFamilie: sig })}
+          />
+        </div>
       </div>
       
       <p className="mt-4 text-xs text-muted-foreground leading-relaxed">

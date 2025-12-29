@@ -29,6 +29,11 @@ const Index = () => {
       return;
     }
     
+    const numberOfPDFs = Math.max(1, Math.ceil(formData.kinder.length / 3));
+    if (numberOfPDFs > 1) {
+      toast.info(`Es werden ${numberOfPDFs} PDFs erstellt (je max. 3 Kinder pro PDF).`);
+    }
+    
     setIsExporting(true);
     try {
       await exportFilledPDF(formData);
