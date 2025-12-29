@@ -399,6 +399,28 @@ const downloadPDF = (pdfBytes: Uint8Array, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
+// Export nur Rundum-Sicher-Paket für Einzelmitglied
+export const exportRundumSicherPaketOnly = async (formData: FormData): Promise<void> => {
+  try {
+    const datumFormatted = formatInputDate(formData.rundumSicherPaket.datumRSP);
+    const rundumBaseName = `Rundum-Sicher-Paket_${datumFormatted.replace(/\./g, "-")}`;
+
+    // Nur Mitglied
+    const mitgliedPerson: PersonInfo = {
+      vorname: formData.mitgliedVorname,
+      name: formData.mitgliedName,
+      geburtsdatum: formData.mitgliedGeburtsdatum,
+      versichertennummer: formData.mitgliedVersichertennummer,
+      type: "mitglied",
+    };
+    const mitgliedRspBytes = await createRundumSicherPaketPDF(formData, mitgliedPerson);
+    downloadPDF(mitgliedRspBytes, `${rundumBaseName}_Mitglied_${formData.mitgliedName}.pdf`);
+  } catch (error) {
+    console.error("Error exporting Rundum-Sicher-Paket PDF:", error);
+    throw error;
+  }
+};
+
 export const exportFilledPDF = async (formData: FormData): Promise<void> => {
   try {
     const datumFormatted = formatInputDate(formData.datum);
