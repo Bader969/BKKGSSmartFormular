@@ -18,61 +18,77 @@ export const ChildrenSection: React.FC<ChildrenSectionProps> = ({ formData, upda
   };
   
   const addChild = () => {
-    if (formData.kinder.length < 3) {
-      updateFormData({
-        kinder: [...formData.kinder, createEmptyFamilyMember()]
-      });
-    }
+    updateFormData({
+      kinder: [...formData.kinder, createEmptyFamilyMember()]
+    });
   };
   
   const removeChild = (index: number) => {
-    if (formData.kinder.length > 1) {
-      const newKinder = formData.kinder.filter((_, i) => i !== index);
-      updateFormData({ kinder: newKinder });
-    }
+    const newKinder = formData.kinder.filter((_, i) => i !== index);
+    updateFormData({ kinder: newKinder });
   };
 
   return (
-    <FormSection title="Angaben zu Kindern" variant="child">
-      {formData.kinder.map((kind, index) => (
-        <div key={index} className="relative">
-          {formData.kinder.length > 1 && (
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="font-medium">Kind {index + 1}</h3>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => removeChild(index)}
-                className="text-destructive hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Entfernen
-              </Button>
-            </div>
-          )}
-          <FamilyMemberForm
-            member={kind}
-            updateMember={(updates) => updateKind(index, updates)}
-            type="child"
-            childIndex={index + 1}
-          />
-          {index < formData.kinder.length - 1 && (
-            <hr className="my-6 border-accent/30" />
-          )}
+    <FormSection title="Angaben zu Kindern (optional)" variant="child">
+      {formData.kinder.length === 0 ? (
+        <div className="text-center py-6 text-muted-foreground">
+          <p className="mb-4">Keine Kinder hinzugefügt.</p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={addChild}
+            className="border-dashed border-accent text-accent hover:bg-accent/10"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Kind hinzufügen
+          </Button>
         </div>
-      ))}
-      
-      {formData.kinder.length < 3 && (
-        <Button
-          type="button"
-          variant="outline"
-          onClick={addChild}
-          className="mt-4 w-full border-dashed border-accent text-accent hover:bg-accent/10"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Weiteres Kind hinzufügen
-        </Button>
+      ) : (
+        <>
+          {formData.kinder.map((kind, index) => (
+            <div key={index} className="relative">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-medium">Kind {index + 1}</h3>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeChild(index)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Entfernen
+                </Button>
+              </div>
+              <FamilyMemberForm
+                member={kind}
+                updateMember={(updates) => updateKind(index, updates)}
+                type="child"
+                childIndex={index + 1}
+              />
+              {index < formData.kinder.length - 1 && (
+                <hr className="my-6 border-accent/30" />
+              )}
+            </div>
+          ))}
+          
+          <Button
+            type="button"
+            variant="outline"
+            onClick={addChild}
+            className="mt-4 w-full border-dashed border-accent text-accent hover:bg-accent/10"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Weiteres Kind hinzufügen
+          </Button>
+          
+          {formData.kinder.length > 3 && (
+            <p className="mt-3 text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+              <strong>Hinweis:</strong> Bei mehr als 3 Kindern werden mehrere PDFs erstellt. 
+              Das erste PDF enthält die Kinder 1-3, das zweite PDF die Kinder 4-6, usw.
+            </p>
+          )}
+        </>
       )}
     </FormSection>
   );
