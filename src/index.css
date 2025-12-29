@@ -124,32 +124,32 @@
 
 @layer components {
   .section-card {
-    @apply rounded-lg border-2 p-6 mb-6 shadow-sm transition-all duration-200;
+    @apply rounded-xl border-l-4 p-6 mb-6 shadow-md transition-all duration-200;
   }
   
   .section-member {
-    border-color: hsl(var(--section-member));
-    background-color: hsl(var(--section-member-bg));
+    border-left-color: hsl(var(--section-member));
+    background: linear-gradient(135deg, hsl(217 55% 93%) 0%, hsl(217 50% 96%) 100%);
   }
   
   .section-spouse {
-    border-color: hsl(var(--section-spouse));
-    background-color: hsl(var(--section-spouse-bg));
+    border-left-color: hsl(var(--section-spouse));
+    background: linear-gradient(135deg, hsl(173 45% 92%) 0%, hsl(173 40% 95%) 100%);
   }
   
   .section-child {
-    border-color: hsl(var(--section-child));
-    background-color: hsl(var(--section-child-bg));
+    border-left-color: hsl(var(--section-child));
+    background: linear-gradient(135deg, hsl(43 65% 92%) 0%, hsl(43 55% 95%) 100%);
   }
   
   .section-signature {
-    border-color: hsl(var(--section-signature));
-    background-color: hsl(var(--section-signature-bg));
+    border-left-color: hsl(var(--section-signature));
+    background: linear-gradient(135deg, hsl(262 40% 93%) 0%, hsl(262 35% 96%) 100%);
   }
   
   .section-info {
-    border-color: hsl(var(--section-info));
-    background-color: hsl(var(--section-info-bg));
+    border-left-color: hsl(var(--section-info));
+    background: linear-gradient(135deg, hsl(200 50% 92%) 0%, hsl(200 45% 95%) 100%);
   }
   
   .section-title {
