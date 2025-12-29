@@ -10,6 +10,8 @@ interface SignatureSectionProps {
 }
 
 export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, updateFormData }) => {
+  const isNurRundumMode = formData.mode === 'nur_rundum';
+  
   return (
     <FormSection title="Ort, Datum und Unterschriften" variant="signature">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -30,7 +32,7 @@ export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, up
         />
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className={`grid gap-6 ${isNurRundumMode ? 'grid-cols-1 max-w-md' : 'grid-cols-1 md:grid-cols-2'}`}>
         <div>
           <label className="block text-sm font-medium mb-2">
             Unterschrift des Mitglieds
@@ -41,15 +43,17 @@ export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, up
           />
         </div>
         
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            ggf. Unterschrift der Familienangehörigen
-          </label>
-          <SignaturePad
-            signature={formData.unterschriftFamilie}
-            onSignatureChange={(sig) => updateFormData({ unterschriftFamilie: sig })}
-          />
-        </div>
+        {!isNurRundumMode && (
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              ggf. Unterschrift der Familienangehörigen
+            </label>
+            <SignaturePad
+              signature={formData.unterschriftFamilie}
+              onSignatureChange={(sig) => updateFormData({ unterschriftFamilie: sig })}
+            />
+          </div>
+        )}
       </div>
       
       <p className="mt-4 text-xs text-muted-foreground leading-relaxed">
