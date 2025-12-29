@@ -36,7 +36,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
             <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
               <Lock className="w-8 h-8 text-primary" />
             </div>
-            <h1 className="text-2xl font-bold text-slate-800">BKK-Smart Formular</h1>
+            <h1 className="text-2xl font-bold text-slate-800">BKK GS-Smart Formular</h1>
             <p className="text-slate-500 mt-2">Bitte melden Sie sich an, um fortzufahren</p>
           </div>
 
