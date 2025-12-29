@@ -2,7 +2,7 @@ import React from 'react';
 
 interface FormSectionProps {
   title: string;
-  variant: 'member' | 'spouse' | 'child' | 'signature';
+  variant: 'member' | 'spouse' | 'child' | 'signature' | 'info';
   children: React.ReactNode;
 }
 

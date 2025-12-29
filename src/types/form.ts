@@ -18,6 +18,27 @@ export interface FamilyMember {
   geburtsort: string;
   geburtsland: string;
   staatsangehoerigkeit: string;
+  // Rundum-Sicher-Paket Felder
+  versichertennummer: string;
+}
+
+// Arzt-Daten für Rundum-Sicher-Paket
+export interface ArztDaten {
+  name: string;
+  ort: string;
+}
+
+// Rundum-Sicher-Paket Daten
+export interface RundumSicherPaketData {
+  iban: string;
+  kontoinhaber: string;
+  zeitraumVon: string;
+  zeitraumBis: string;
+  aerzte: ArztDaten[];
+  artZusatzversicherung: string;
+  jahresbeitrag: string;
+  datenschutz1: boolean;
+  datenschutz2: boolean;
 }
 
 export interface FormData {
@@ -55,7 +76,30 @@ export interface FormData {
   
   // Unterschrift der Familienangehörigen
   unterschriftFamilie: string;
+  
+  // Rundum-Sicher-Paket
+  rundumSicherPaket: RundumSicherPaketData;
+  
+  // Mitglied Versichertennummer für Rundum-Sicher-Paket
+  mitgliedVersichertennummer: string;
 }
+
+export const createEmptyArztDaten = (): ArztDaten => ({
+  name: '',
+  ort: '',
+});
+
+export const createEmptyRundumSicherPaket = (): RundumSicherPaketData => ({
+  iban: '',
+  kontoinhaber: '',
+  zeitraumVon: '',
+  zeitraumBis: '',
+  aerzte: [createEmptyArztDaten(), createEmptyArztDaten(), createEmptyArztDaten()],
+  artZusatzversicherung: '',
+  jahresbeitrag: '',
+  datenschutz1: false,
+  datenschutz2: false,
+});
 
 export const createEmptyFamilyMember = (): FamilyMember => ({
   name: '',
@@ -76,6 +120,7 @@ export const createEmptyFamilyMember = (): FamilyMember => ({
   geburtsort: '',
   geburtsland: '',
   staatsangehoerigkeit: '',
+  versichertennummer: '',
 });
 
 export const createInitialFormData = (): FormData => {
@@ -114,5 +159,7 @@ export const createInitialFormData = (): FormData => {
     kinder: [],
     unterschrift: '',
     unterschriftFamilie: '',
+    rundumSicherPaket: createEmptyRundumSicherPaket(),
+    mitgliedVersichertennummer: '',
   };
 };

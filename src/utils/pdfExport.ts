@@ -271,6 +271,67 @@ const createFilledPDF = async (
   return await pdfDoc.save();
 };
 
+// === Rundum-Sicher-Paket PDF ===
+interface PersonInfo {
+  vorname: string;
+  name: string;
+  geburtsdatum: string;
+  versichertennummer: string;
+  type: 'mitglied' | 'ehegatte' | 'kind';
+  kindIndex?: number;
+}
+
+const createRundumSicherPaketPDF = async (
+  formData: FormData,
+  person: PersonInfo
+): Promise<Uint8Array> => {
+  const pdfUrl = '/rundum-sicher-paket.pdf';
+  const existingPdfBytes = await fetch(pdfUrl).then(res => res.arrayBuffer());
+  const pdfDoc = await PDFDocument.load(existingPdfBytes);
+  const form = pdfDoc.getForm();
+  const helpers = createPDFHelpers(form);
+  const { setTextField, setCheckbox } = helpers;
+  
+  const datumFormatted = formatInputDate(formData.datum);
+  const rsp = formData.rundumSicherPaket;
+
+  // Person-Daten
+  setTextField('Vorname', person.vorname);
+  setTextField('Name', person.name);
+  setTextField('Versichertennummer', person.versichertennummer);
+  setTextField('Geburtsdatum', formatInputDate(person.geburtsdatum));
+
+  // Bankdaten
+  setTextField('IBAN', rsp.iban);
+  setTextField('Name des Kontoinhabers', rsp.kontoinhaber);
+
+  // Zeitraum
+  const zeitraumVon = formatInputDate(rsp.zeitraumVon);
+  const zeitraumBis = formatInputDate(rsp.zeitraumBis);
+  setTextField('Zeitraum', `${zeitraumVon} - ${zeitraumBis}`);
+
+  // Ärzte
+  rsp.aerzte.forEach((arzt, index) => {
+    const num = index + 1;
+    setTextField(`Name Arzt ${num}`, arzt.name);
+    setTextField(`Ort Arzt ${num}`, arzt.ort);
+  });
+
+  // Zusatzversicherung
+  setTextField('Art Zusatzversicherung', rsp.artZusatzversicherung);
+  setTextField('Jahresbeitrag', rsp.jahresbeitrag);
+  
+  // Datum
+  setTextField('Datum Makler', datumFormatted);
+  setTextField('Datum', datumFormatted);
+
+  // Datenschutz
+  setCheckbox('Datenschutz 1', rsp.datenschutz1);
+  setCheckbox('Datenschutz 2', rsp.datenschutz2);
+
+  return await pdfDoc.save();
+};
+
 const downloadPDF = (pdfBytes: Uint8Array, filename: string) => {
   const blob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
@@ -292,6 +353,7 @@ export const exportFilledPDF = async (formData: FormData): Promise<void> => {
     const children = formData.kinder;
     const numberOfPDFs = Math.max(1, Math.ceil(children.length / 3));
 
+    // Export Familienversicherung PDFs
     for (let pdfIndex = 0; pdfIndex < numberOfPDFs; pdfIndex++) {
       const startChildIndex = pdfIndex * 3;
       const childrenForThisPDF = children.slice(startChildIndex, startChildIndex + 3);
@@ -304,8 +366,52 @@ export const exportFilledPDF = async (formData: FormData): Promise<void> => {
 
       downloadPDF(pdfBytes, filename);
 
-      // Small delay between downloads to prevent browser blocking
-      if (pdfIndex < numberOfPDFs - 1) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    // Export Rundum-Sicher-Paket PDFs
+    const rundumBaseName = `Rundum-Sicher-Paket_${datumFormatted.replace(/\./g, '-')}`;
+
+    // Mitglied
+    const mitgliedPerson: PersonInfo = {
+      vorname: formData.mitgliedVorname,
+      name: formData.mitgliedName,
+      geburtsdatum: formData.mitgliedGeburtsdatum,
+      versichertennummer: formData.mitgliedVersichertennummer,
+      type: 'mitglied'
+    };
+    const mitgliedRspBytes = await createRundumSicherPaketPDF(formData, mitgliedPerson);
+    downloadPDF(mitgliedRspBytes, `${rundumBaseName}_Mitglied_${formData.mitgliedName}.pdf`);
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Ehegatte
+    if (formData.ehegatte.name || formData.ehegatte.vorname) {
+      const ehegattePerson: PersonInfo = {
+        vorname: formData.ehegatte.vorname,
+        name: formData.ehegatte.name,
+        geburtsdatum: formData.ehegatte.geburtsdatum,
+        versichertennummer: formData.ehegatte.versichertennummer,
+        type: 'ehegatte'
+      };
+      const ehegatteRspBytes = await createRundumSicherPaketPDF(formData, ehegattePerson);
+      downloadPDF(ehegatteRspBytes, `${rundumBaseName}_Ehegatte_${formData.ehegatte.name}.pdf`);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    // Kinder
+    for (let i = 0; i < formData.kinder.length; i++) {
+      const kind = formData.kinder[i];
+      if (kind.name || kind.vorname) {
+        const kindPerson: PersonInfo = {
+          vorname: kind.vorname,
+          name: kind.name,
+          geburtsdatum: kind.geburtsdatum,
+          versichertennummer: kind.versichertennummer,
+          type: 'kind',
+          kindIndex: i + 1
+        };
+        const kindRspBytes = await createRundumSicherPaketPDF(formData, kindPerson);
+        downloadPDF(kindRspBytes, `${rundumBaseName}_Kind${i + 1}_${kind.name}.pdf`);
         await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
