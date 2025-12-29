@@ -150,7 +150,7 @@ const Index = () => {
           <div className="flex items-center gap-3 mb-2">
             <FileText className="h-8 w-8" />
             <h1 className="text-2xl md:text-3xl font-bold">
-              BKK-Smart Formular
+              BKK GS-Smart Formular
             </h1>
           </div>
           <p className="text-primary-foreground/80 text-sm md:text-base">
