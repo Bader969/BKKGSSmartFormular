@@ -292,8 +292,8 @@ const createRundumSicherPaketPDF = async (
   const helpers = createPDFHelpers(form);
   const { setTextField, setCheckbox } = helpers;
   
-  const datumFormatted = formatInputDate(formData.datum);
   const rsp = formData.rundumSicherPaket;
+  const datumFormatted = formatInputDate(rsp.datumRSP);
 
   // Person-Daten
   setTextField('Vorname', person.vorname);
@@ -310,18 +310,23 @@ const createRundumSicherPaketPDF = async (
   const zeitraumBis = formatInputDate(rsp.zeitraumBis);
   setTextField('Zeitraum', `${zeitraumVon} - ${zeitraumBis}`);
 
-  // Ärzte
-  rsp.aerzte.forEach((arzt, index) => {
-    const num = index + 1;
-    setTextField(`Name Arzt ${num}`, arzt.name);
-    setTextField(`Ort Arzt ${num}`, arzt.ort);
-  });
+  // Arzt - je nach Person unterschiedlich
+  let arzt = { name: '', ort: '' };
+  if (person.type === 'mitglied') {
+    arzt = rsp.arztMitglied;
+  } else if (person.type === 'ehegatte') {
+    arzt = rsp.arztEhegatte;
+  } else if (person.type === 'kind' && person.kindIndex !== undefined) {
+    arzt = rsp.aerzteKinder[person.kindIndex - 1] || { name: '', ort: '' };
+  }
+  setTextField('Name Arzt 1', arzt.name);
+  setTextField('Ort Arzt 1', arzt.ort);
 
   // Zusatzversicherung
   setTextField('Art Zusatzversicherung', rsp.artZusatzversicherung);
   setTextField('Jahresbeitrag', rsp.jahresbeitrag);
   
-  // Datum
+  // Datum (identisch für beide Felder)
   setTextField('Datum Makler', datumFormatted);
   setTextField('Datum', datumFormatted);
 
@@ -329,7 +334,57 @@ const createRundumSicherPaketPDF = async (
   setCheckbox('Datenschutz 1', rsp.datenschutz1);
   setCheckbox('Datenschutz 2', rsp.datenschutz2);
 
+  // Unterschriften einbetten
+  const pages = pdfDoc.getPages();
+  
+  // Makler-Unterschrift (neben "Datum Makler")
+  if (rsp.unterschriftMakler) {
+    await embedSignatureAtPosition(pdfDoc, rsp.unterschriftMakler, 400, 494, 1);
+  }
+  
+  // Person-Unterschrift (neben "Datum") - abhängig von der Person
+  let personSignature = '';
+  if (person.type === 'mitglied') {
+    personSignature = formData.unterschrift;
+  } else if (person.type === 'ehegatte') {
+    personSignature = formData.unterschriftFamilie;
+  } else if (person.type === 'kind') {
+    personSignature = formData.unterschrift; // Mitglied-Unterschrift für Kinder
+  }
+  
+  if (personSignature) {
+    await embedSignatureAtPosition(pdfDoc, personSignature, 160, 713, 1);
+  }
+
   return await pdfDoc.save();
+};
+
+const embedSignatureAtPosition = async (
+  pdfDoc: PDFDocument,
+  signatureData: string,
+  x: number,
+  y: number,
+  pageIndex: number
+) => {
+  if (!signatureData) return;
+
+  try {
+    const pages = pdfDoc.getPages();
+    const page = pages[pageIndex];
+    const { height } = page.getSize();
+
+    const signatureImage = await pdfDoc.embedPng(signatureData);
+    const sigDims = signatureImage.scale(0.25);
+
+    page.drawImage(signatureImage, {
+      x,
+      y: height - y,
+      width: Math.min(sigDims.width, 100),
+      height: Math.min(sigDims.height, 35),
+    });
+  } catch (e) {
+    console.error('Could not embed signature:', e);
+  }
 };
 
 const downloadPDF = (pdfBytes: Uint8Array, filename: string) => {

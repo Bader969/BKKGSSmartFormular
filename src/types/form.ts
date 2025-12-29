@@ -34,11 +34,15 @@ export interface RundumSicherPaketData {
   kontoinhaber: string;
   zeitraumVon: string;
   zeitraumBis: string;
-  aerzte: ArztDaten[];
+  datumRSP: string; // Gemeinsames Datum für "Datum Makler" und "Datum"
+  arztMitglied: ArztDaten;
+  arztEhegatte: ArztDaten;
+  aerzteKinder: ArztDaten[];
   artZusatzversicherung: string;
   jahresbeitrag: string;
   datenschutz1: boolean;
   datenschutz2: boolean;
+  unterschriftMakler: string;
 }
 
 export interface FormData {
@@ -92,13 +96,17 @@ export const createEmptyArztDaten = (): ArztDaten => ({
 export const createEmptyRundumSicherPaket = (): RundumSicherPaketData => ({
   iban: '',
   kontoinhaber: '',
-  zeitraumVon: '',
-  zeitraumBis: '',
-  aerzte: [createEmptyArztDaten(), createEmptyArztDaten(), createEmptyArztDaten()],
+  zeitraumVon: '2026-01-01',
+  zeitraumBis: '2026-12-31',
+  datumRSP: '2026-01-10',
+  arztMitglied: createEmptyArztDaten(),
+  arztEhegatte: createEmptyArztDaten(),
+  aerzteKinder: [],
   artZusatzversicherung: '',
   jahresbeitrag: '',
   datenschutz1: false,
   datenschutz2: false,
+  unterschriftMakler: '',
 });
 
 export const createEmptyFamilyMember = (): FamilyMember => ({

@@ -1,7 +1,8 @@
 import React from 'react';
 import { FormSection } from './FormSection';
 import { FormField } from './FormField';
-import { FormData, RundumSicherPaketData, ArztDaten } from '@/types/form';
+import { SignaturePad } from './SignaturePad';
+import { FormData, RundumSicherPaketData, ArztDaten, createEmptyArztDaten } from '@/types/form';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 
@@ -20,10 +21,14 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
     });
   };
 
-  const updateArzt = (index: number, updates: Partial<ArztDaten>) => {
-    const newAerzte = [...formData.rundumSicherPaket.aerzte];
-    newAerzte[index] = { ...newAerzte[index], ...updates };
-    updateRundumSicherPaket({ aerzte: newAerzte });
+  const updateArztKind = (index: number, updates: Partial<ArztDaten>) => {
+    const newAerzteKinder = [...formData.rundumSicherPaket.aerzteKinder];
+    // Ensure array is large enough
+    while (newAerzteKinder.length <= index) {
+      newAerzteKinder.push(createEmptyArztDaten());
+    }
+    newAerzteKinder[index] = { ...newAerzteKinder[index], ...updates };
+    updateRundumSicherPaket({ aerzteKinder: newAerzteKinder });
   };
 
   return (
@@ -97,7 +102,21 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
         </div>
       </div>
 
-      {/* Zeitraum */}
+      {/* Datum (pre-filled mit 10.01.2026) */}
+      <div className="space-y-4 mb-6">
+        <h4 className="font-medium text-foreground">Datum</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            type="date"
+            label="Datum (für Makler & Unterschrift)"
+            id="datumRSP"
+            value={formData.rundumSicherPaket.datumRSP}
+            onChange={(value) => updateRundumSicherPaket({ datumRSP: value })}
+          />
+        </div>
+      </div>
+
+      {/* Zeitraum (pre-filled) */}
       <div className="space-y-4 mb-6">
         <h4 className="font-medium text-foreground">Zeitraum</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -118,25 +137,77 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
         </div>
       </div>
 
-      {/* Ärzte */}
+      {/* Ärzte - pro Person */}
       <div className="space-y-4 mb-6">
         <h4 className="font-medium text-foreground">Ärzte (optional)</h4>
-        {formData.rundumSicherPaket.aerzte.map((arzt, index) => (
-          <div key={`arzt-${index}`} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        {/* Arzt für Mitglied */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            type="text"
+            label="Name Arzt (Mitglied)"
+            id="arztMitgliedName"
+            value={formData.rundumSicherPaket.arztMitglied.name}
+            onChange={(value) => updateRundumSicherPaket({ 
+              arztMitglied: { ...formData.rundumSicherPaket.arztMitglied, name: value }
+            })}
+            placeholder="Name des Arztes"
+          />
+          <FormField
+            type="text"
+            label="Ort Arzt (Mitglied)"
+            id="arztMitgliedOrt"
+            value={formData.rundumSicherPaket.arztMitglied.ort}
+            onChange={(value) => updateRundumSicherPaket({ 
+              arztMitglied: { ...formData.rundumSicherPaket.arztMitglied, ort: value }
+            })}
+            placeholder="Ort"
+          />
+        </div>
+
+        {/* Arzt für Ehegatte (nur wenn vorhanden) */}
+        {(formData.ehegatte.name || formData.ehegatte.vorname) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               type="text"
-              label={`Name Arzt ${index + 1}`}
-              id={`nameArzt${index + 1}`}
-              value={arzt.name}
-              onChange={(value) => updateArzt(index, { name: value })}
+              label="Name Arzt (Ehegatte)"
+              id="arztEhegatteName"
+              value={formData.rundumSicherPaket.arztEhegatte.name}
+              onChange={(value) => updateRundumSicherPaket({ 
+                arztEhegatte: { ...formData.rundumSicherPaket.arztEhegatte, name: value }
+              })}
               placeholder="Name des Arztes"
             />
             <FormField
               type="text"
-              label={`Ort Arzt ${index + 1}`}
-              id={`ortArzt${index + 1}`}
-              value={arzt.ort}
-              onChange={(value) => updateArzt(index, { ort: value })}
+              label="Ort Arzt (Ehegatte)"
+              id="arztEhegatteOrt"
+              value={formData.rundumSicherPaket.arztEhegatte.ort}
+              onChange={(value) => updateRundumSicherPaket({ 
+                arztEhegatte: { ...formData.rundumSicherPaket.arztEhegatte, ort: value }
+              })}
+              placeholder="Ort"
+            />
+          </div>
+        )}
+
+        {/* Ärzte für Kinder */}
+        {formData.kinder.map((kind, index) => (
+          <div key={`arzt-kind-${index}`} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              type="text"
+              label={`Name Arzt (Kind ${index + 1})`}
+              id={`arztKindName${index}`}
+              value={formData.rundumSicherPaket.aerzteKinder[index]?.name || ''}
+              onChange={(value) => updateArztKind(index, { name: value })}
+              placeholder="Name des Arztes"
+            />
+            <FormField
+              type="text"
+              label={`Ort Arzt (Kind ${index + 1})`}
+              id={`arztKindOrt${index}`}
+              value={formData.rundumSicherPaket.aerzteKinder[index]?.ort || ''}
+              onChange={(value) => updateArztKind(index, { ort: value })}
               placeholder="Ort"
             />
           </div>
@@ -164,6 +235,15 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
             placeholder="z.B. 120,00 €"
           />
         </div>
+      </div>
+
+      {/* Unterschrift Makler */}
+      <div className="space-y-4 mb-6">
+        <h4 className="font-medium text-foreground">Unterschrift Makler</h4>
+        <SignaturePad
+          signature={formData.rundumSicherPaket.unterschriftMakler}
+          onSignatureChange={(sig) => updateRundumSicherPaket({ unterschriftMakler: sig })}
+        />
       </div>
 
       {/* Datenschutz */}
