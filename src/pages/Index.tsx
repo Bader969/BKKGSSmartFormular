@@ -34,14 +34,68 @@ const Index = () => {
   };
   
   const handleExport = async () => {
-    // Validierung
+    // Validierung Mitglied
     if (!formData.mitgliedName || !formData.mitgliedVorname) {
-      toast.error('Bitte geben Sie mindestens Name und Vorname des Mitglieds ein.');
+      toast.error('Bitte geben Sie Name und Vorname des Mitglieds ein.');
+      return;
+    }
+    
+    if (!formData.mitgliedGeburtsdatum) {
+      toast.error('Bitte geben Sie das Geburtsdatum des Mitglieds ein.');
+      return;
+    }
+    
+    if (!formData.mitgliedKvNummer) {
+      toast.error('Bitte geben Sie die KV-Nummer ein.');
+      return;
+    }
+    
+    if (!formData.mitgliedKrankenkasse) {
+      toast.error('Bitte geben Sie den Namen der Krankenkasse ein.');
+      return;
+    }
+    
+    if (!formData.familienstand) {
+      toast.error('Bitte wählen Sie den Familienstand aus.');
+      return;
+    }
+    
+    if (!formData.ort) {
+      toast.error('Bitte geben Sie den Ort ein.');
       return;
     }
     
     if (!formData.unterschrift) {
       toast.error('Bitte unterschreiben Sie das Formular.');
+      return;
+    }
+    
+    // Rundum-Sicher-Paket Validierung
+    if (!formData.rundumSicherPaket.zusatzversicherung1) {
+      toast.error('Bitte wählen Sie Zusatzversicherung 1 (Pflicht) aus.');
+      return;
+    }
+    
+    // Jahresbeitrag min. 300€
+    const jahresbeitragClean = formData.rundumSicherPaket.jahresbeitrag.replace(/[€\s]/g, '').replace(',', '.');
+    const jahresbeitragAmount = parseFloat(jahresbeitragClean);
+    if (isNaN(jahresbeitragAmount) || jahresbeitragAmount < 300) {
+      toast.error('Der Jahresbeitrag muss mindestens 300 € betragen.');
+      return;
+    }
+    
+    if (!formData.rundumSicherPaket.iban) {
+      toast.error('Bitte geben Sie die IBAN ein.');
+      return;
+    }
+    
+    if (!formData.rundumSicherPaket.kontoinhaber) {
+      toast.error('Bitte geben Sie den Namen des Kontoinhabers ein.');
+      return;
+    }
+    
+    if (!formData.rundumSicherPaket.unterschriftMakler) {
+      toast.error('Bitte fügen Sie die Unterschrift des Maklers hinzu.');
       return;
     }
     
