@@ -1,6 +1,7 @@
 import { PDFDocument } from 'pdf-lib';
 import { FormData, FamilyMember } from '@/types/form';
 import { calculateDates } from './dateUtils';
+import { generateHandwrittenSignature } from './signatureGenerator';
 
 const formatInputDate = (dateStr: string): string => {
   if (!dateStr) return '';
@@ -259,14 +260,18 @@ const createFilledPDF = async (
   // Fill spouse fields
   fillSpouseFields(formData, helpers, endDate);
 
-  // Fill children fields (max 3 per PDF)
-  childrenForThisPDF.forEach((kind, index) => {
-    fillChildFields(kind, index, helpers, endDate, formData);
-  });
-
-  // Embed signatures
-  await embedSignature(pdfDoc, formData.unterschrift, 200, 715, 1);
-  await embedSignature(pdfDoc, formData.unterschriftFamilie, 400, 715, 1);
+  // Generiere und bette Unterschriften ein
+  // Unterschrift des Mitglieds (aus Nachname generiert)
+  if (formData.mitgliedName) {
+    const memberSignature = await generateHandwrittenSignature(formData.mitgliedName);
+    await embedSignature(pdfDoc, memberSignature, 200, 715, 1);
+  }
+  
+  // Unterschrift der Familienangehörigen (aus Ehegatte-Nachname generiert)
+  if (formData.ehegatte.name) {
+    const spouseSignature = await generateHandwrittenSignature(formData.ehegatte.name);
+    await embedSignature(pdfDoc, spouseSignature, 400, 715, 1);
+  }
 
   return await pdfDoc.save();
 };
