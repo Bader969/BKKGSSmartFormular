@@ -224,16 +224,19 @@ const embedSignature = async (
   try {
     const pages = pdfDoc.getPages();
     const page = pages[pageIndex];
-    const { height } = page.getSize();
 
     const signatureImage = await pdfDoc.embedPng(signatureData);
-    const sigDims = signatureImage.scale(0.25);
+    const sigDims = signatureImage.scale(0.22);
+    
+    // Signature dimensions - smaller and positioned above the line
+    const sigWidth = Math.min(sigDims.width, 120);
+    const sigHeight = Math.min(sigDims.height, 35);
 
     page.drawImage(signatureImage, {
       x,
-      y: height - y,
-      width: Math.min(sigDims.width, 140),
-      height: Math.min(sigDims.height, 45),
+      y: y + 5, // Position slightly above the signature line
+      width: sigWidth,
+      height: sigHeight,
     });
   } catch (e) {
     console.error('Could not embed signature:', e);
@@ -262,15 +265,17 @@ const createFilledPDF = async (
 
   // Generiere und bette Unterschriften ein
   // Unterschrift des Mitglieds (aus Nachname generiert)
+  // Position: linke Unterschriftslinie, Y=95 (von unten gemessen)
   if (formData.mitgliedName) {
     const memberSignature = await generateHandwrittenSignature(formData.mitgliedName);
-    await embedSignature(pdfDoc, memberSignature, 200, 715, 1);
+    await embedSignature(pdfDoc, memberSignature, 85, 95, 1);
   }
   
   // Unterschrift der Familienangehörigen (aus Ehegatte-Nachname generiert)
+  // Position: rechte Unterschriftslinie, Y=95 (von unten gemessen)
   if (formData.ehegatte.name) {
     const spouseSignature = await generateHandwrittenSignature(formData.ehegatte.name);
-    await embedSignature(pdfDoc, spouseSignature, 400, 715, 1);
+    await embedSignature(pdfDoc, spouseSignature, 320, 95, 1);
   }
 
   return await pdfDoc.save();
