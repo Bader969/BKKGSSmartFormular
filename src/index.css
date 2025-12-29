@@ -38,17 +38,17 @@
 
     --radius: 0.5rem;
 
-    /* Section Colors - Harmonisches Farbschema */
+    /* Section Colors - Harmonisches Farbschema mit stärkerem Kontrast */
     --section-member: 217 70% 45%;
-    --section-member-bg: 217 60% 96%;
+    --section-member-bg: 217 55% 93%;
     --section-spouse: 173 55% 38%;
-    --section-spouse-bg: 173 45% 95%;
+    --section-spouse-bg: 173 45% 92%;
     --section-child: 43 85% 48%;
-    --section-child-bg: 43 70% 95%;
+    --section-child-bg: 43 65% 92%;
     --section-signature: 262 50% 52%;
-    --section-signature-bg: 262 40% 96%;
+    --section-signature-bg: 262 40% 93%;
     --section-info: 200 65% 42%;
-    --section-info-bg: 200 55% 95%;
+    --section-info-bg: 200 50% 92%;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
