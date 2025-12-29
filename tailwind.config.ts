@@ -47,6 +47,16 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        section: {
+          member: "hsl(var(--section-member))",
+          "member-bg": "hsl(var(--section-member-bg))",
+          spouse: "hsl(var(--section-spouse))",
+          "spouse-bg": "hsl(var(--section-spouse-bg))",
+          child: "hsl(var(--section-child))",
+          "child-bg": "hsl(var(--section-child-bg))",
+          signature: "hsl(var(--section-signature))",
+          "signature-bg": "hsl(var(--section-signature-bg))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -57,6 +67,9 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+      },
+      fontFamily: {
+        sans: ['"Source Sans 3"', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         lg: "var(--radius)",
