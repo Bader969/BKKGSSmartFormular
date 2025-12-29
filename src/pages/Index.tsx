@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FormData, FormMode, createInitialFormData } from '@/types/form';
 import { MemberSection } from '@/components/MemberSection';
 import { SpouseSection } from '@/components/SpouseSection';
@@ -11,6 +11,7 @@ import { exportFilledPDF, exportRundumSicherPaketOnly } from '@/utils/pdfExport'
 import { toast } from 'sonner';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { generateSignatureImage } from '@/utils/signatureGenerator';
 
 const Index = () => {
   const [formData, setFormData] = useState<FormData>(createInitialFormData);
@@ -40,27 +41,29 @@ const Index = () => {
       return;
     }
     
-    if (!formData.unterschrift) {
-      toast.error('Bitte unterschreiben Sie das Formular.');
-      return;
+    // Falls keine Unterschrift vorhanden, generiere eine aus dem Namen
+    let exportData = { ...formData };
+    if (!exportData.unterschrift && exportData.mitgliedName) {
+      const generatedSig = await generateSignatureImage(exportData.mitgliedName);
+      exportData = { ...exportData, unterschrift: generatedSig };
     }
     
     // Datenschutz-Validierung
-    if (!formData.rundumSicherPaket.datenschutz1 || !formData.rundumSicherPaket.datenschutz2) {
+    if (!exportData.rundumSicherPaket.datenschutz1 || !exportData.rundumSicherPaket.datenschutz2) {
       toast.error('Bitte stimmen Sie den Datenschutzbestimmungen zu.');
       return;
     }
     
     setIsExporting(true);
     try {
-      if (formData.mode === 'nur_rundum') {
+      if (exportData.mode === 'nur_rundum') {
         toast.info('Es wird 1 Rundum-Sicher-Paket-PDF erstellt.');
-        await exportRundumSicherPaketOnly(formData);
+        await exportRundumSicherPaketOnly(exportData);
       } else {
-        const numberOfPDFs = Math.max(1, Math.ceil(formData.kinder.length / 3));
-        const numberOfRundumPDFs = 1 + (formData.ehegatte.name ? 1 : 0) + formData.kinder.length;
+        const numberOfPDFs = Math.max(1, Math.ceil(exportData.kinder.length / 3));
+        const numberOfRundumPDFs = 1 + (exportData.ehegatte.name ? 1 : 0) + exportData.kinder.length;
         toast.info(`Es werden ${numberOfPDFs} Familienversicherungs-PDF(s) und ${numberOfRundumPDFs} Rundum-Sicher-Paket-PDF(s) erstellt.`);
-        await exportFilledPDF(formData);
+        await exportFilledPDF(exportData);
       }
       toast.success('PDF erfolgreich exportiert!');
     } catch (error) {

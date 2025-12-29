@@ -70,6 +70,7 @@ export default {
       },
       fontFamily: {
         sans: ['"Source Sans 3"', 'system-ui', 'sans-serif'],
+        signature: ['"Dancing Script"', 'cursive'],
       },
       borderRadius: {
         lg: "var(--radius)",

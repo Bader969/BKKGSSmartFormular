@@ -20,14 +20,27 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
   return (
     <FormSection title="Allgemeine Angaben des Mitglieds" variant="member">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <FormField
-          type="text"
-          label="Name"
-          id="mitgliedName"
-          value={formData.mitgliedName}
-          onChange={(value) => updateFormData({ mitgliedName: value })}
-          placeholder="Nachname"
-        />
+        <div>
+          <FormField
+            type="text"
+            label="Name"
+            id="mitgliedName"
+            value={formData.mitgliedName}
+            onChange={(value) => updateFormData({ mitgliedName: value })}
+            placeholder="Nachname"
+          />
+          {formData.mitgliedName && (
+            <div className="mt-2 p-3 bg-card/50 rounded-lg border border-border/50">
+              <p className="text-xs text-muted-foreground mb-1">Vorschau der Unterschrift:</p>
+              <p 
+                className="font-signature text-2xl italic"
+                style={{ color: '#1a4d80' }}
+              >
+                {formData.mitgliedName}
+              </p>
+            </div>
+          )}
+        </div>
         <FormField
           type="text"
           label="Vorname"
