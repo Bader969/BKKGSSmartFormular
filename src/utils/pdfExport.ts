@@ -352,7 +352,7 @@ const createRundumSicherPaketPDF = async (formData: FormData, person: PersonInfo
   }
 
   if (personSignature) {
-    await embedSignatureAtPosition(pdfDoc, personSignature, 160, 700, 1);
+    await embedSignatureAtPosition(pdfDoc, personSignature, 160, 713, 1);
   }
 
   return await pdfDoc.save();
@@ -373,13 +373,20 @@ const embedSignatureAtPosition = async (
     const { height } = page.getSize();
 
     const signatureImage = await pdfDoc.embedPng(signatureData);
+    
+    // Wir definieren die Zielhöhe fest, um mit der Positionierung zu rechnen
+    const targetHeight = 35; 
     const sigDims = signatureImage.scale(0.25);
+    const finalWidth = Math.min(sigDims.width, 100);
+    const finalHeight = Math.min(sigDims.height, targetHeight);
 
     page.drawImage(signatureImage, {
       x,
-      y: height - y,
-      width: Math.min(sigDims.width, 100),
-      height: Math.min(sigDims.height, 35),
+      // Korrektur: Wir ziehen die finalHeight ab, damit die Unterschrift AUF der Linie steht
+      // Und wir nutzen den exakten CSV-Wert
+      y: height - y - finalHeight + 5, // +5 als kleiner Puffer nach oben
+      width: finalWidth,
+      height: finalHeight,
     });
   } catch (e) {
     console.error("Could not embed signature:", e);
