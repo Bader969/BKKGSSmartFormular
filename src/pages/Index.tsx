@@ -16,6 +16,7 @@ import { LoginForm } from '@/components/LoginForm';
 const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [formData, setFormData] = useState<FormData>(createInitialFormData);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     const authStatus = sessionStorage.getItem('isAuthenticated');
@@ -31,7 +32,6 @@ const Index = () => {
   if (!isAuthenticated) {
     return <LoginForm onLogin={handleLogin} />;
   }
-  const [isExporting, setIsExporting] = useState(false);
   
   const updateFormData = (updates: Partial<FormData>) => {
     setFormData(prev => {
