@@ -45,7 +45,12 @@ export interface RundumSicherPaketData {
   unterschriftMakler: string;
 }
 
+export type FormMode = 'familienversicherung_und_rundum' | 'nur_rundum';
+
 export interface FormData {
+  // Formular-Modus
+  mode: FormMode;
+  
   // Mitglied Angaben
   mitgliedName: string;
   mitgliedVorname: string;
@@ -151,6 +156,7 @@ export const createInitialFormData = (): FormData => {
   };
 
   return {
+    mode: 'familienversicherung_und_rundum',
     mitgliedName: '',
     mitgliedVorname: '',
     mitgliedGeburtsdatum: '',

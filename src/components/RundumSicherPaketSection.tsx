@@ -31,10 +31,15 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
     updateRundumSicherPaket({ aerzteKinder: newAerzteKinder });
   };
 
+  const isNurRundumMode = formData.mode === 'nur_rundum';
+
   return (
     <FormSection title="Rundum-Sicher-Paket (Zusatzversicherung)" variant="info">
       <p className="text-sm text-muted-foreground mb-4">
-        Diese Angaben werden für jede versicherte Person (Mitglied, Ehegatte, Kinder) als separates PDF erstellt.
+        {isNurRundumMode 
+          ? 'Diese Angaben werden für das Mitglied als PDF erstellt.'
+          : 'Diese Angaben werden für jede versicherte Person (Mitglied, Ehegatte, Kinder) als separates PDF erstellt.'
+        }
       </p>
 
       {/* Versichertennummern */}
@@ -49,7 +54,7 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
             onChange={(value) => updateFormData({ mitgliedVersichertennummer: value })}
             placeholder="Versichertennummer"
           />
-          {(formData.ehegatte.name || formData.ehegatte.vorname) && (
+          {!isNurRundumMode && (formData.ehegatte.name || formData.ehegatte.vorname) && (
             <FormField
               type="text"
               label="Versichertennr. Ehegatte"
@@ -61,7 +66,7 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
               placeholder="Versichertennummer"
             />
           )}
-          {formData.kinder.map((kind, index) => (
+          {!isNurRundumMode && formData.kinder.map((kind, index) => (
             <FormField
               key={`kind-versichertennr-${index}`}
               type="text"
@@ -165,8 +170,8 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
           />
         </div>
 
-        {/* Arzt für Ehegatte (nur wenn vorhanden) */}
-        {(formData.ehegatte.name || formData.ehegatte.vorname) && (
+        {/* Arzt für Ehegatte (nur wenn vorhanden und nicht nur Rundum-Modus) */}
+        {!isNurRundumMode && (formData.ehegatte.name || formData.ehegatte.vorname) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               type="text"
@@ -192,7 +197,7 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
         )}
 
         {/* Ärzte für Kinder */}
-        {formData.kinder.map((kind, index) => (
+        {!isNurRundumMode && formData.kinder.map((kind, index) => (
           <div key={`arzt-kind-${index}`} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               type="text"
