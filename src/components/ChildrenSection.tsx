@@ -69,32 +69,35 @@ export const ChildrenSection: React.FC<ChildrenSectionProps> = ({ formData, upda
                 childIndex={index + 1}
               />
               
-              {/* Pre-filled Felder anzeigen (automatisch vom Antragsteller) */}
+              {/* Pre-filled Felder anzeigen (vom Antragsteller - bearbeitbar) */}
               <div className="mt-4 p-4 bg-card/50 rounded-lg border">
-                <p className="text-sm text-muted-foreground mb-3">Automatisch ausgefüllte Felder (vom Antragsteller):</p>
+                <p className="text-sm text-muted-foreground mb-3">Vorausgefüllte Felder (vom Antragsteller - bearbeitbar):</p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-muted-foreground">Krankenkasse (Kind)</Label>
+                    <Label className="text-sm font-medium">Krankenkasse (Kind)</Label>
                     <Input 
-                      value={formData.mitgliedKrankenkasse || ''} 
-                      disabled 
-                      className="bg-muted/50"
+                      value={kind.bisherigBestandBei || formData.mitgliedKrankenkasse || ''} 
+                      onChange={(e) => updateKind(index, { bisherigBestandBei: e.target.value })}
+                      placeholder="Krankenkasse"
+                      className="bg-card"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-muted-foreground">Vorname (letzte Vers.)</Label>
+                    <Label className="text-sm font-medium">Vorname (letzte Vers.)</Label>
                     <Input 
-                      value={formData.mitgliedVorname || ''} 
-                      disabled 
-                      className="bg-muted/50"
+                      value={kind.bisherigVorname || formData.mitgliedVorname || ''} 
+                      onChange={(e) => updateKind(index, { bisherigVorname: e.target.value })}
+                      placeholder="Vorname"
+                      className="bg-card"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-muted-foreground">Nachname (letzte Vers.)</Label>
+                    <Label className="text-sm font-medium">Nachname (letzte Vers.)</Label>
                     <Input 
-                      value={formData.mitgliedName || ''} 
-                      disabled 
-                      className="bg-muted/50"
+                      value={kind.bisherigNachname || formData.mitgliedName || ''} 
+                      onChange={(e) => updateKind(index, { bisherigNachname: e.target.value })}
+                      placeholder="Nachname"
+                      className="bg-card"
                     />
                   </div>
                 </div>
