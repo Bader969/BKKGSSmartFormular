@@ -133,11 +133,12 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
         <h4 className="font-medium mb-3 text-sm">Bisherige Versicherung (vorausgefüllt - bearbeitbar):</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
-            type="date"
+            type="text"
             label="Bisherige Versicherung endete am"
             id={`${prefix}-endeteAm`}
             value={member.bisherigEndeteAm || endDate}
             onChange={(value) => updateMember({ bisherigEndeteAm: value })}
+            placeholder="TT.MM.JJJJ"
           />
           <div className="space-y-2">
             <FormField
