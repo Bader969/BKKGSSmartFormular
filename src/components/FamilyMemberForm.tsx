@@ -110,11 +110,11 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField
           type="text"
-          label="KV-Nummer"
-          id={`${prefix}-kvNummer`}
-          value={member.abweichendeAnschrift}
-          onChange={(value) => updateMember({ abweichendeAnschrift: value })}
-          placeholder="Krankenversicherungsnummer"
+          label="Versichertennummer"
+          id={`${prefix}-versichertennummer`}
+          value={member.versichertennummer}
+          onChange={(value) => updateMember({ versichertennummer: value })}
+          placeholder="Versichertennummer"
         />
         {type === 'child' && (
           <FormField
