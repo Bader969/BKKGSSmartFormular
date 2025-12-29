@@ -36,6 +36,12 @@ const Index = () => {
       return;
     }
     
+    // Datenschutz-Validierung
+    if (!formData.rundumSicherPaket.datenschutz1 || !formData.rundumSicherPaket.datenschutz2) {
+      toast.error('Bitte stimmen Sie den Datenschutzbestimmungen zu.');
+      return;
+    }
+    
     setIsExporting(true);
     try {
       if (formData.mode === 'nur_rundum') {

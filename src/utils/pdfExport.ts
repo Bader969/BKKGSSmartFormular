@@ -465,13 +465,13 @@ export const exportFilledPDF = async (formData: FormData): Promise<void> => {
     downloadPDF(mitgliedRspBytes, `${rundumBaseName}_Mitglied_${formData.mitgliedName}.pdf`);
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Ehegatte
+    // Ehegatte - KV-Nummer und Versichertennummer vom Mitglied übernehmen
     if (formData.ehegatte.name || formData.ehegatte.vorname) {
       const ehegattePerson: PersonInfo = {
         vorname: formData.ehegatte.vorname,
         name: formData.ehegatte.name,
         geburtsdatum: formData.ehegatte.geburtsdatum,
-        versichertennummer: formData.ehegatte.versichertennummer,
+        versichertennummer: formData.mitgliedVersichertennummer, // Vom Mitglied übernommen
         type: "ehegatte",
       };
       const ehegatteRspBytes = await createRundumSicherPaketPDF(formData, ehegattePerson);
@@ -479,7 +479,7 @@ export const exportFilledPDF = async (formData: FormData): Promise<void> => {
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    // Kinder
+    // Kinder - KV-Nummer und Versichertennummer vom Mitglied übernehmen
     for (let i = 0; i < formData.kinder.length; i++) {
       const kind = formData.kinder[i];
       if (kind.name || kind.vorname) {
@@ -487,7 +487,7 @@ export const exportFilledPDF = async (formData: FormData): Promise<void> => {
           vorname: kind.vorname,
           name: kind.name,
           geburtsdatum: kind.geburtsdatum,
-          versichertennummer: kind.versichertennummer,
+          versichertennummer: formData.mitgliedVersichertennummer, // Vom Mitglied übernommen
           type: "kind",
           kindIndex: i + 1,
         };

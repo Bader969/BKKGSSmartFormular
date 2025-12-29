@@ -42,9 +42,12 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
         }
       </p>
 
-      {/* Versichertennummern */}
+      {/* Versichertennummern - automatisch von Mitglied kopiert */}
       <div className="space-y-4 mb-6">
         <h4 className="font-medium text-foreground">Versichertennummern</h4>
+        <p className="text-xs text-muted-foreground">
+          {!isNurRundumMode && 'KV-Nummer und Versichertennummer werden automatisch vom Mitglied übernommen.'}
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <FormField
             type="text"
@@ -54,33 +57,6 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
             onChange={(value) => updateFormData({ mitgliedVersichertennummer: value })}
             placeholder="Versichertennummer"
           />
-          {!isNurRundumMode && (formData.ehegatte.name || formData.ehegatte.vorname) && (
-            <FormField
-              type="text"
-              label="Versichertennr. Ehegatte"
-              id="ehegatteVersichertennummer"
-              value={formData.ehegatte.versichertennummer}
-              onChange={(value) => updateFormData({
-                ehegatte: { ...formData.ehegatte, versichertennummer: value }
-              })}
-              placeholder="Versichertennummer"
-            />
-          )}
-          {!isNurRundumMode && formData.kinder.map((kind, index) => (
-            <FormField
-              key={`kind-versichertennr-${index}`}
-              type="text"
-              label={`Versichertennr. Kind ${index + 1}`}
-              id={`kindVersichertennummer${index}`}
-              value={kind.versichertennummer}
-              onChange={(value) => {
-                const newKinder = [...formData.kinder];
-                newKinder[index] = { ...newKinder[index], versichertennummer: value };
-                updateFormData({ kinder: newKinder });
-              }}
-              placeholder="Versichertennummer"
-            />
-          ))}
         </div>
       </div>
 
@@ -251,18 +227,19 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
         />
       </div>
 
-      {/* Datenschutz */}
+      {/* Datenschutz - Pflichtfelder */}
       <div className="space-y-4">
-        <h4 className="font-medium text-foreground">Datenschutz</h4>
+        <h4 className="font-medium text-foreground">Datenschutz <span className="text-destructive">*</span></h4>
         <div className="space-y-3">
           <div className="flex items-start space-x-3">
             <Checkbox
               id="datenschutz1"
               checked={formData.rundumSicherPaket.datenschutz1}
               onCheckedChange={(checked) => updateRundumSicherPaket({ datenschutz1: checked === true })}
+              required
             />
             <Label htmlFor="datenschutz1" className="text-sm leading-relaxed cursor-pointer">
-              Ich bin damit einverstanden, dass meine Daten zur Bearbeitung des Antrags verwendet werden.
+              Ich bin damit einverstanden, dass meine Daten zur Bearbeitung des Antrags verwendet werden. <span className="text-destructive">*</span>
             </Label>
           </div>
           <div className="flex items-start space-x-3">
@@ -270,12 +247,14 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
               id="datenschutz2"
               checked={formData.rundumSicherPaket.datenschutz2}
               onCheckedChange={(checked) => updateRundumSicherPaket({ datenschutz2: checked === true })}
+              required
             />
             <Label htmlFor="datenschutz2" className="text-sm leading-relaxed cursor-pointer">
-              Ich bin damit einverstanden, dass meine Gesundheitsdaten an Dritte weitergegeben werden dürfen.
+              Ich bin damit einverstanden, dass meine Gesundheitsdaten an Dritte weitergegeben werden dürfen. <span className="text-destructive">*</span>
             </Label>
           </div>
         </div>
+        <p className="text-xs text-muted-foreground">* Pflichtfelder - Diese Zustimmungen sind für den Antrag erforderlich.</p>
       </div>
     </FormSection>
   );
