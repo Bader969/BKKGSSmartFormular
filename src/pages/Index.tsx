@@ -4,6 +4,7 @@ import { MemberSection } from '@/components/MemberSection';
 import { SpouseSection } from '@/components/SpouseSection';
 import { ChildrenSection } from '@/components/ChildrenSection';
 import { SignatureSection } from '@/components/SignatureSection';
+import { RundumSicherPaketSection } from '@/components/RundumSicherPaketSection';
 import { Button } from '@/components/ui/button';
 import { FileDown, FileText, AlertCircle } from 'lucide-react';
 import { exportFilledPDF } from '@/utils/pdfExport';
@@ -30,9 +31,9 @@ const Index = () => {
     }
     
     const numberOfPDFs = Math.max(1, Math.ceil(formData.kinder.length / 3));
-    if (numberOfPDFs > 1) {
-      toast.info(`Es werden ${numberOfPDFs} PDFs erstellt (je max. 3 Kinder pro PDF).`);
-    }
+    const numberOfRundumPDFs = 1 + (formData.ehegatte.name ? 1 : 0) + formData.kinder.length;
+    
+    toast.info(`Es werden ${numberOfPDFs} Familienversicherungs-PDF(s) und ${numberOfRundumPDFs} Rundum-Sicher-Paket-PDF(s) erstellt.`);
     
     setIsExporting(true);
     try {
@@ -81,6 +82,7 @@ const Index = () => {
           <MemberSection formData={formData} updateFormData={updateFormData} />
           <SpouseSection formData={formData} updateFormData={updateFormData} />
           <ChildrenSection formData={formData} updateFormData={updateFormData} />
+          <RundumSicherPaketSection formData={formData} updateFormData={updateFormData} />
           <SignatureSection formData={formData} updateFormData={updateFormData} />
           
           {/* Export Button */}
