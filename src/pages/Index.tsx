@@ -20,39 +20,9 @@ const Index = () => {
     setFormData(prev => {
       const newData = { ...prev, ...updates };
       
-      // Automatische Synchronisierung der KV-Nummer zur Versichertennummer
+      // Automatische Synchronisierung der KV-Nummer zur Mitglied-Versichertennummer
       if ('mitgliedKvNummer' in updates) {
         newData.mitgliedVersichertennummer = updates.mitgliedKvNummer as string;
-        
-        // Auch auf Ehegatte und Kinder übertragen
-        if (newData.ehegatte) {
-          newData.ehegatte = {
-            ...newData.ehegatte,
-            versichertennummer: updates.mitgliedKvNummer as string
-          };
-        }
-        if (newData.kinder && newData.kinder.length > 0) {
-          newData.kinder = newData.kinder.map(kind => ({
-            ...kind,
-            versichertennummer: updates.mitgliedKvNummer as string
-          }));
-        }
-      }
-      
-      // Wenn Versichertennummer direkt geändert wird, auch auf Ehegatte und Kinder übertragen
-      if ('mitgliedVersichertennummer' in updates) {
-        if (newData.ehegatte) {
-          newData.ehegatte = {
-            ...newData.ehegatte,
-            versichertennummer: newData.mitgliedVersichertennummer
-          };
-        }
-        if (newData.kinder && newData.kinder.length > 0) {
-          newData.kinder = newData.kinder.map(kind => ({
-            ...kind,
-            versichertennummer: newData.mitgliedVersichertennummer
-          }));
-        }
       }
       
       return newData;
