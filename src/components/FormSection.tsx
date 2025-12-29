@@ -7,31 +7,32 @@ interface FormSectionProps {
   children: React.ReactNode;
 }
 
+// Elegante, harmonische Farbpalette mit sanften, professionellen Tönen
 const variantStyles = {
   member: {
-    cardBg: '#c7ddf5',
-    borderColor: '#1d4ed8',
-    titleColor: '#1d4ed8'
+    cardBg: '#f0f4f8',
+    borderColor: '#4a6fa5',
+    titleColor: '#3d5a80'
   },
   spouse: {
-    cardBg: '#b8e8e0',
-    borderColor: '#0d9488',
-    titleColor: '#0d9488'
+    cardBg: '#f2f7f5',
+    borderColor: '#6b9080',
+    titleColor: '#4a7c67'
   },
   child: {
-    cardBg: '#fde68a',
-    borderColor: '#ca8a04',
-    titleColor: '#a16207'
+    cardBg: '#fef9f3',
+    borderColor: '#d4a373',
+    titleColor: '#b08650'
   },
   signature: {
-    cardBg: '#ddd6f3',
-    borderColor: '#7c3aed',
-    titleColor: '#7c3aed'
+    cardBg: '#f5f3f7',
+    borderColor: '#8e7ba4',
+    titleColor: '#6b5a82'
   },
   info: {
-    cardBg: '#bae6fd',
-    borderColor: '#0284c7',
-    titleColor: '#0284c7'
+    cardBg: '#f3f6f9',
+    borderColor: '#7895a8',
+    titleColor: '#5a7a8f'
   }
 };
 
