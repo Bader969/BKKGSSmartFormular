@@ -1,9 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { FormSection } from './FormSection';
 import { FormField } from './FormField';
-import { SignaturePad } from './SignaturePad';
+import { SignaturePreview } from './SignaturePreview';
 import { FormData } from '@/types/form';
-import { generateHandwrittenSignature } from '@/utils/signatureGenerator';
 
 interface SignatureSectionProps {
   formData: FormData;
@@ -11,26 +10,6 @@ interface SignatureSectionProps {
 }
 
 export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, updateFormData }) => {
-  // Pre-fill Unterschrift des Mitglieds mit dessen Nachnamen
-  useEffect(() => {
-    if (formData.mitgliedName && !formData.unterschrift) {
-      const signature = generateHandwrittenSignature(formData.mitgliedName);
-      if (signature) {
-        updateFormData({ unterschrift: signature });
-      }
-    }
-  }, [formData.mitgliedName]);
-
-  // Pre-fill Unterschrift der Familienangehörigen mit Nachnamen des Ehegatten
-  useEffect(() => {
-    if (formData.ehegatte.name && !formData.unterschriftFamilie) {
-      const signature = generateHandwrittenSignature(formData.ehegatte.name);
-      if (signature) {
-        updateFormData({ unterschriftFamilie: signature });
-      }
-    }
-  }, [formData.ehegatte.name]);
-
   return (
     <FormSection title="Ort, Datum und Unterschriften" variant="signature">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -52,38 +31,42 @@ export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, up
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Unterschrift des Mitglieds */}
         <div>
-          <label className="block text-sm font-medium mb-2">
-            Unterschrift des Mitglieds
-            {formData.mitgliedName && (
-              <span className="text-muted-foreground ml-2 font-normal">
-                (Vorausgefüllt: {formData.mitgliedName})
-              </span>
-            )}
-          </label>
-          <SignaturePad
-            signature={formData.unterschrift}
-            onSignatureChange={(sig) => updateFormData({ unterschrift: sig })}
+          <FormField
+            type="text"
+            label="Nachname des Mitglieds (für Unterschrift)"
+            id="unterschriftMitgliedName"
+            value={formData.mitgliedName}
+            onChange={(value) => updateFormData({ mitgliedName: value })}
+            placeholder="Nachname eingeben"
+          />
+          <SignaturePreview 
+            name={formData.mitgliedName} 
+            label="Unterschrift des Mitglieds" 
           />
         </div>
         
+        {/* Unterschrift der Familienangehörigen */}
         <div>
-          <label className="block text-sm font-medium mb-2">
-            ggf. Unterschrift der Familienangehörigen
-            {formData.ehegatte.name && (
-              <span className="text-muted-foreground ml-2 font-normal">
-                (Vorausgefüllt: {formData.ehegatte.name})
-              </span>
-            )}
-          </label>
-          <SignaturePad
-            signature={formData.unterschriftFamilie}
-            onSignatureChange={(sig) => updateFormData({ unterschriftFamilie: sig })}
+          <FormField
+            type="text"
+            label="Nachname des Ehegatten (für Unterschrift)"
+            id="unterschriftEhegatteName"
+            value={formData.ehegatte.name}
+            onChange={(value) => updateFormData({ 
+              ehegatte: { ...formData.ehegatte, name: value } 
+            })}
+            placeholder="Nachname eingeben"
+          />
+          <SignaturePreview 
+            name={formData.ehegatte.name} 
+            label="Unterschrift der Familienangehörigen" 
           />
         </div>
       </div>
       
-      <p className="mt-4 text-xs text-muted-foreground leading-relaxed">
+      <p className="mt-6 text-xs text-muted-foreground leading-relaxed">
         Mit der Unterschrift erkläre ich, die Zustimmung der Familienangehörigen zur Abgabe 
         der erforderlichen Daten erhalten zu haben. Ich bestätige die Richtigkeit der Angaben 
         und werde über Änderungen umgehend informieren.
@@ -91,3 +74,4 @@ export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, up
     </FormSection>
   );
 };
+
