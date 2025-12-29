@@ -38,15 +38,17 @@
 
     --radius: 0.5rem;
 
-    /* Section Colors */
-    --section-member: 210 80% 45%;
-    --section-member-bg: 210 80% 97%;
-    --section-spouse: 145 60% 40%;
-    --section-spouse-bg: 145 60% 97%;
-    --section-child: 35 90% 55%;
-    --section-child-bg: 35 90% 97%;
-    --section-signature: 280 60% 50%;
-    --section-signature-bg: 280 60% 97%;
+    /* Section Colors - Harmonisches Farbschema */
+    --section-member: 217 70% 45%;
+    --section-member-bg: 217 60% 96%;
+    --section-spouse: 173 55% 38%;
+    --section-spouse-bg: 173 45% 95%;
+    --section-child: 43 85% 48%;
+    --section-child-bg: 43 70% 95%;
+    --section-signature: 262 50% 52%;
+    --section-signature-bg: 262 40% 96%;
+    --section-info: 200 65% 42%;
+    --section-info-bg: 200 55% 95%;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -87,14 +89,16 @@
     --input: 220 15% 25%;
     --ring: 210 80% 55%;
 
-    --section-member: 210 80% 55%;
-    --section-member-bg: 210 50% 15%;
-    --section-spouse: 145 60% 45%;
-    --section-spouse-bg: 145 40% 15%;
-    --section-child: 35 90% 55%;
-    --section-child-bg: 35 50% 15%;
-    --section-signature: 280 60% 55%;
-    --section-signature-bg: 280 40% 15%;
+    --section-member: 217 70% 55%;
+    --section-member-bg: 217 40% 18%;
+    --section-spouse: 173 55% 45%;
+    --section-spouse-bg: 173 35% 16%;
+    --section-child: 43 85% 55%;
+    --section-child-bg: 43 50% 16%;
+    --section-signature: 262 50% 58%;
+    --section-signature-bg: 262 35% 17%;
+    --section-info: 200 65% 50%;
+    --section-info-bg: 200 40% 16%;
 
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
@@ -143,6 +147,11 @@
     background-color: hsl(var(--section-signature-bg));
   }
   
+  .section-info {
+    border-color: hsl(var(--section-info));
+    background-color: hsl(var(--section-info-bg));
+  }
+  
   .section-title {
     @apply text-lg font-semibold mb-4 pb-2 border-b;
   }
@@ -165,6 +174,11 @@
   .section-title-signature {
     color: hsl(var(--section-signature));
     border-color: hsl(var(--section-signature) / 0.3);
+  }
+  
+  .section-title-info {
+    color: hsl(var(--section-info));
+    border-color: hsl(var(--section-info) / 0.3);
   }
 
   .form-grid {

@@ -56,6 +56,8 @@ export default {
           "child-bg": "hsl(var(--section-child-bg))",
           signature: "hsl(var(--section-signature))",
           "signature-bg": "hsl(var(--section-signature-bg))",
+          info: "hsl(var(--section-info))",
+          "info-bg": "hsl(var(--section-info-bg))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
