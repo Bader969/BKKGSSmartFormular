@@ -70,6 +70,43 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
         />
       </div>
       
+      {type === 'child' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <FormField
+            type="text"
+            label="Geburtsname"
+            id={`${prefix}-geburtsname`}
+            value={member.geburtsname || member.name}
+            onChange={(value) => updateMember({ geburtsname: value })}
+            placeholder="Wird automatisch vom Nachnamen übernommen"
+          />
+          <FormField
+            type="text"
+            label="Geburtsort"
+            id={`${prefix}-geburtsort`}
+            value={member.geburtsort}
+            onChange={(value) => updateMember({ geburtsort: value })}
+            placeholder="z.B. Berlin"
+          />
+          <FormField
+            type="text"
+            label="Geburtsland"
+            id={`${prefix}-geburtsland`}
+            value={member.geburtsland}
+            onChange={(value) => updateMember({ geburtsland: value })}
+            placeholder="z.B. Deutschland"
+          />
+          <FormField
+            type="text"
+            label="Staatsangehörigkeit"
+            id={`${prefix}-staatsangehoerigkeit`}
+            value={member.staatsangehoerigkeit}
+            onChange={(value) => updateMember({ staatsangehoerigkeit: value })}
+            placeholder="z.B. Deutsch"
+          />
+        </div>
+      )}
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField
           type="text"

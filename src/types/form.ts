@@ -13,6 +13,11 @@ export interface FamilyMember {
   bisherigNachname: string;
   bisherigBestehtWeiter: boolean;
   bisherigBestehtWeiterBei: string;
+  // Neue Felder für Kinder
+  geburtsname: string;
+  geburtsort: string;
+  geburtsland: string;
+  staatsangehoerigkeit: string;
 }
 
 export interface FormData {
@@ -20,7 +25,6 @@ export interface FormData {
   mitgliedName: string;
   mitgliedVorname: string;
   mitgliedGeburtsdatum: string;
-  mitgliedAnschrift: string;
   mitgliedKvNummer: string;
   mitgliedKrankenkasse: string;
   
@@ -68,6 +72,10 @@ export const createEmptyFamilyMember = (): FamilyMember => ({
   bisherigNachname: '',
   bisherigBestehtWeiter: true,
   bisherigBestehtWeiterBei: 'BKK GS',
+  geburtsname: '',
+  geburtsort: '',
+  geburtsland: '',
+  staatsangehoerigkeit: '',
 });
 
 export const createInitialFormData = (): FormData => {
@@ -93,7 +101,6 @@ export const createInitialFormData = (): FormData => {
     mitgliedName: '',
     mitgliedVorname: '',
     mitgliedGeburtsdatum: '',
-    mitgliedAnschrift: '',
     mitgliedKvNummer: '',
     mitgliedKrankenkasse: '',
     familienstand: '',

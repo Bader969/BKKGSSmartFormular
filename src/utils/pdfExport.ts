@@ -139,7 +139,8 @@ const fillChildFields = (
   kind: FamilyMember,
   index: number,
   helpers: PDFHelpers,
-  endDate: string
+  endDate: string,
+  formData: FormData
 ) => {
   const { setTextField, setCheckbox } = helpers;
   const childNum = index + 1;
@@ -180,6 +181,20 @@ const fillChildFields = (
 
   // Page 2 - Bisherige Versicherung
   setTextField(endetAmField, endDate);
+  
+  // Krankenkasse des Kindes = Krankenkasse des Antragstellers (pre-filled)
+  setTextField(`Kind${childNum} - letzte Vers KK`, formData.mitgliedKrankenkasse || '');
+  
+  // Vor- und Nachname des Antragstellers für das Kind (pre-filled)
+  setTextField(`Kind${childNum} - letzte Vers KK Vorname`, formData.mitgliedVorname || '');
+  setTextField(`Kind${childNum} - letzte Vers KK Nachname`, formData.mitgliedName || '');
+  
+  // Geburtsname = Nachname des Kindes (pre-filled)
+  setTextField(`Kind${childNum} Geburtsname`, kind.geburtsname || kind.name || '');
+  setTextField(`Kind${childNum} Geburtsnort`, kind.geburtsort || '');
+  setTextField(`Kind${childNum} Geburtsland`, kind.geburtsland || '');
+  setTextField(`Kind${childNum} Staatsangh`, kind.staatsangehoerigkeit || '');
+  
   setCheckbox(`Kind${childNum} Fami`, true);
   setCheckbox(`Kind${childNum} MG`, false);
   setCheckbox(`Kind${childNum} nicht gesetzlich`, false);
@@ -235,7 +250,7 @@ const createFilledPDF = async (
 
   // Fill children fields (max 3 per PDF)
   childrenForThisPDF.forEach((kind, index) => {
-    fillChildFields(kind, index, helpers, endDate);
+    fillChildFields(kind, index, helpers, endDate, formData);
   });
 
   // Embed signatures

@@ -45,15 +45,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
         />
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-        <FormField
-          type="text"
-          label="Anschrift"
-          id="mitgliedAnschrift"
-          value={formData.mitgliedAnschrift}
-          onChange={(value) => updateFormData({ mitgliedAnschrift: value })}
-          placeholder="Straße, Hausnummer, PLZ, Ort"
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <FormField
           type="text"
           label="KV-Nummer"
