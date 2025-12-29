@@ -4,6 +4,8 @@ import { FamilyMemberForm } from './FamilyMemberForm';
 import { FormData, FamilyMember, createEmptyFamilyMember } from '@/types/form';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface ChildrenSectionProps {
   formData: FormData;
@@ -66,6 +68,38 @@ export const ChildrenSection: React.FC<ChildrenSectionProps> = ({ formData, upda
                 type="child"
                 childIndex={index + 1}
               />
+              
+              {/* Pre-filled Felder anzeigen (automatisch vom Antragsteller) */}
+              <div className="mt-4 p-4 bg-card/50 rounded-lg border">
+                <p className="text-sm text-muted-foreground mb-3">Automatisch ausgefüllte Felder (vom Antragsteller):</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">Krankenkasse (Kind)</Label>
+                    <Input 
+                      value={formData.mitgliedKrankenkasse || ''} 
+                      disabled 
+                      className="bg-muted/50"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">Vorname (letzte Vers.)</Label>
+                    <Input 
+                      value={formData.mitgliedVorname || ''} 
+                      disabled 
+                      className="bg-muted/50"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">Nachname (letzte Vers.)</Label>
+                    <Input 
+                      value={formData.mitgliedName || ''} 
+                      disabled 
+                      className="bg-muted/50"
+                    />
+                  </div>
+                </div>
+              </div>
+              
               {index < formData.kinder.length - 1 && (
                 <hr className="my-6 border-accent/30" />
               )}

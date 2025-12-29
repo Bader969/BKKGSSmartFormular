@@ -124,6 +124,16 @@ const fillSpouseFields = (
     // Page 2 - Bisherige Versicherung
     setTextField('Ehegatte - letzte Vers endet am', endDate);
     setTextField('Ehegatte - letzte Vers KK', formData.ehegatteKrankenkasse || '');
+    
+    // Vor- und Nachname des Antragstellers für Ehegatte (pre-filled)
+    setTextField('Ehegatte - letzte Vers KK Vorname', formData.mitgliedVorname || '');
+    setTextField('Ehegatte - letzte Vers KK Nachname', formData.mitgliedName || '');
+    
+    // Geburtsname = Nachname des Ehegatten (pre-filled)
+    setTextField('Ehegatte Geburtsname', formData.ehegatte.geburtsname || formData.ehegatte.name || '');
+    setTextField('Ehegatte Geburtsnort', formData.ehegatte.geburtsort || '');
+    setTextField('Ehegatte Geburtsland', formData.ehegatte.geburtsland || '');
+    setTextField('Ehegatte Staatsangh', formData.ehegatte.staatsangehoerigkeit || '');
 
     setCheckbox('Ehegatte Fami', true);
     setCheckbox('Ehegatte MG', false);
