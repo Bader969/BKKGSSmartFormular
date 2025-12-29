@@ -147,9 +147,9 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
             type="text"
             label="Name Arzt (Mitglied)"
             id="arztMitgliedName"
-            value={formData.rundumSicherPaket.arztMitglied.name}
+            value={formData.rundumSicherPaket.arztMitglied?.name || ''}
             onChange={(value) => updateRundumSicherPaket({ 
-              arztMitglied: { ...formData.rundumSicherPaket.arztMitglied, name: value }
+              arztMitglied: { ...(formData.rundumSicherPaket.arztMitglied || { name: '', ort: '' }), name: value }
             })}
             placeholder="Name des Arztes"
           />
@@ -157,9 +157,9 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
             type="text"
             label="Ort Arzt (Mitglied)"
             id="arztMitgliedOrt"
-            value={formData.rundumSicherPaket.arztMitglied.ort}
+            value={formData.rundumSicherPaket.arztMitglied?.ort || ''}
             onChange={(value) => updateRundumSicherPaket({ 
-              arztMitglied: { ...formData.rundumSicherPaket.arztMitglied, ort: value }
+              arztMitglied: { ...(formData.rundumSicherPaket.arztMitglied || { name: '', ort: '' }), ort: value }
             })}
             placeholder="Ort"
           />
@@ -172,9 +172,9 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
               type="text"
               label="Name Arzt (Ehegatte)"
               id="arztEhegatteName"
-              value={formData.rundumSicherPaket.arztEhegatte.name}
+              value={formData.rundumSicherPaket.arztEhegatte?.name || ''}
               onChange={(value) => updateRundumSicherPaket({ 
-                arztEhegatte: { ...formData.rundumSicherPaket.arztEhegatte, name: value }
+                arztEhegatte: { ...(formData.rundumSicherPaket.arztEhegatte || { name: '', ort: '' }), name: value }
               })}
               placeholder="Name des Arztes"
             />
@@ -182,9 +182,9 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
               type="text"
               label="Ort Arzt (Ehegatte)"
               id="arztEhegatteOrt"
-              value={formData.rundumSicherPaket.arztEhegatte.ort}
+              value={formData.rundumSicherPaket.arztEhegatte?.ort || ''}
               onChange={(value) => updateRundumSicherPaket({ 
-                arztEhegatte: { ...formData.rundumSicherPaket.arztEhegatte, ort: value }
+                arztEhegatte: { ...(formData.rundumSicherPaket.arztEhegatte || { name: '', ort: '' }), ort: value }
               })}
               placeholder="Ort"
             />
