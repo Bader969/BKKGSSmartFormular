@@ -30,6 +30,23 @@ export interface ArztDaten {
   ort: string;
 }
 
+// Zusatzversicherung Optionen
+export type ZusatzversicherungOption = 
+  | 'zahnzusatz'
+  | 'private_rente'
+  | 'unfall'
+  | 'berufsunfaehigkeit'
+  | 'grundfaehigkeit'
+  | '';
+
+export const ZUSATZVERSICHERUNG_OPTIONS = [
+  { value: 'zahnzusatz', label: 'Zahnzusatzversicherung' },
+  { value: 'private_rente', label: 'Private Rentenversicherung' },
+  { value: 'unfall', label: 'Unfallversicherung' },
+  { value: 'berufsunfaehigkeit', label: 'Berufsunfähigkeitsversicherung' },
+  { value: 'grundfaehigkeit', label: 'Grundfähigkeitsversicherung' },
+] as const;
+
 // Rundum-Sicher-Paket Daten
 export interface RundumSicherPaketData {
   iban: string;
@@ -40,7 +57,8 @@ export interface RundumSicherPaketData {
   arztMitglied: ArztDaten;
   arztEhegatte: ArztDaten;
   aerzteKinder: ArztDaten[];
-  artZusatzversicherung: string;
+  zusatzversicherung1: ZusatzversicherungOption; // Pflicht
+  zusatzversicherung2: ZusatzversicherungOption; // Optional
   jahresbeitrag: string;
   datenschutz1: boolean;
   datenschutz2: boolean;
@@ -109,7 +127,8 @@ export const createEmptyRundumSicherPaket = (): RundumSicherPaketData => ({
   arztMitglied: createEmptyArztDaten(),
   arztEhegatte: createEmptyArztDaten(),
   aerzteKinder: [],
-  artZusatzversicherung: '',
+  zusatzversicherung1: '',
+  zusatzversicherung2: '',
   jahresbeitrag: '',
   datenschutz1: false,
   datenschutz2: false,

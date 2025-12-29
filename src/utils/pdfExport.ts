@@ -321,8 +321,18 @@ const createRundumSicherPaketPDF = async (formData: FormData, person: PersonInfo
   setTextField("Name Arzt 1", arzt.name);
   setTextField("Ort Arzt 1", arzt.ort);
 
-  // Zusatzversicherung
-  setTextField("Art Zusatzversicherung", rsp.artZusatzversicherung);
+  // Zusatzversicherung - kombiniere beide Felder
+  const zusatzversicherungLabels: Record<string, string> = {
+    'zahnzusatz': 'Zahnzusatzversicherung',
+    'private_rente': 'Private Rentenversicherung',
+    'unfall': 'Unfallversicherung',
+    'berufsunfaehigkeit': 'Berufsunfähigkeitsversicherung',
+    'grundfaehigkeit': 'Grundfähigkeitsversicherung',
+  };
+  const zv1 = rsp.zusatzversicherung1 ? zusatzversicherungLabels[rsp.zusatzversicherung1] || '' : '';
+  const zv2 = rsp.zusatzversicherung2 ? zusatzversicherungLabels[rsp.zusatzversicherung2] || '' : '';
+  const artZusatzversicherung = [zv1, zv2].filter(Boolean).join(', ');
+  setTextField("Art Zusatzversicherung", artZusatzversicherung);
   setTextField("Jahresbeitrag", rsp.jahresbeitrag);
 
   // Datum (identisch für beide Felder)
