@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { FormSection } from './FormSection';
 import { FormField } from './FormField';
 import { SignaturePad } from './SignaturePad';
 import { FormData } from '@/types/form';
+import { generateHandwrittenSignature } from '@/utils/signatureGenerator';
 
 interface SignatureSectionProps {
   formData: FormData;
@@ -10,6 +11,26 @@ interface SignatureSectionProps {
 }
 
 export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, updateFormData }) => {
+  // Pre-fill Unterschrift des Mitglieds mit dessen Nachnamen
+  useEffect(() => {
+    if (formData.mitgliedName && !formData.unterschrift) {
+      const signature = generateHandwrittenSignature(formData.mitgliedName);
+      if (signature) {
+        updateFormData({ unterschrift: signature });
+      }
+    }
+  }, [formData.mitgliedName]);
+
+  // Pre-fill Unterschrift der Familienangehörigen mit Nachnamen des Ehegatten
+  useEffect(() => {
+    if (formData.ehegatte.name && !formData.unterschriftFamilie) {
+      const signature = generateHandwrittenSignature(formData.ehegatte.name);
+      if (signature) {
+        updateFormData({ unterschriftFamilie: signature });
+      }
+    }
+  }, [formData.ehegatte.name]);
+
   return (
     <FormSection title="Ort, Datum und Unterschriften" variant="signature">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -34,6 +55,11 @@ export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, up
         <div>
           <label className="block text-sm font-medium mb-2">
             Unterschrift des Mitglieds
+            {formData.mitgliedName && (
+              <span className="text-muted-foreground ml-2 font-normal">
+                (Vorausgefüllt: {formData.mitgliedName})
+              </span>
+            )}
           </label>
           <SignaturePad
             signature={formData.unterschrift}
@@ -44,6 +70,11 @@ export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, up
         <div>
           <label className="block text-sm font-medium mb-2">
             ggf. Unterschrift der Familienangehörigen
+            {formData.ehegatte.name && (
+              <span className="text-muted-foreground ml-2 font-normal">
+                (Vorausgefüllt: {formData.ehegatte.name})
+              </span>
+            )}
           </label>
           <SignaturePad
             signature={formData.unterschriftFamilie}
