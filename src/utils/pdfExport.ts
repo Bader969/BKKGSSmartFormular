@@ -331,7 +331,7 @@ const createRundumSicherPaketPDF = async (formData: FormData, person: PersonInfo
   };
   const zv1 = rsp.zusatzversicherung1 ? zusatzversicherungLabels[rsp.zusatzversicherung1] || '' : '';
   const zv2 = rsp.zusatzversicherung2 ? zusatzversicherungLabels[rsp.zusatzversicherung2] || '' : '';
-  const artZusatzversicherung = [zv1, zv2].filter(Boolean).join(', ');
+  const artZusatzversicherung = [zv1, zv2].filter(Boolean).join(' + ');
   setTextField("Art Zusatzversicherung", artZusatzversicherung);
   setTextField("Jahresbeitrag", rsp.jahresbeitrag);
 
