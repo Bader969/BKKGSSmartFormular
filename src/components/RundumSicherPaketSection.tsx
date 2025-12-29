@@ -293,12 +293,15 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
             </Label>
             <Select
               value={formData.rundumSicherPaket.zusatzversicherung2}
-              onValueChange={(value) => updateRundumSicherPaket({ zusatzversicherung2: value as ZusatzversicherungOption })}
+              onValueChange={(value) => updateRundumSicherPaket({ zusatzversicherung2: value === "__clear__" ? "" as ZusatzversicherungOption : value as ZusatzversicherungOption })}
             >
               <SelectTrigger className="bg-card">
                 <SelectValue placeholder="Bitte wählen (optional)" />
               </SelectTrigger>
               <SelectContent className="bg-popover z-50">
+                <SelectItem value="__clear__" className="text-muted-foreground">
+                  Keine Auswahl
+                </SelectItem>
                 {ZUSATZVERSICHERUNG_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
