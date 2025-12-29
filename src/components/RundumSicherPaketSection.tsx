@@ -6,6 +6,15 @@ import { FormData, RundumSicherPaketData, ArztDaten, createEmptyArztDaten, ZUSAT
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { 
+  validateVersichertennummer, 
+  validateIBAN, 
+  validateName, 
+  validateDate, 
+  validateJahresbeitrag,
+  validateOrt,
+  validateSelect
+} from '@/utils/validation';
 
 interface RundumSicherPaketSectionProps {
   formData: FormData;
@@ -45,7 +54,7 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
 
       {/* Versichertennummern - für jede Person separat */}
       <div className="space-y-4 mb-6">
-        <h4 className="font-medium text-foreground">Versichertennummern</h4>
+        <h4 className="font-medium text-foreground">Versichertennummern <span className="text-destructive">*</span></h4>
         <p className="text-xs text-muted-foreground">
           Geben Sie für jede Person die individuelle Versichertennummer ein.
         </p>
@@ -57,7 +66,9 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
             id="mitgliedVersichertennummer"
             value={formData.mitgliedVersichertennummer}
             onChange={(value) => updateFormData({ mitgliedVersichertennummer: value })}
-            placeholder="Versichertennummer Mitglied"
+            placeholder="z.B. A123456789"
+            required
+            validate={validateVersichertennummer}
           />
           
           {/* Ehegatte - nur anzeigen wenn vorhanden und nicht nur Rundum-Modus */}
@@ -70,7 +81,9 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
               onChange={(value) => updateFormData({
                 ehegatte: { ...formData.ehegatte, versichertennummer: value }
               })}
-              placeholder="Versichertennummer Ehegatte"
+              placeholder="z.B. A123456789"
+              required
+              validate={validateVersichertennummer}
             />
           )}
           
@@ -87,7 +100,9 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
                 newKinder[index] = { ...newKinder[index], versichertennummer: value };
                 updateFormData({ kinder: newKinder });
               }}
-              placeholder={`Versichertennummer Kind ${index + 1}`}
+              placeholder={`z.B. A123456789`}
+              required
+              validate={validateVersichertennummer}
             />
           ))}
         </div>
@@ -95,7 +110,7 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
 
       {/* Bankdaten */}
       <div className="space-y-4 mb-6">
-        <h4 className="font-medium text-foreground">Bankverbindung</h4>
+        <h4 className="font-medium text-foreground">Bankverbindung <span className="text-destructive">*</span></h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             type="text"
@@ -104,6 +119,8 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
             value={formData.rundumSicherPaket.iban}
             onChange={(value) => updateRundumSicherPaket({ iban: value })}
             placeholder="DE89 3704 0044 0532 0130 00"
+            required
+            validate={validateIBAN}
           />
           <FormField
             type="text"
@@ -112,13 +129,15 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
             value={formData.rundumSicherPaket.kontoinhaber}
             onChange={(value) => updateRundumSicherPaket({ kontoinhaber: value })}
             placeholder="Vor- und Nachname"
+            required
+            validate={validateName}
           />
         </div>
       </div>
 
       {/* Datum (pre-filled mit 10.01.2026) */}
       <div className="space-y-4 mb-6">
-        <h4 className="font-medium text-foreground">Datum</h4>
+        <h4 className="font-medium text-foreground">Datum <span className="text-destructive">*</span></h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             type="date"
@@ -126,13 +145,15 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
             id="datumRSP"
             value={formData.rundumSicherPaket.datumRSP}
             onChange={(value) => updateRundumSicherPaket({ datumRSP: value })}
+            required
+            validate={validateDate}
           />
         </div>
       </div>
 
       {/* Zeitraum (pre-filled) */}
       <div className="space-y-4 mb-6">
-        <h4 className="font-medium text-foreground">Zeitraum</h4>
+        <h4 className="font-medium text-foreground">Zeitraum <span className="text-destructive">*</span></h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             type="date"
@@ -140,6 +161,8 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
             id="zeitraumVon"
             value={formData.rundumSicherPaket.zeitraumVon}
             onChange={(value) => updateRundumSicherPaket({ zeitraumVon: value })}
+            required
+            validate={validateDate}
           />
           <FormField
             type="date"
@@ -147,6 +170,8 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
             id="zeitraumBis"
             value={formData.rundumSicherPaket.zeitraumBis}
             onChange={(value) => updateRundumSicherPaket({ zeitraumBis: value })}
+            required
+            validate={validateDate}
           />
         </div>
       </div>
@@ -166,6 +191,7 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
               arztMitglied: { ...(formData.rundumSicherPaket.arztMitglied || { name: '', ort: '' }), name: value }
             })}
             placeholder="Name des Arztes"
+            validate={validateName}
           />
           <FormField
             type="text"
@@ -176,6 +202,7 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
               arztMitglied: { ...(formData.rundumSicherPaket.arztMitglied || { name: '', ort: '' }), ort: value }
             })}
             placeholder="Ort"
+            validate={validateOrt}
           />
         </div>
 
@@ -191,6 +218,7 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
                 arztEhegatte: { ...(formData.rundumSicherPaket.arztEhegatte || { name: '', ort: '' }), name: value }
               })}
               placeholder="Name des Arztes"
+              validate={validateName}
             />
             <FormField
               type="text"
@@ -201,6 +229,7 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
                 arztEhegatte: { ...(formData.rundumSicherPaket.arztEhegatte || { name: '', ort: '' }), ort: value }
               })}
               placeholder="Ort"
+              validate={validateOrt}
             />
           </div>
         )}
@@ -215,6 +244,7 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
               value={formData.rundumSicherPaket.aerzteKinder[index]?.name || ''}
               onChange={(value) => updateArztKind(index, { name: value })}
               placeholder="Name des Arztes"
+              validate={validateName}
             />
             <FormField
               type="text"
@@ -223,6 +253,7 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
               value={formData.rundumSicherPaket.aerzteKinder[index]?.ort || ''}
               onChange={(value) => updateArztKind(index, { ort: value })}
               placeholder="Ort"
+              validate={validateOrt}
             />
           </div>
         ))}
@@ -230,7 +261,7 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
 
       {/* Zusatzversicherung */}
       <div className="space-y-4 mb-6">
-        <h4 className="font-medium text-foreground">Zusatzversicherung</h4>
+        <h4 className="font-medium text-foreground">Zusatzversicherung <span className="text-destructive">*</span></h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Pflicht-Dropdown */}
           <div className="space-y-2">
@@ -282,14 +313,16 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
             id="jahresbeitrag"
             value={formData.rundumSicherPaket.jahresbeitrag}
             onChange={(value) => updateRundumSicherPaket({ jahresbeitrag: value })}
-            placeholder="z.B. 120,00 €"
+            placeholder="mind. 300 €"
+            required
+            validate={validateJahresbeitrag}
           />
         </div>
       </div>
 
       {/* Unterschrift Makler */}
       <div className="space-y-4 mb-6">
-        <h4 className="font-medium text-foreground">Unterschrift Makler</h4>
+        <h4 className="font-medium text-foreground">Unterschrift Makler <span className="text-destructive">*</span></h4>
         <SignaturePad
           signature={formData.rundumSicherPaket.unterschriftMakler}
           onSignatureChange={(sig) => updateRundumSicherPaket({ unterschriftMakler: sig })}

@@ -2,6 +2,16 @@ import React from 'react';
 import { FormSection } from './FormSection';
 import { FormField } from './FormField';
 import { FormData } from '@/types/form';
+import { 
+  validateName, 
+  validateGeburtsdatum, 
+  validateKvNummer, 
+  validateKrankenkasse,
+  validateSelect,
+  validateTelefon,
+  validateEmail,
+  validateOrt
+} from '@/utils/validation';
 
 interface MemberSectionProps {
   formData: FormData;
@@ -27,6 +37,8 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           value={formData.mitgliedName}
           onChange={(value) => updateFormData({ mitgliedName: value })}
           placeholder="Nachname"
+          required
+          validate={validateName}
         />
         <FormField
           type="text"
@@ -35,6 +47,8 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           value={formData.mitgliedVorname}
           onChange={(value) => updateFormData({ mitgliedVorname: value })}
           placeholder="Vorname"
+          required
+          validate={validateName}
         />
         <FormField
           type="date"
@@ -42,6 +56,8 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           id="mitgliedGeburtsdatum"
           value={formData.mitgliedGeburtsdatum}
           onChange={(value) => updateFormData({ mitgliedGeburtsdatum: value })}
+          required
+          validate={validateGeburtsdatum}
         />
       </div>
       
@@ -53,6 +69,8 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           value={formData.mitgliedKvNummer}
           onChange={(value) => updateFormData({ mitgliedKvNummer: value })}
           placeholder="Krankenversicherungsnummer"
+          required
+          validate={validateKvNummer}
         />
         <FormField
           type="text"
@@ -61,6 +79,21 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           value={formData.mitgliedKrankenkasse}
           onChange={(value) => updateFormData({ mitgliedKrankenkasse: value })}
           placeholder="z.B. BKK GS"
+          required
+          validate={validateKrankenkasse}
+        />
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <FormField
+          type="text"
+          label="Ort"
+          id="ort"
+          value={formData.ort}
+          onChange={(value) => updateFormData({ ort: value })}
+          placeholder="z.B. Berlin"
+          required
+          validate={validateOrt}
         />
       </div>
       
@@ -73,6 +106,8 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           onChange={(value) => updateFormData({ familienstand: value as FormData['familienstand'] })}
           options={familienstandOptions}
           placeholder="Auswählen..."
+          required
+          validate={validateSelect}
         />
         <FormField
           type="tel"
@@ -81,6 +116,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           value={formData.telefon}
           onChange={(value) => updateFormData({ telefon: value })}
           placeholder="Telefonnummer"
+          validate={validateTelefon}
         />
         <FormField
           type="email"
@@ -89,6 +125,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           value={formData.email}
           onChange={(value) => updateFormData({ email: value })}
           placeholder="E-Mail-Adresse"
+          validate={validateEmail}
         />
       </div>
       

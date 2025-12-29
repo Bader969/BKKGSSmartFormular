@@ -3,6 +3,8 @@ import { FormSection } from './FormSection';
 import { FamilyMemberForm } from './FamilyMemberForm';
 import { FormField } from './FormField';
 import { FormData, FamilyMember } from '@/types/form';
+import { validateName, validateOrt, validateStaatsangehoerigkeit, validateKrankenkasse } from '@/utils/validation';
+
 interface SpouseSectionProps {
   formData: FormData;
   updateFormData: (updates: Partial<FormData>) => void;
@@ -32,6 +34,8 @@ export const SpouseSection: React.FC<SpouseSectionProps> = ({ formData, updateFo
           value={formData.ehegatte.geburtsname || formData.ehegatte.name}
           onChange={(value) => updateEhegatte({ geburtsname: value })}
           placeholder="Wird automatisch vom Nachnamen übernommen"
+          required
+          validate={validateName}
         />
         <FormField
           type="text"
@@ -40,6 +44,8 @@ export const SpouseSection: React.FC<SpouseSectionProps> = ({ formData, updateFo
           value={formData.ehegatte.geburtsort}
           onChange={(value) => updateEhegatte({ geburtsort: value })}
           placeholder="z.B. Berlin"
+          required
+          validate={validateOrt}
         />
         <FormField
           type="text"
@@ -48,6 +54,8 @@ export const SpouseSection: React.FC<SpouseSectionProps> = ({ formData, updateFo
           value={formData.ehegatte.geburtsland}
           onChange={(value) => updateEhegatte({ geburtsland: value })}
           placeholder="z.B. Deutschland"
+          required
+          validate={validateOrt}
         />
         <FormField
           type="text"
@@ -56,6 +64,8 @@ export const SpouseSection: React.FC<SpouseSectionProps> = ({ formData, updateFo
           value={formData.ehegatte.staatsangehoerigkeit}
           onChange={(value) => updateEhegatte({ staatsangehoerigkeit: value })}
           placeholder="z.B. Deutsch"
+          required
+          validate={validateStaatsangehoerigkeit}
         />
       </div>
       
@@ -67,6 +77,8 @@ export const SpouseSection: React.FC<SpouseSectionProps> = ({ formData, updateFo
           value={formData.ehegatteKrankenkasse}
           onChange={(value) => updateFormData({ ehegatteKrankenkasse: value })}
           placeholder="z.B. BKK GS"
+          required
+          validate={validateKrankenkasse}
         />
       </div>
       
@@ -81,6 +93,8 @@ export const SpouseSection: React.FC<SpouseSectionProps> = ({ formData, updateFo
             value={formData.ehegatte.bisherigVorname || formData.mitgliedVorname}
             onChange={(value) => updateEhegatte({ bisherigVorname: value })}
             placeholder="Vorname des Antragstellers"
+            required
+            validate={validateName}
           />
           <FormField
             type="text"
@@ -89,13 +103,15 @@ export const SpouseSection: React.FC<SpouseSectionProps> = ({ formData, updateFo
             value={formData.ehegatte.bisherigNachname || formData.mitgliedName}
             onChange={(value) => updateEhegatte({ bisherigNachname: value })}
             placeholder="Nachname des Antragstellers"
+            required
+            validate={validateName}
           />
         </div>
       </div>
       
       {/* Versicherungsart Checkboxen */}
       <div className="mt-4 pt-4 border-t border-secondary/20">
-        <p className="text-sm text-muted-foreground mb-3">Bisherige Versicherungsart:</p>
+        <p className="text-sm text-muted-foreground mb-3">Bisherige Versicherungsart: <span className="text-destructive">*</span></p>
         <div className="flex flex-wrap gap-4">
           <label className="flex items-center space-x-2 cursor-pointer">
             <input

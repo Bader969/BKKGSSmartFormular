@@ -2,6 +2,14 @@ import React from 'react';
 import { FormField } from './FormField';
 import { FamilyMember } from '@/types/form';
 import { calculateDates } from '@/utils/dateUtils';
+import { 
+  validateName, 
+  validateGeburtsdatum, 
+  validateSelect, 
+  validateOrt, 
+  validateStaatsangehoerigkeit,
+  validateVersichertennummer
+} from '@/utils/validation';
 
 interface FamilyMemberFormProps {
   member: FamilyMember;
@@ -44,6 +52,8 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
           value={member.name}
           onChange={(value) => updateMember({ name: value })}
           placeholder="Nachname"
+          required
+          validate={validateName}
         />
         <FormField
           type="text"
@@ -52,6 +62,8 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
           value={member.vorname}
           onChange={(value) => updateMember({ vorname: value })}
           placeholder="Vorname"
+          required
+          validate={validateName}
         />
         <FormField
           type="select"
@@ -60,6 +72,8 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
           value={member.geschlecht}
           onChange={(value) => updateMember({ geschlecht: value as FamilyMember['geschlecht'] })}
           options={geschlechtOptions}
+          required
+          validate={validateSelect}
         />
         <FormField
           type="date"
@@ -67,6 +81,8 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
           id={`${prefix}-geburtsdatum`}
           value={member.geburtsdatum}
           onChange={(value) => updateMember({ geburtsdatum: value })}
+          required
+          validate={validateGeburtsdatum}
         />
       </div>
       
@@ -79,6 +95,8 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
             value={member.geburtsname || member.name}
             onChange={(value) => updateMember({ geburtsname: value })}
             placeholder="Wird automatisch vom Nachnamen übernommen"
+            required
+            validate={validateName}
           />
           <FormField
             type="text"
@@ -87,6 +105,8 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
             value={member.geburtsort}
             onChange={(value) => updateMember({ geburtsort: value })}
             placeholder="z.B. Berlin"
+            required
+            validate={validateOrt}
           />
           <FormField
             type="text"
@@ -95,6 +115,8 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
             value={member.geburtsland}
             onChange={(value) => updateMember({ geburtsland: value })}
             placeholder="z.B. Deutschland"
+            required
+            validate={validateOrt}
           />
           <FormField
             type="text"
@@ -103,6 +125,8 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
             value={member.staatsangehoerigkeit}
             onChange={(value) => updateMember({ staatsangehoerigkeit: value })}
             placeholder="z.B. Deutsch"
+            required
+            validate={validateStaatsangehoerigkeit}
           />
         </div>
       )}
@@ -115,6 +139,8 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
           value={member.versichertennummer}
           onChange={(value) => updateMember({ versichertennummer: value })}
           placeholder="Versichertennummer"
+          required
+          validate={validateVersichertennummer}
         />
         {type === 'child' && (
           <FormField
@@ -124,6 +150,8 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
             value={member.verwandtschaft}
             onChange={(value) => updateMember({ verwandtschaft: value as FamilyMember['verwandtschaft'] })}
             options={verwandtschaftOptions}
+            required
+            validate={validateSelect}
           />
         )}
       </div>
@@ -139,6 +167,7 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
             value={member.bisherigEndeteAm || endDate}
             onChange={(value) => updateMember({ bisherigEndeteAm: value })}
             placeholder="TT.MM.JJJJ"
+            required
           />
           <div className="space-y-2">
             <FormField
@@ -155,6 +184,7 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
               value={member.bisherigBestehtWeiterBei}
               onChange={(value) => updateMember({ bisherigBestehtWeiterBei: value })}
               placeholder="Name der Krankenkasse"
+              required
             />
           </div>
         </div>
