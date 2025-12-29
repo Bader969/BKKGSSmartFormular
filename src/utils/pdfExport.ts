@@ -353,7 +353,7 @@ const createRundumSicherPaketPDF = async (
   }
   
   if (personSignature) {
-    await embedSignatureAtPosition(pdfDoc, personSignature, 160, 713, 1);
+    await embedSignatureAtPosition(pdfDoc, personSignature, 160, 695, 1);
   }
 
   return await pdfDoc.save();
