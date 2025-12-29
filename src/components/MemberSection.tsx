@@ -32,21 +32,21 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <FormField
           type="text"
-          label="Name"
-          id="mitgliedName"
-          value={formData.mitgliedName}
-          onChange={(value) => updateFormData({ mitgliedName: value })}
-          placeholder="Nachname"
-          required
-          validate={validateName}
-        />
-        <FormField
-          type="text"
           label="Vorname"
           id="mitgliedVorname"
           value={formData.mitgliedVorname}
           onChange={(value) => updateFormData({ mitgliedVorname: value })}
           placeholder="Vorname"
+          required
+          validate={validateName}
+        />
+        <FormField
+          type="text"
+          label="Name"
+          id="mitgliedName"
+          value={formData.mitgliedName}
+          onChange={(value) => updateFormData({ mitgliedName: value })}
+          placeholder="Nachname"
           required
           validate={validateName}
         />

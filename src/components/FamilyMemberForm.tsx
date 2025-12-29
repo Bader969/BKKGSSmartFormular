@@ -47,21 +47,21 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <FormField
           type="text"
-          label="Name"
-          id={`${prefix}-name`}
-          value={member.name}
-          onChange={(value) => updateMember({ name: value })}
-          placeholder="Nachname"
-          required
-          validate={validateName}
-        />
-        <FormField
-          type="text"
           label="Vorname"
           id={`${prefix}-vorname`}
           value={member.vorname}
           onChange={(value) => updateMember({ vorname: value })}
           placeholder="Vorname"
+          required
+          validate={validateName}
+        />
+        <FormField
+          type="text"
+          label="Name"
+          id={`${prefix}-name`}
+          value={member.name}
+          onChange={(value) => updateMember({ name: value })}
+          placeholder="Nachname"
           required
           validate={validateName}
         />
