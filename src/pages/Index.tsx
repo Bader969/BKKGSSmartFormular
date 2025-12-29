@@ -17,7 +17,29 @@ const Index = () => {
   const [isExporting, setIsExporting] = useState(false);
   
   const updateFormData = (updates: Partial<FormData>) => {
-    setFormData(prev => ({ ...prev, ...updates }));
+    setFormData(prev => {
+      const newData = { ...prev, ...updates };
+      
+      // Automatische Synchronisierung der Versichertennummer vom Mitglied auf Ehegatte und Kinder
+      if ('mitgliedVersichertennummer' in updates || 'mitgliedKvNummer' in updates) {
+        // Ehegatte aktualisieren
+        if (newData.ehegatte) {
+          newData.ehegatte = {
+            ...newData.ehegatte,
+            versichertennummer: newData.mitgliedVersichertennummer
+          };
+        }
+        // Kinder aktualisieren
+        if (newData.kinder && newData.kinder.length > 0) {
+          newData.kinder = newData.kinder.map(kind => ({
+            ...kind,
+            versichertennummer: newData.mitgliedVersichertennummer
+          }));
+        }
+      }
+      
+      return newData;
+    });
   };
   
   const handleModeChange = (mode: FormMode) => {
