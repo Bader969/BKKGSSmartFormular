@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FormData, FormMode, createInitialFormData } from '@/types/form';
 import { MemberSection } from '@/components/MemberSection';
 import { SpouseSection } from '@/components/SpouseSection';
@@ -11,9 +11,26 @@ import { exportFilledPDF, exportRundumSicherPaketOnly } from '@/utils/pdfExport'
 import { toast } from 'sonner';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { LoginForm } from '@/components/LoginForm';
 
 const Index = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [formData, setFormData] = useState<FormData>(createInitialFormData);
+
+  useEffect(() => {
+    const authStatus = sessionStorage.getItem('isAuthenticated');
+    if (authStatus === 'true') {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+  };
+
+  if (!isAuthenticated) {
+    return <LoginForm onLogin={handleLogin} />;
+  }
   const [isExporting, setIsExporting] = useState(false);
   
   const updateFormData = (updates: Partial<FormData>) => {
