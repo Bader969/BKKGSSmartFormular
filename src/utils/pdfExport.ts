@@ -228,13 +228,20 @@ const embedSignature = async (
     const { height } = page.getSize();
 
     const signatureImage = await pdfDoc.embedPng(signatureData);
+    
+    // Feste Größe für konsistente Positionierung
+    const targetHeight = 30;
+    const targetWidth = 120;
     const sigDims = signatureImage.scale(0.25);
+    const finalWidth = Math.min(sigDims.width, targetWidth);
+    const finalHeight = Math.min(sigDims.height, targetHeight);
 
+    // Y-Koordinate so berechnen, dass Unterschrift AUF der Linie sitzt
     page.drawImage(signatureImage, {
       x,
       y: height - y,
-      width: Math.min(sigDims.width, 140),
-      height: Math.min(sigDims.height, 45),
+      width: finalWidth,
+      height: finalHeight,
     });
   } catch (e) {
     console.error("Could not embed signature:", e);
@@ -266,9 +273,10 @@ const createFilledPDF = async (
     fillChildFields(kind, index, helpers, endDate, formData);
   });
 
-  // Embed signatures
-  await embedSignature(pdfDoc, formData.unterschrift, 200, 715, 1);
-  await embedSignature(pdfDoc, formData.unterschriftFamilie, 400, 715, 1);
+  // Embed signatures - Mitglied links, Familienangehörige rechts
+  // Y-Position angepasst damit Unterschrift exakt auf der Linie sitzt
+  await embedSignature(pdfDoc, formData.unterschrift, 85, 745, 1);       // Mitglied-Unterschrift
+  await embedSignature(pdfDoc, formData.unterschriftFamilie, 340, 745, 1); // Ehegatte-Unterschrift
 
   return await pdfDoc.save();
 };
