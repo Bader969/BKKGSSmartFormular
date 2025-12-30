@@ -2,11 +2,23 @@ import React, { useState, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Upload, Copy, Check, Sparkles, Loader2, X, FileImage, Shield, Image } from 'lucide-react';
+import { Upload, Copy, Check, Sparkles, Loader2, X, FileImage, Shield, Image, Download, Settings2, FileText } from 'lucide-react';
 import { FormData } from '@/types/form';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import { 
+  processImage, 
+  fileToBase64, 
+  dataUrlToBase64, 
+  getMimeTypeFromDataUrl,
+  defaultProcessingOptions,
+  type ProcessingOptions 
+} from '@/utils/imageProcessing';
+import { createPdfFromImages, downloadBlob, getImageDimensions, type ImageForPdf } from '@/utils/pdfUtils';
 
 interface JsonImportDialogProps {
   formData: FormData;
@@ -16,8 +28,10 @@ interface JsonImportDialogProps {
 interface UploadedFile {
   file: File;
   preview: string;
+  processedPreview?: string;
   base64: string;
   mimeType: string;
+  isProcessed: boolean;
 }
 
 // Beispiel-JSON-Daten für alle Felder
@@ -136,6 +150,10 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [isProcessingImages, setIsProcessingImages] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [showScannerSettings, setShowScannerSettings] = useState(false);
+  const [processingOptions, setProcessingOptions] = useState<ProcessingOptions>(defaultProcessingOptions);
 
   const exampleJson = JSON.stringify(createExampleJson(), null, 2);
 
@@ -150,30 +168,20 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
     }
   };
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => {
-        const result = reader.result as string;
-        // Remove the data:image/xxx;base64, prefix
-        const base64 = result.split(',')[1];
-        resolve(base64);
-      };
-      reader.onerror = reject;
-    });
-  };
-
   const handleFileUpload = useCallback(async (files: FileList | File[]) => {
     const validFiles: UploadedFile[] = [];
     
     for (const file of Array.from(files)) {
-      if (!file.type.startsWith('image/')) {
-        toast.error(`${file.name} ist kein Bild`);
+      // Accept images and PDFs
+      const isImage = file.type.startsWith('image/');
+      const isPdf = file.type === 'application/pdf';
+      
+      if (!isImage && !isPdf) {
+        toast.error(`${file.name} ist keine gültige Datei (JPG, PNG, PDF)`);
         continue;
       }
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error(`${file.name} ist zu groß (max. 10MB)`);
+      if (file.size > 20 * 1024 * 1024) {
+        toast.error(`${file.name} ist zu groß (max. 20MB)`);
         continue;
       }
       
@@ -184,7 +192,8 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
           file,
           preview,
           base64,
-          mimeType: file.type
+          mimeType: file.type,
+          isProcessed: false
         });
       } catch (error) {
         console.error('Error processing file:', error);
@@ -218,16 +227,105 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
     setUploadedFiles(prev => {
       const newFiles = [...prev];
       URL.revokeObjectURL(newFiles[index].preview);
+      if (newFiles[index].processedPreview) {
+        URL.revokeObjectURL(newFiles[index].processedPreview);
+      }
       newFiles.splice(index, 1);
       return newFiles;
     });
   };
 
+  // Process images with scanner filters
+  const handleProcessImages = async () => {
+    const imageFiles = uploadedFiles.filter(f => f.mimeType.startsWith('image/'));
+    
+    if (imageFiles.length === 0) {
+      toast.error('Keine Bilder zum Verarbeiten vorhanden');
+      return;
+    }
+
+    setIsProcessingImages(true);
+    toast.info('Dokumente werden lokal optimiert...');
+
+    try {
+      const processedFiles = await Promise.all(
+        uploadedFiles.map(async (uploadedFile) => {
+          // Skip PDFs - they can't be processed as images
+          if (uploadedFile.mimeType === 'application/pdf') {
+            return uploadedFile;
+          }
+
+          const { dataUrl, blob } = await processImage(uploadedFile.preview, processingOptions);
+          
+          // Revoke old preview if it was processed before
+          if (uploadedFile.processedPreview) {
+            URL.revokeObjectURL(uploadedFile.processedPreview);
+          }
+          
+          // Revoke original preview - we don't need it anymore (privacy)
+          URL.revokeObjectURL(uploadedFile.preview);
+
+          return {
+            ...uploadedFile,
+            preview: dataUrl,
+            processedPreview: URL.createObjectURL(blob),
+            base64: dataUrlToBase64(dataUrl),
+            mimeType: 'image/jpeg',
+            isProcessed: true
+          };
+        })
+      );
+
+      setUploadedFiles(processedFiles);
+      toast.success('Dokumente erfolgreich optimiert!');
+    } catch (error) {
+      console.error('Error processing images:', error);
+      toast.error('Fehler beim Verarbeiten der Bilder');
+    } finally {
+      setIsProcessingImages(false);
+    }
+  };
+
+  // Export processed images as PDF
+  const handleExportPdf = async () => {
+    const processedImages = uploadedFiles.filter(f => f.mimeType.startsWith('image/'));
+    
+    if (processedImages.length === 0) {
+      toast.error('Keine Bilder für PDF-Export vorhanden');
+      return;
+    }
+
+    setIsExportingPdf(true);
+
+    try {
+      const imagesForPdf: ImageForPdf[] = await Promise.all(
+        processedImages.map(async (file) => {
+          const dimensions = await getImageDimensions(file.processedPreview || file.preview);
+          return {
+            dataUrl: file.processedPreview || file.preview,
+            width: dimensions.width,
+            height: dimensions.height
+          };
+        })
+      );
+
+      const pdfBlob = await createPdfFromImages(imagesForPdf);
+      const filename = `dokumente-scan-${new Date().toISOString().slice(0, 10)}.pdf`;
+      downloadBlob(pdfBlob, filename);
+      toast.success('PDF erfolgreich erstellt!');
+    } catch (error) {
+      console.error('Error creating PDF:', error);
+      toast.error('Fehler beim Erstellen der PDF');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   const handleExtractWithGemini = async () => {
     const hasText = freitextInput.trim().length > 0;
-    const hasImages = uploadedFiles.length > 0;
+    const hasFiles = uploadedFiles.length > 0;
 
-    if (!hasText && !hasImages) {
+    if (!hasText && !hasFiles) {
       toast.error('Bitte gib Text ein oder lade Dokumente hoch.');
       return;
     }
@@ -238,7 +336,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
     try {
       const requestBody: { text?: string; images?: { base64: string; mimeType: string }[] } = {};
       
-      if (hasImages) {
+      if (hasFiles) {
         requestBody.images = uploadedFiles.map(f => ({
           base64: f.base64,
           mimeType: f.mimeType
@@ -275,7 +373,10 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       toast.success('Daten erfolgreich extrahiert!');
       
       // Clean up file previews
-      uploadedFiles.forEach(f => URL.revokeObjectURL(f.preview));
+      uploadedFiles.forEach(f => {
+        URL.revokeObjectURL(f.preview);
+        if (f.processedPreview) URL.revokeObjectURL(f.processedPreview);
+      });
       setUploadedFiles([]);
       setFreitextInput('');
     } catch (error) {
@@ -311,7 +412,10 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       setOpen(false);
       setJsonInput('');
       setFreitextInput('');
-      uploadedFiles.forEach(f => URL.revokeObjectURL(f.preview));
+      uploadedFiles.forEach(f => {
+        URL.revokeObjectURL(f.preview);
+        if (f.processedPreview) URL.revokeObjectURL(f.processedPreview);
+      });
       setUploadedFiles([]);
     } catch (error) {
       toast.error('Ungültiges JSON-Format. Bitte überprüfen Sie die Eingabe.');
@@ -322,6 +426,9 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
   const handleShowCurrentData = () => {
     setJsonInput(JSON.stringify(formData, null, 2));
   };
+
+  const hasImages = uploadedFiles.some(f => f.mimeType.startsWith('image/'));
+  const hasPdfs = uploadedFiles.some(f => f.mimeType === 'application/pdf');
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -365,7 +472,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
                 id="file-upload"
                 type="file"
                 multiple
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
                 className="hidden"
                 onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
               />
@@ -374,7 +481,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
                 Dokumente hier ablegen oder klicken zum Hochladen
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Ausweise, Krankenkassenkarten, Bescheide (JPG, PNG) – max. 10MB pro Datei
+                Ausweise, Krankenkassenkarten, Bescheide (JPG, PNG, PDF) – max. 20MB pro Datei
               </p>
             </div>
 
@@ -387,11 +494,17 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
                 <div className="flex flex-wrap gap-2">
                   {uploadedFiles.map((file, index) => (
                     <div key={index} className="relative group">
-                      <img
-                        src={file.preview}
-                        alt={file.file.name}
-                        className="h-20 w-20 object-cover rounded-md border"
-                      />
+                      {file.mimeType === 'application/pdf' ? (
+                        <div className="h-20 w-20 flex items-center justify-center rounded-md border bg-muted">
+                          <FileText className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                      ) : (
+                        <img
+                          src={file.processedPreview || file.preview}
+                          alt={file.file.name}
+                          className={`h-20 w-20 object-cover rounded-md border ${file.isProcessed ? 'ring-2 ring-green-500' : ''}`}
+                        />
+                      )}
                       <button
                         onClick={() => removeFile(index)}
                         className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -399,8 +512,122 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
                         <X className="h-3 w-3" />
                       </button>
                       <p className="text-[10px] truncate max-w-[80px] mt-1">{file.file.name}</p>
+                      {file.isProcessed && (
+                        <span className="absolute bottom-6 left-0 right-0 text-[8px] text-center text-green-600 font-medium">
+                          Optimiert
+                        </span>
+                      )}
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Scanner Settings */}
+            {hasImages && (
+              <div className="space-y-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowScannerSettings(!showScannerSettings)}
+                  className="gap-2"
+                >
+                  <Settings2 className="h-4 w-4" />
+                  Scanner-Einstellungen
+                </Button>
+
+                {showScannerSettings && (
+                  <div className="p-4 border rounded-lg bg-background space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm">Kontrast: {processingOptions.contrast.toFixed(1)}</Label>
+                      <Slider
+                        value={[processingOptions.contrast]}
+                        onValueChange={([value]) => setProcessingOptions(prev => ({ ...prev, contrast: value }))}
+                        min={0.5}
+                        max={2}
+                        step={0.1}
+                        className="w-full"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-sm">Helligkeit: {processingOptions.brightness}</Label>
+                      <Slider
+                        value={[processingOptions.brightness]}
+                        onValueChange={([value]) => setProcessingOptions(prev => ({ ...prev, brightness: value }))}
+                        min={-50}
+                        max={50}
+                        step={5}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Auto-Crop (Hintergrund entfernen)</Label>
+                      <Switch
+                        checked={processingOptions.autoCrop}
+                        onCheckedChange={(checked) => setProcessingOptions(prev => ({ ...prev, autoCrop: checked }))}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Graustufen</Label>
+                      <Switch
+                        checked={processingOptions.grayscale}
+                        onCheckedChange={(checked) => setProcessingOptions(prev => ({ ...prev, grayscale: checked }))}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Rauschen reduzieren</Label>
+                      <Switch
+                        checked={processingOptions.denoise}
+                        onCheckedChange={(checked) => setProcessingOptions(prev => ({ ...prev, denoise: checked }))}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleProcessImages}
+                    disabled={isProcessingImages || !hasImages}
+                    className="gap-2"
+                  >
+                    {isProcessingImages ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Optimiere...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Bilder optimieren (Scanner-Filter)
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleExportPdf}
+                    disabled={isExportingPdf || !hasImages}
+                    className="gap-2"
+                  >
+                    {isExportingPdf ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Erstelle PDF...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4" />
+                        Dokumente als gescanntes PDF speichern
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
             )}
@@ -409,7 +636,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
             <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
               <Shield className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
               <p className="text-xs text-green-700 dark:text-green-400">
-                <strong>Sichere Verarbeitung:</strong> Ihre Dokumente werden verschlüsselt analysiert und nach der Verarbeitung sofort gelöscht. Es erfolgt keine Speicherung.
+                <strong>Sichere Verarbeitung:</strong> Ihre Dokumente werden verschlüsselt analysiert und nach der Verarbeitung sofort gelöscht. Originalfotos werden nach dem Cropping verworfen – nur bereinigte Dokumente bleiben im Speicher.
               </p>
             </div>
           </div>
@@ -441,7 +668,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  Daten mit KI extrahieren
+                  Daten mit KI extrahieren {hasPdfs && '(inkl. PDFs)'}
                 </>
               )}
             </Button>
