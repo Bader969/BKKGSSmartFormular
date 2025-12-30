@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Upload, Copy, Check, Sparkles, Loader2, X, FileImage, Shield, Image, Download, Settings2, FileText } from 'lucide-react';
+import { Upload, Copy, Check, Sparkles, Loader2, X, FileImage, Shield, Image, Download, Settings2, FileText, RotateCcw } from 'lucide-react';
 import { FormData } from '@/types/form';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,10 +28,15 @@ interface JsonImportDialogProps {
 interface UploadedFile {
   file: File;
   preview: string;
+  originalPreview: string; // Keep original for restore
   processedPreview?: string;
+  aiImprovedPreview?: string; // AI-enhanced version from edge function
+  aiImprovedBase64?: string;
   base64: string;
   mimeType: string;
   isProcessed: boolean;
+  isAiImproved: boolean;
+  useOriginal: boolean; // Flag to use original instead of AI version
 }
 
 // Beispiel-JSON-Daten für alle Felder
@@ -191,9 +196,12 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
         validFiles.push({
           file,
           preview,
+          originalPreview: preview,
           base64,
           mimeType: file.type,
-          isProcessed: false
+          isProcessed: false,
+          isAiImproved: false,
+          useOriginal: false
         });
       } catch (error) {
         console.error('Error processing file:', error);
@@ -271,7 +279,9 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
             processedPreview: URL.createObjectURL(blob),
             base64: dataUrlToBase64(dataUrl),
             mimeType: 'image/jpeg',
-            isProcessed: true
+            isProcessed: true,
+            isAiImproved: uploadedFile.isAiImproved,
+            useOriginal: uploadedFile.useOriginal
           };
         })
       );
@@ -286,7 +296,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
     }
   };
 
-  // Export processed images as PDF
+  // Export processed images as PDF - uses AI-improved versions when available
   const handleExportPdf = async () => {
     const processedImages = uploadedFiles.filter(f => f.mimeType.startsWith('image/'));
     
@@ -300,9 +310,11 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
     try {
       const imagesForPdf: ImageForPdf[] = await Promise.all(
         processedImages.map(async (file) => {
-          const dimensions = await getImageDimensions(file.processedPreview || file.preview);
+          // Use AI-improved image if available and not overridden
+          const activePreview = getActivePreview(file);
+          const dimensions = await getImageDimensions(activePreview);
           return {
-            dataUrl: file.processedPreview || file.preview,
+            dataUrl: activePreview,
             width: dimensions.width,
             height: dimensions.height
           };
@@ -312,7 +324,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       const pdfBlob = await createPdfFromImages(imagesForPdf);
       const filename = `dokumente-scan-${new Date().toISOString().slice(0, 10)}.pdf`;
       downloadBlob(pdfBlob, filename);
-      toast.success('PDF erfolgreich erstellt!');
+      toast.success('PDF mit KI-verbesserten Bildern erstellt!');
     } catch (error) {
       console.error('Error creating PDF:', error);
       toast.error('Fehler beim Erstellen der PDF');
@@ -368,17 +380,32 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
 
       setAnalysisProgress(100);
 
-      // Set the extracted JSON to the JSON input field
-      setJsonInput(JSON.stringify(data, null, 2));
-      toast.success('Daten erfolgreich extrahiert!');
+      // Check if we have AI-improved images in the response
+      if (data.improvedImages && Array.isArray(data.improvedImages)) {
+        const updatedFiles = uploadedFiles.map((file, index) => {
+          const improvedImage = data.improvedImages[index];
+          if (improvedImage && file.mimeType.startsWith('image/')) {
+            const aiDataUrl = `data:image/jpeg;base64,${improvedImage}`;
+            return {
+              ...file,
+              aiImprovedPreview: aiDataUrl,
+              aiImprovedBase64: improvedImage,
+              isAiImproved: true,
+              useOriginal: false
+            };
+          }
+          return file;
+        });
+        setUploadedFiles(updatedFiles);
+        toast.success('Daten extrahiert & Bilder magisch verbessert!');
+      } else {
+        toast.success('Daten erfolgreich extrahiert!');
+      }
+
+      // Extract the actual form data (exclude improvedImages)
+      const { improvedImages, ...formDataFromAi } = data;
+      setJsonInput(JSON.stringify(formDataFromAi, null, 2));
       
-      // Clean up file previews
-      uploadedFiles.forEach(f => {
-        URL.revokeObjectURL(f.preview);
-        if (f.processedPreview) URL.revokeObjectURL(f.processedPreview);
-      });
-      setUploadedFiles([]);
-      setFreitextInput('');
     } catch (error) {
       console.error('Error extracting data:', error);
       toast.error('Fehler bei der Datenextraktion. Bitte versuche es erneut.');
@@ -386,6 +413,38 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       setIsExtracting(false);
       setAnalysisProgress(0);
     }
+  };
+
+  // Toggle between AI-improved and original image
+  const handleRestoreOriginal = (index: number) => {
+    setUploadedFiles(prev => prev.map((file, i) => {
+      if (i === index) {
+        return { ...file, useOriginal: !file.useOriginal };
+      }
+      return file;
+    }));
+  };
+
+  // Get the best preview for display and export
+  const getActivePreview = (file: UploadedFile): string => {
+    if (file.useOriginal) {
+      return file.processedPreview || file.originalPreview;
+    }
+    if (file.aiImprovedPreview) {
+      return file.aiImprovedPreview;
+    }
+    return file.processedPreview || file.preview;
+  };
+
+  // Get base64 for PDF export (prefers AI-improved unless useOriginal)
+  const getActiveBase64 = (file: UploadedFile): string => {
+    if (file.useOriginal) {
+      return file.base64;
+    }
+    if (file.aiImprovedBase64) {
+      return file.aiImprovedBase64;
+    }
+    return file.base64;
   };
 
   const handleImport = () => {
@@ -491,30 +550,60 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
                 <p className="text-xs font-medium text-muted-foreground">
                   {uploadedFiles.length} Dokument(e) ausgewählt:
                 </p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-3">
                   {uploadedFiles.map((file, index) => (
                     <div key={index} className="relative group">
                       {file.mimeType === 'application/pdf' ? (
-                        <div className="h-20 w-20 flex items-center justify-center rounded-md border bg-muted">
+                        <div className="h-24 w-24 flex items-center justify-center rounded-md border bg-muted">
                           <FileText className="h-8 w-8 text-muted-foreground" />
                         </div>
                       ) : (
-                        <img
-                          src={file.processedPreview || file.preview}
-                          alt={file.file.name}
-                          className={`h-20 w-20 object-cover rounded-md border ${file.isProcessed ? 'ring-2 ring-green-500' : ''}`}
-                        />
+                        <div className="relative">
+                          <img
+                            src={getActivePreview(file)}
+                            alt={file.file.name}
+                            className={`h-24 w-24 object-cover rounded-md border transition-all ${
+                              file.isAiImproved && !file.useOriginal 
+                                ? 'ring-2 ring-purple-500' 
+                                : file.isProcessed 
+                                  ? 'ring-2 ring-green-500' 
+                                  : ''
+                            }`}
+                          />
+                          {/* AI Improved Badge */}
+                          {file.isAiImproved && !file.useOriginal && (
+                            <span className="absolute top-1 left-1 bg-purple-500 text-white text-[8px] px-1 py-0.5 rounded font-medium">
+                              ✨ KI
+                            </span>
+                          )}
+                          {/* Restore Original Button */}
+                          {file.isAiImproved && (
+                            <button
+                              onClick={() => handleRestoreOriginal(index)}
+                              className="absolute bottom-1 left-1 right-1 bg-background/90 hover:bg-background text-[9px] px-1 py-0.5 rounded border flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title={file.useOriginal ? 'KI-Version verwenden' : 'Original wiederherstellen'}
+                            >
+                              <RotateCcw className="h-2.5 w-2.5" />
+                              {file.useOriginal ? 'KI-Version' : 'Original'}
+                            </button>
+                          )}
+                        </div>
                       )}
                       <button
                         onClick={() => removeFile(index)}
-                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                       >
                         <X className="h-3 w-3" />
                       </button>
-                      <p className="text-[10px] truncate max-w-[80px] mt-1">{file.file.name}</p>
-                      {file.isProcessed && (
-                        <span className="absolute bottom-6 left-0 right-0 text-[8px] text-center text-green-600 font-medium">
+                      <p className="text-[10px] truncate max-w-[96px] mt-1">{file.file.name}</p>
+                      {file.isProcessed && !file.isAiImproved && (
+                        <span className="text-[8px] text-center text-green-600 font-medium block">
                           Optimiert
+                        </span>
+                      )}
+                      {file.useOriginal && file.isAiImproved && (
+                        <span className="text-[8px] text-center text-amber-600 font-medium block">
+                          Original
                         </span>
                       )}
                     </div>
