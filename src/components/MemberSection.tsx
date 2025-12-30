@@ -67,7 +67,10 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           label="KV-Nummer"
           id="mitgliedKvNummer"
           value={formData.mitgliedKvNummer}
-          onChange={(value) => updateFormData({ mitgliedKvNummer: value })}
+          onChange={(value) => updateFormData({ 
+            mitgliedKvNummer: value,
+            mitgliedVersichertennummer: value  // Synchronisiert mit Versichertennr. im Rundum-Sicher-Paket
+          })}
           placeholder="Krankenversicherungsnummer"
           required
           validate={validateKvNummer}
