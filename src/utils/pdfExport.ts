@@ -113,8 +113,9 @@ const fillSpouseFields = (formData: FormData, helpers: PDFHelpers, endDate: stri
       setTextField("Ehegatte GebDatum", formatInputDate(formData.ehegatte.geburtsdatum));
     }
 
-    if (formData.ehegatte.abweichendeAnschrift) {
-      setTextField("Ehegatte Anschrift", formData.ehegatte.abweichendeAnschrift);
+    // Versichertennummer des Ehegatten in das Anschrift-Feld schreiben
+    if (formData.ehegatte.versichertennummer) {
+      setTextField("Ehegatte Anschrift", formData.ehegatte.versichertennummer);
     }
 
     // Page 2 - Bisherige Versicherung
@@ -182,8 +183,9 @@ const fillChildFields = (
     setTextField(gebDatumField, formatInputDate(kind.geburtsdatum));
   }
 
-  if (kind.abweichendeAnschrift) {
-    setTextField(anschriftField, kind.abweichendeAnschrift);
+  // Versichertennummer des Kindes in das Anschrift-Feld schreiben
+  if (kind.versichertennummer) {
+    setTextField(anschriftField, kind.versichertennummer);
   }
 
   // Verwandtschaftsverhältnis
