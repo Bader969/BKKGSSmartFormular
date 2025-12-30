@@ -157,7 +157,6 @@ const createRundumOnlyExampleJson = (): Partial<FormData> => ({
 export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, setFormData, currentMode }) => {
   const [open, setOpen] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
-  const [freitextInput, setFreitextInput] = useState('');
   const [copied, setCopied] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -279,11 +278,8 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
   };
 
   const handleExtractWithGemini = async () => {
-    const hasText = freitextInput.trim().length > 0;
-    const hasFiles = uploadedFiles.length > 0;
-
-    if (!hasText && !hasFiles) {
-      toast.error('Bitte gib Text ein oder lade Dokumente hoch.');
+    if (uploadedFiles.length === 0) {
+      toast.error('Bitte lade Dokumente hoch.');
       return;
     }
 
@@ -296,19 +292,12 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
         images?: { base64: string; mimeType: string }[];
         mode: FormMode;
       } = {
-        mode: currentMode
-      };
-      
-      if (hasFiles) {
-        requestBody.images = uploadedFiles.map(f => ({
+        mode: currentMode,
+        images: uploadedFiles.map(f => ({
           base64: f.base64,
           mimeType: f.mimeType
-        }));
-      }
-      
-      if (hasText) {
-        requestBody.text = freitextInput;
-      }
+        }))
+      };
 
       setAnalysisProgress(30);
 
@@ -366,7 +355,6 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       toast.success('JSON erfolgreich importiert!');
       setOpen(false);
       setJsonInput('');
-      setFreitextInput('');
       uploadedFiles.forEach(f => URL.revokeObjectURL(f.preview));
       setUploadedFiles([]);
     } catch (error) {
@@ -564,22 +552,12 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
             </div>
           </div>
 
-          {/* Freitext-Extraktion mit KI */}
-          <div className="space-y-2 p-4 border rounded-lg bg-muted/30">
-            <label className="text-sm font-medium block">Oder Freitext hier einfügen:</label>
-            <Textarea
-              value={freitextInput}
-              onChange={(e) => setFreitextInput(e.target.value)}
-              placeholder="Füge hier beliebigen Text ein (z.B. E-Mail, Brief, Notizen), aus dem die Versicherungsdaten extrahiert werden sollen..."
-              className="min-h-[100px]"
-            />
-          </div>
 
           {/* Extract Button with Progress */}
           <div className="space-y-2">
             <Button 
               onClick={handleExtractWithGemini} 
-              disabled={isExtracting || (!freitextInput.trim() && uploadedFiles.length === 0)}
+              disabled={isExtracting || uploadedFiles.length === 0}
               className="w-full gap-2"
               size="lg"
             >
