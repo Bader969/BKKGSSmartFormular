@@ -66,7 +66,10 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
             label="Versichertennr. Mitglied"
             id="mitgliedVersichertennummer"
             value={formData.mitgliedVersichertennummer}
-            onChange={(value) => updateFormData({ mitgliedVersichertennummer: value })}
+            onChange={(value) => updateFormData({ 
+              mitgliedVersichertennummer: value,
+              mitgliedKvNummer: value  // Synchronisiert mit KV-Nummer im Mitglied-Bereich
+            })}
             placeholder="z.B. A123456789"
             required
             validate={validateVersichertennummer}
