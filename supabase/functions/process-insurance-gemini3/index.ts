@@ -72,7 +72,7 @@ serve(async (req) => {
     // Validate input - either text or images required
     if ((!text || typeof text !== 'string') && (!images || !Array.isArray(images) || images.length === 0)) {
       return new Response(
-        JSON.stringify({ error: 'Text oder Bilder sind erforderlich' }),
+        JSON.stringify({ error: 'Text oder Bilder/PDFs sind erforderlich' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -82,8 +82,12 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
+    // Separate images and PDFs
+    const imageFiles = images?.filter((img: { mimeType: string }) => img.mimeType.startsWith('image/')) || [];
+    const pdfFiles = images?.filter((img: { mimeType: string }) => img.mimeType === 'application/pdf') || [];
+
     console.log('Processing insurance data with Gemini...');
-    console.log('Input type:', images ? `${images.length} images` : 'text');
+    console.log('Input type:', images ? `${imageFiles.length} images, ${pdfFiles.length} PDFs` : 'text');
 
     const systemPrompt = `Du bist ein Experte für Versicherungsdaten. Analysiere diesen Stapel an Dokumenten einer Familie. 
 Identifiziere die Rollen (Mitglied, Ehegatte, Kinder) basierend auf Namen und Geburtsdaten. 
@@ -101,22 +105,39 @@ Wichtig:
     // Build messages array based on input type
     let messages: any[];
     
-    if (images && images.length > 0) {
-      // Image-based extraction using Gemini 3 Pro with vision
-      const imageContents = images.map((img: { base64: string; mimeType: string }) => ({
-        type: "image_url",
-        image_url: {
-          url: `data:${img.mimeType};base64,${img.base64}`
-        }
-      }));
+    const hasVisualContent = imageFiles.length > 0 || pdfFiles.length > 0;
+    
+    if (hasVisualContent) {
+      // Build content array with all files (images and PDFs)
+      const fileContents: any[] = [];
+      
+      // Add images
+      for (const img of imageFiles) {
+        fileContents.push({
+          type: "image_url",
+          image_url: {
+            url: `data:${img.mimeType};base64,${img.base64}`
+          }
+        });
+      }
+      
+      // Add PDFs - Gemini 2.5 Pro supports PDF input
+      for (const pdf of pdfFiles) {
+        fileContents.push({
+          type: "image_url",
+          image_url: {
+            url: `data:${pdf.mimeType};base64,${pdf.base64}`
+          }
+        });
+      }
 
       messages = [
         { role: 'system', content: systemPrompt },
         { 
           role: 'user', 
           content: [
-            { type: 'text', text: 'Analysiere diese Dokumente und extrahiere alle Versicherungsdaten:' },
-            ...imageContents
+            { type: 'text', text: 'Analysiere diese Dokumente (Bilder und/oder PDFs) und extrahiere alle Versicherungsdaten:' },
+            ...fileContents
           ]
         }
       ];
@@ -135,7 +156,8 @@ Wichtig:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: images && images.length > 0 ? 'google/gemini-2.5-pro' : 'google/gemini-2.5-flash',
+        // Always use gemini-2.5-pro for visual content (supports images and PDFs)
+        model: hasVisualContent ? 'google/gemini-2.5-pro' : 'google/gemini-2.5-flash',
         messages,
       }),
     });
@@ -186,7 +208,7 @@ Wichtig:
 
     console.log('Extracted JSON:', JSON.stringify(extractedJson, null, 2));
 
-    // Images are processed in memory only - no storage
+    // Images/PDFs are processed in memory only - no storage
     // This ensures PII data is never persisted
 
     return new Response(
