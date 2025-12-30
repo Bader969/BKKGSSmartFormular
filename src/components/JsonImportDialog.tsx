@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Upload, Copy, Check } from 'lucide-react';
+import { Upload, Copy, Check, Sparkles, Loader2 } from 'lucide-react';
 import { FormData } from '@/types/form';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface JsonImportDialogProps {
   formData: FormData;
@@ -121,7 +122,9 @@ const createExampleJson = (): FormData => ({
 export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, setFormData }) => {
   const [open, setOpen] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
+  const [freitextInput, setFreitextInput] = useState('');
   const [copied, setCopied] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
 
   const exampleJson = JSON.stringify(createExampleJson(), null, 2);
 
@@ -133,6 +136,40 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error('Kopieren fehlgeschlagen');
+    }
+  };
+
+  const handleExtractWithGemini = async () => {
+    if (!freitextInput.trim()) {
+      toast.error('Bitte gib zuerst einen Text ein.');
+      return;
+    }
+
+    setIsExtracting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('process-insurance-gemini3', {
+        body: { text: freitextInput }
+      });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        toast.error('Fehler beim Aufrufen der KI-Funktion.');
+        return;
+      }
+
+      if (data.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      // Set the extracted JSON to the JSON input field
+      setJsonInput(JSON.stringify(data, null, 2));
+      toast.success('Daten erfolgreich extrahiert!');
+    } catch (error) {
+      console.error('Error extracting data:', error);
+      toast.error('Fehler bei der Datenextraktion. Bitte versuche es erneut.');
+    } finally {
+      setIsExtracting(false);
     }
   };
 
@@ -159,6 +196,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       toast.success('JSON erfolgreich importiert!');
       setOpen(false);
       setJsonInput('');
+      setFreitextInput('');
     } catch (error) {
       toast.error('Ungültiges JSON-Format. Bitte überprüfen Sie die Eingabe.');
       console.error('JSON parse error:', error);
@@ -181,11 +219,39 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
         <DialogHeader>
           <DialogTitle>JSON-Daten importieren</DialogTitle>
           <DialogDescription>
-            Fügen Sie JSON-Daten ein, um alle Formularfelder auf einmal auszufüllen.
+            Fügen Sie JSON-Daten ein oder lassen Sie die KI Daten aus Freitext extrahieren.
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4">
+          {/* Freitext-Extraktion mit KI */}
+          <div className="space-y-2 p-4 border rounded-lg bg-muted/30">
+            <label className="text-sm font-medium block">Freitext hier einfügen:</label>
+            <Textarea
+              value={freitextInput}
+              onChange={(e) => setFreitextInput(e.target.value)}
+              placeholder="Füge hier beliebigen Text ein (z.B. E-Mail, Brief, Notizen), aus dem die Versicherungsdaten extrahiert werden sollen..."
+              className="min-h-[120px]"
+            />
+            <Button 
+              onClick={handleExtractWithGemini} 
+              disabled={isExtracting || !freitextInput.trim()}
+              className="gap-2"
+            >
+              {isExtracting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Extrahiere...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Daten mit Gemini 3 extrahieren
+                </>
+              )}
+            </Button>
+          </div>
+
           <div className="flex gap-2 flex-wrap">
             <Button variant="secondary" size="sm" onClick={handleCopyExample} className="gap-2">
               {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -202,7 +268,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
               value={jsonInput}
               onChange={(e) => setJsonInput(e.target.value)}
               placeholder='{"mitgliedName": "Mustermann", "mitgliedVorname": "Max", ...}'
-              className="font-mono text-xs min-h-[400px]"
+              className="font-mono text-xs min-h-[300px]"
             />
           </div>
           
