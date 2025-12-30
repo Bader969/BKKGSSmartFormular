@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { LoginForm } from '@/components/LoginForm';
+import { JsonImportDialog } from '@/components/JsonImportDialog';
 
 const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -147,11 +148,14 @@ const Index = () => {
       {/* Header */}
       <header className="bg-primary text-primary-foreground py-6 px-4 shadow-lg">
         <div className="max-w-5xl mx-auto">
-          <div className="flex items-center gap-3 mb-2">
-            <FileText className="h-8 w-8" />
-            <h1 className="text-2xl md:text-3xl font-bold">
-              BKK GS-Smart Formular
-            </h1>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <FileText className="h-8 w-8" />
+              <h1 className="text-2xl md:text-3xl font-bold">
+                BKK GS-Smart Formular
+              </h1>
+            </div>
+            <JsonImportDialog formData={formData} setFormData={setFormData} />
           </div>
           <p className="text-primary-foreground/80 text-sm md:text-base">
             BKK GILDEMEISTER SEIDENSTICK - Online-Formular
