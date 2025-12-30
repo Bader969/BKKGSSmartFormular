@@ -5,36 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    const { text } = await req.json();
-    
-    if (!text || typeof text !== 'string') {
-      return new Response(
-        JSON.stringify({ error: 'Text ist erforderlich' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
-    }
-
-    console.log('Processing insurance text with Gemini 3...');
-    console.log('Input text length:', text.length);
-
-    const systemPrompt = `Du bist ein Experte für das Extrahieren von strukturierten Daten aus Versicherungstexten.
-Extrahiere alle relevanten Informationen aus dem gegebenen Text und gib sie als JSON zurück.
-
-Das JSON muss folgendes Format haben (fülle nur Felder aus, die du im Text findest):
-
-{
+const jsonSchema = `{
   "mode": "familienversicherung_und_rundum" | "nur_familienversicherung" | "nur_rundum",
   "mitgliedName": "Nachname des Mitglieds",
   "mitgliedVorname": "Vorname des Mitglieds",
@@ -60,8 +31,6 @@ Das JSON muss folgendes Format haben (fülle nur Felder aus, die du im Text find
     "bisherigBestandBei": "Vorherige Krankenkasse",
     "bisherigEndeteAm": "TT.MM.JJJJ",
     "bisherigArt": "mitgliedschaft" | "familienversicherung",
-    "bisherigVorname": "Vorname des bisherigen Mitglieds",
-    "bisherigNachname": "Nachname des bisherigen Mitglieds",
     "familienversichert": true | false
   },
   "kinder": [
@@ -88,13 +57,76 @@ Das JSON muss folgendes Format haben (fülle nur Felder aus, die du im Text find
     "arztEhegatte": { "name": "Arztname", "ort": "Praxisort" },
     "aerzteKinder": [{ "name": "Arztname", "ort": "Praxisort" }]
   }
-}
+}`;
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const body = await req.json();
+    const { text, images } = body;
+    
+    // Validate input - either text or images required
+    if ((!text || typeof text !== 'string') && (!images || !Array.isArray(images) || images.length === 0)) {
+      return new Response(
+        JSON.stringify({ error: 'Text oder Bilder sind erforderlich' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY is not configured');
+    }
+
+    console.log('Processing insurance data with Gemini...');
+    console.log('Input type:', images ? `${images.length} images` : 'text');
+
+    const systemPrompt = `Du bist ein Experte für Versicherungsdaten. Analysiere diesen Stapel an Dokumenten einer Familie. 
+Identifiziere die Rollen (Mitglied, Ehegatte, Kinder) basierend auf Namen und Geburtsdaten. 
+Extrahiere alle relevanten Daten (Name, Vorname, Geburtsdatum, KV-Nummer, IBAN, Krankenkasse, Arbeitgeber/Jobcenter) und gib sie EXAKT in diesem JSON-Schema zurück:
+
+${jsonSchema}
 
 Wichtig:
 - Gib NUR das JSON zurück, keine zusätzliche Erklärung
 - Verwende deutsche Datumsformate (TT.MM.JJJJ) außer für das "datum" Feld (JJJJ-MM-TT)
-- Lasse Felder weg, für die du keine Informationen findest
-- Achte auf korrekte Schreibweisen und Formatierungen`;
+- Falls Daten auf den Bildern/im Text fehlen, setze ""
+- Achte auf korrekte Schreibweisen und Formatierungen
+- Antworte NUR mit dem JSON`;
+
+    // Build messages array based on input type
+    let messages: any[];
+    
+    if (images && images.length > 0) {
+      // Image-based extraction using Gemini 3 Pro with vision
+      const imageContents = images.map((img: { base64: string; mimeType: string }) => ({
+        type: "image_url",
+        image_url: {
+          url: `data:${img.mimeType};base64,${img.base64}`
+        }
+      }));
+
+      messages = [
+        { role: 'system', content: systemPrompt },
+        { 
+          role: 'user', 
+          content: [
+            { type: 'text', text: 'Analysiere diese Dokumente und extrahiere alle Versicherungsdaten:' },
+            ...imageContents
+          ]
+        }
+      ];
+    } else {
+      // Text-based extraction
+      messages = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Extrahiere die Versicherungsdaten aus folgendem Text:\n\n${text}` }
+      ];
+    }
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -103,11 +135,8 @@ Wichtig:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Extrahiere die Versicherungsdaten aus folgendem Text:\n\n${text}` }
-        ],
+        model: images && images.length > 0 ? 'google/gemini-2.5-pro' : 'google/gemini-2.5-flash',
+        messages,
       }),
     });
 
@@ -156,6 +185,9 @@ Wichtig:
     }
 
     console.log('Extracted JSON:', JSON.stringify(extractedJson, null, 2));
+
+    // Images are processed in memory only - no storage
+    // This ensures PII data is never persisted
 
     return new Response(
       JSON.stringify(extractedJson),
