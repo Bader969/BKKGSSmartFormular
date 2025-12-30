@@ -165,7 +165,7 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
               {isExtracting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  KI analysiert Text...
+                  analysiert...
                 </>
               ) : (
                 <>
