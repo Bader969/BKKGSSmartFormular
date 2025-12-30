@@ -2,23 +2,28 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Upload, Copy, Check, Sparkles, Loader2, X, FileImage, Shield, Image, Download, Settings2, FileText, RotateCcw } from 'lucide-react';
+import { Upload, Copy, Check, Sparkles, Loader2, X, FileImage, Shield, Image, Download, FileText } from 'lucide-react';
 import { FormData, FormMode } from '@/types/form';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
-import { 
-  processImage, 
-  fileToBase64, 
-  dataUrlToBase64, 
-  getMimeTypeFromDataUrl,
-  defaultProcessingOptions,
-  type ProcessingOptions 
-} from '@/utils/imageProcessing';
-import { createPdfFromImages, downloadBlob, getImageDimensions, type ImageForPdf } from '@/utils/pdfUtils';
+import { createCombinedPdf, downloadBlob } from '@/utils/pdfUtils';
+
+/**
+ * Convert a File to base64 string (without data URL prefix)
+ */
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
 
 interface JsonImportDialogProps {
   formData: FormData;
@@ -29,15 +34,8 @@ interface JsonImportDialogProps {
 interface UploadedFile {
   file: File;
   preview: string;
-  originalPreview: string; // Keep original for restore
-  processedPreview?: string;
-  aiImprovedPreview?: string; // AI-enhanced version from edge function
-  aiImprovedBase64?: string;
   base64: string;
   mimeType: string;
-  isProcessed: boolean;
-  isAiImproved: boolean;
-  useOriginal: boolean; // Flag to use original instead of AI version
 }
 
 // Beispiel-JSON-Daten für Familienversicherung + Rundum
@@ -161,10 +159,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [isProcessingImages, setIsProcessingImages] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
-  const [showScannerSettings, setShowScannerSettings] = useState(false);
-  const [processingOptions, setProcessingOptions] = useState<ProcessingOptions>(defaultProcessingOptions);
 
   // Modus-abhängiges Beispiel-JSON
   const exampleJson = useMemo(() => {
@@ -191,7 +186,6 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
     const validFiles: UploadedFile[] = [];
     
     for (const file of Array.from(files)) {
-      // Accept images and PDFs
       const isImage = file.type.startsWith('image/');
       const isPdf = file.type === 'application/pdf';
       
@@ -210,12 +204,8 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
         validFiles.push({
           file,
           preview,
-          originalPreview: preview,
           base64,
           mimeType: file.type,
-          isProcessed: false,
-          isAiImproved: false,
-          useOriginal: false
         });
       } catch (error) {
         console.error('Error processing file:', error);
@@ -249,96 +239,30 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
     setUploadedFiles(prev => {
       const newFiles = [...prev];
       URL.revokeObjectURL(newFiles[index].preview);
-      if (newFiles[index].processedPreview) {
-        URL.revokeObjectURL(newFiles[index].processedPreview);
-      }
       newFiles.splice(index, 1);
       return newFiles;
     });
   };
 
-  // Process images with scanner filters
-  const handleProcessImages = async () => {
-    const imageFiles = uploadedFiles.filter(f => f.mimeType.startsWith('image/'));
-    
-    if (imageFiles.length === 0) {
-      toast.error('Keine Bilder zum Verarbeiten vorhanden');
-      return;
-    }
-
-    setIsProcessingImages(true);
-    toast.info('Dokumente werden lokal optimiert...');
-
-    try {
-      const processedFiles = await Promise.all(
-        uploadedFiles.map(async (uploadedFile) => {
-          // Skip PDFs - they can't be processed as images
-          if (uploadedFile.mimeType === 'application/pdf') {
-            return uploadedFile;
-          }
-
-          const { dataUrl, blob } = await processImage(uploadedFile.preview, processingOptions);
-          
-          // Revoke old preview if it was processed before
-          if (uploadedFile.processedPreview) {
-            URL.revokeObjectURL(uploadedFile.processedPreview);
-          }
-          
-          // Revoke original preview - we don't need it anymore (privacy)
-          URL.revokeObjectURL(uploadedFile.preview);
-
-          return {
-            ...uploadedFile,
-            preview: dataUrl,
-            processedPreview: URL.createObjectURL(blob),
-            base64: dataUrlToBase64(dataUrl),
-            mimeType: 'image/jpeg',
-            isProcessed: true,
-            isAiImproved: uploadedFile.isAiImproved,
-            useOriginal: uploadedFile.useOriginal
-          };
-        })
-      );
-
-      setUploadedFiles(processedFiles);
-      toast.success('Dokumente erfolgreich optimiert!');
-    } catch (error) {
-      console.error('Error processing images:', error);
-      toast.error('Fehler beim Verarbeiten der Bilder');
-    } finally {
-      setIsProcessingImages(false);
-    }
-  };
-
-  // Export processed images as PDF - uses AI-improved versions when available
+  // Export all files as combined PDF
   const handleExportPdf = async () => {
-    const processedImages = uploadedFiles.filter(f => f.mimeType.startsWith('image/'));
-    
-    if (processedImages.length === 0) {
-      toast.error('Keine Bilder für PDF-Export vorhanden');
+    if (uploadedFiles.length === 0) {
+      toast.error('Keine Dateien für PDF-Export vorhanden');
       return;
     }
 
     setIsExportingPdf(true);
 
     try {
-      const imagesForPdf: ImageForPdf[] = await Promise.all(
-        processedImages.map(async (file) => {
-          // Use AI-improved image if available and not overridden
-          const activePreview = getActivePreview(file);
-          const dimensions = await getImageDimensions(activePreview);
-          return {
-            dataUrl: activePreview,
-            width: dimensions.width,
-            height: dimensions.height
-          };
-        })
-      );
+      const filesForPdf = uploadedFiles.map(f => ({
+        base64: f.base64,
+        mimeType: f.mimeType
+      }));
 
-      const pdfBlob = await createPdfFromImages(imagesForPdf);
-      const filename = `dokumente-scan-${new Date().toISOString().slice(0, 10)}.pdf`;
+      const pdfBlob = await createCombinedPdf(filesForPdf);
+      const filename = `dokumente-${new Date().toISOString().slice(0, 10)}.pdf`;
       downloadBlob(pdfBlob, filename);
-      toast.success('PDF mit KI-verbesserten Bildern erstellt!');
+      toast.success('PDF erfolgreich erstellt!');
     } catch (error) {
       console.error('Error creating PDF:', error);
       toast.error('Fehler beim Erstellen der PDF');
@@ -399,30 +323,9 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       }
 
       setAnalysisProgress(100);
+      toast.success('Daten erfolgreich extrahiert!');
 
-      // Check if we have AI-improved images in the response
-      if (data.improvedImages && Array.isArray(data.improvedImages)) {
-        const updatedFiles = uploadedFiles.map((file, index) => {
-          const improvedImage = data.improvedImages[index];
-          if (improvedImage && file.mimeType.startsWith('image/')) {
-            const aiDataUrl = `data:image/jpeg;base64,${improvedImage}`;
-            return {
-              ...file,
-              aiImprovedPreview: aiDataUrl,
-              aiImprovedBase64: improvedImage,
-              isAiImproved: true,
-              useOriginal: false
-            };
-          }
-          return file;
-        });
-        setUploadedFiles(updatedFiles);
-        toast.success('Daten extrahiert & Bilder magisch verbessert!');
-      } else {
-        toast.success('Daten erfolgreich extrahiert!');
-      }
-
-      // Extract the actual form data (exclude improvedImages)
+      // Extract the actual form data (exclude improvedImages if present)
       const { improvedImages, ...formDataFromAi } = data;
       setJsonInput(JSON.stringify(formDataFromAi, null, 2));
       
@@ -435,48 +338,14 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
     }
   };
 
-  // Toggle between AI-improved and original image
-  const handleRestoreOriginal = (index: number) => {
-    setUploadedFiles(prev => prev.map((file, i) => {
-      if (i === index) {
-        return { ...file, useOriginal: !file.useOriginal };
-      }
-      return file;
-    }));
-  };
-
-  // Get the best preview for display and export
-  const getActivePreview = (file: UploadedFile): string => {
-    if (file.useOriginal) {
-      return file.processedPreview || file.originalPreview;
-    }
-    if (file.aiImprovedPreview) {
-      return file.aiImprovedPreview;
-    }
-    return file.processedPreview || file.preview;
-  };
-
-  // Get base64 for PDF export (prefers AI-improved unless useOriginal)
-  const getActiveBase64 = (file: UploadedFile): string => {
-    if (file.useOriginal) {
-      return file.base64;
-    }
-    if (file.aiImprovedBase64) {
-      return file.aiImprovedBase64;
-    }
-    return file.base64;
-  };
-
   const handleImport = () => {
     try {
       const parsed = JSON.parse(jsonInput) as FormData;
       
-      // Validierung der grundlegenden Struktur
       if (typeof parsed !== 'object' || parsed === null) {
         throw new Error('Ungültiges JSON-Format');
       }
       
-      // Merge mit bestehenden Daten (behält Standardwerte bei)
       setFormData({
         ...formData,
         ...parsed,
@@ -491,10 +360,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       setOpen(false);
       setJsonInput('');
       setFreitextInput('');
-      uploadedFiles.forEach(f => {
-        URL.revokeObjectURL(f.preview);
-        if (f.processedPreview) URL.revokeObjectURL(f.processedPreview);
-      });
+      uploadedFiles.forEach(f => URL.revokeObjectURL(f.preview));
       setUploadedFiles([]);
     } catch (error) {
       toast.error('Ungültiges JSON-Format. Bitte überprüfen Sie die Eingabe.');
@@ -584,36 +450,11 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
                           <FileText className="h-8 w-8 text-muted-foreground" />
                         </div>
                       ) : (
-                        <div className="relative">
-                          <img
-                            src={getActivePreview(file)}
-                            alt={file.file.name}
-                            className={`h-24 w-24 object-cover rounded-md border transition-all ${
-                              file.isAiImproved && !file.useOriginal 
-                                ? 'ring-2 ring-purple-500' 
-                                : file.isProcessed 
-                                  ? 'ring-2 ring-green-500' 
-                                  : ''
-                            }`}
-                          />
-                          {/* AI Improved Badge */}
-                          {file.isAiImproved && !file.useOriginal && (
-                            <span className="absolute top-1 left-1 bg-purple-500 text-white text-[8px] px-1 py-0.5 rounded font-medium">
-                              ✨ KI
-                            </span>
-                          )}
-                          {/* Restore Original Button */}
-                          {file.isAiImproved && (
-                            <button
-                              onClick={() => handleRestoreOriginal(index)}
-                              className="absolute bottom-1 left-1 right-1 bg-background/90 hover:bg-background text-[9px] px-1 py-0.5 rounded border flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                              title={file.useOriginal ? 'KI-Version verwenden' : 'Original wiederherstellen'}
-                            >
-                              <RotateCcw className="h-2.5 w-2.5" />
-                              {file.useOriginal ? 'KI-Version' : 'Original'}
-                            </button>
-                          )}
-                        </div>
+                        <img
+                          src={file.preview}
+                          alt={file.file.name}
+                          className="h-24 w-24 object-cover rounded-md border"
+                        />
                       )}
                       <button
                         onClick={() => removeFile(index)}
@@ -622,128 +463,30 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
                         <X className="h-3 w-3" />
                       </button>
                       <p className="text-[10px] truncate max-w-[96px] mt-1">{file.file.name}</p>
-                      {file.isProcessed && !file.isAiImproved && (
-                        <span className="text-[8px] text-center text-green-600 font-medium block">
-                          Optimiert
-                        </span>
-                      )}
-                      {file.useOriginal && file.isAiImproved && (
-                        <span className="text-[8px] text-center text-amber-600 font-medium block">
-                          Original
-                        </span>
-                      )}
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
 
-            {/* Scanner Settings */}
-            {hasImages && (
-              <div className="space-y-3">
+                {/* PDF Export Button */}
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
-                  onClick={() => setShowScannerSettings(!showScannerSettings)}
-                  className="gap-2"
+                  onClick={handleExportPdf}
+                  disabled={isExportingPdf}
+                  className="gap-2 mt-2"
                 >
-                  <Settings2 className="h-4 w-4" />
-                  Scanner-Einstellungen
+                  {isExportingPdf ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Erstelle PDF...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" />
+                      Alle Dateien als PDF zusammenfassen
+                    </>
+                  )}
                 </Button>
-
-                {showScannerSettings && (
-                  <div className="p-4 border rounded-lg bg-background space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-sm">Kontrast: {processingOptions.contrast.toFixed(1)}</Label>
-                      <Slider
-                        value={[processingOptions.contrast]}
-                        onValueChange={([value]) => setProcessingOptions(prev => ({ ...prev, contrast: value }))}
-                        min={0.5}
-                        max={2}
-                        step={0.1}
-                        className="w-full"
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label className="text-sm">Helligkeit: {processingOptions.brightness}</Label>
-                      <Slider
-                        value={[processingOptions.brightness]}
-                        onValueChange={([value]) => setProcessingOptions(prev => ({ ...prev, brightness: value }))}
-                        min={-50}
-                        max={50}
-                        step={5}
-                        className="w-full"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">Auto-Crop (Hintergrund entfernen)</Label>
-                      <Switch
-                        checked={processingOptions.autoCrop}
-                        onCheckedChange={(checked) => setProcessingOptions(prev => ({ ...prev, autoCrop: checked }))}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">Graustufen</Label>
-                      <Switch
-                        checked={processingOptions.grayscale}
-                        onCheckedChange={(checked) => setProcessingOptions(prev => ({ ...prev, grayscale: checked }))}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">Rauschen reduzieren</Label>
-                      <Switch
-                        checked={processingOptions.denoise}
-                        onCheckedChange={(checked) => setProcessingOptions(prev => ({ ...prev, denoise: checked }))}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleProcessImages}
-                    disabled={isProcessingImages || !hasImages}
-                    className="gap-2"
-                  >
-                    {isProcessingImages ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Optimiere...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4" />
-                        Bilder optimieren (Scanner-Filter)
-                      </>
-                    )}
-                  </Button>
-
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleExportPdf}
-                    disabled={isExportingPdf || !hasImages}
-                    className="gap-2"
-                  >
-                    {isExportingPdf ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Erstelle PDF...
-                      </>
-                    ) : (
-                      <>
-                        <Download className="h-4 w-4" />
-                        Dokumente als gescanntes PDF speichern
-                      </>
-                    )}
-                  </Button>
-                </div>
               </div>
             )}
 
@@ -751,7 +494,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
             <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
               <Shield className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
               <p className="text-xs text-green-700 dark:text-green-400">
-                <strong>Sichere Verarbeitung:</strong> Ihre Dokumente werden verschlüsselt analysiert und nach der Verarbeitung sofort gelöscht. Originalfotos werden nach dem Cropping verworfen – nur bereinigte Dokumente bleiben im Speicher.
+                <strong>Sichere Verarbeitung:</strong> Ihre Dokumente werden verschlüsselt analysiert und nach der Verarbeitung sofort gelöscht.
               </p>
             </div>
           </div>
