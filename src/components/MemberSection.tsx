@@ -80,7 +80,10 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           label="Name der Krankenkasse"
           id="mitgliedKrankenkasse"
           value={formData.mitgliedKrankenkasse}
-          onChange={(value) => updateFormData({ mitgliedKrankenkasse: value })}
+          onChange={(value) => updateFormData({ 
+            mitgliedKrankenkasse: value,
+            ehegatteKrankenkasse: value  // Synchronisiert mit Name der bisherigen Krankenkasse (Ehegatte)
+          })}
           placeholder="z.B. BKK GS"
           required
           validate={validateKrankenkasse}
