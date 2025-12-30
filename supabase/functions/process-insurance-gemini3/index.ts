@@ -5,8 +5,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const jsonSchema = `{
-  "mode": "familienversicherung_und_rundum" | "nur_familienversicherung" | "nur_rundum",
+// Schema für Familienversicherung + Rundum-Sicher-Paket
+const familyJsonSchema = `{
+  "mode": "familienversicherung_und_rundum",
   "mitgliedName": "Nachname des Mitglieds",
   "mitgliedVorname": "Vorname des Mitglieds",
   "mitgliedGeburtsdatum": "TT.MM.JJJJ",
@@ -59,6 +60,26 @@ const jsonSchema = `{
   }
 }`;
 
+// Vereinfachtes Schema nur für Rundum-Sicher-Paket (ohne Familienmitglieder)
+const rundumOnlyJsonSchema = `{
+  "mode": "nur_rundum",
+  "mitgliedName": "Nachname des Mitglieds",
+  "mitgliedVorname": "Vorname des Mitglieds",
+  "mitgliedGeburtsdatum": "TT.MM.JJJJ",
+  "mitgliedKvNummer": "Krankenversicherungsnummer",
+  "mitgliedKrankenkasse": "Name der Krankenkasse",
+  "familienstand": "ledig" | "verheiratet" | "geschieden" | "verwitwet",
+  "telefon": "Telefonnummer",
+  "email": "E-Mail-Adresse",
+  "datum": "JJJJ-MM-TT",
+  "ort": "Ort",
+  "rundumSicherPaket": {
+    "iban": "IBAN",
+    "kontoinhaber": "Name des Kontoinhabers",
+    "arztMitglied": { "name": "Arztname", "ort": "Praxisort" }
+  }
+}`;
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -67,7 +88,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { text, images } = body;
+    const { text, images, mode } = body;
     
     // Validate input - either text or images required
     if ((!text || typeof text !== 'string') && (!images || !Array.isArray(images) || images.length === 0)) {
@@ -76,6 +97,10 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Determine which mode we're in
+    const isRundumOnly = mode === 'nur_rundum';
+    const jsonSchema = isRundumOnly ? rundumOnlyJsonSchema : familyJsonSchema;
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
@@ -88,9 +113,17 @@ serve(async (req) => {
 
     console.log('Processing insurance data with Gemini...');
     console.log('Input type:', images ? `${imageFiles.length} images, ${pdfFiles.length} PDFs` : 'text');
+    console.log('Mode:', mode || 'familienversicherung_und_rundum');
 
-    const systemPrompt = `Du bist ein Experte für Versicherungsdaten. Analysiere diesen Stapel an Dokumenten einer Familie. 
-Identifiziere die Rollen (Mitglied, Ehegatte, Kinder) basierend auf Namen und Geburtsdaten. 
+    // Modus-spezifische Anweisungen
+    const modeInstruction = isRundumOnly 
+      ? `Du extrahierst NUR die Daten des Mitglieds selbst. IGNORIERE alle Familienmitglieder (Ehegatte, Kinder) in den Dokumenten komplett. Es handelt sich um einen Einzelantrag für das Rundum-Sicher-Paket.`
+      : `Identifiziere die Rollen (Mitglied, Ehegatte, Kinder) basierend auf Namen und Geburtsdaten. Extrahiere alle Familienmitglieder.`;
+
+    const systemPrompt = `Du bist ein Experte für Versicherungsdaten. Analysiere diesen Stapel an Dokumenten.
+
+${modeInstruction}
+
 Extrahiere alle relevanten Daten (Name, Vorname, Geburtsdatum, KV-Nummer, IBAN, Krankenkasse, Arbeitgeber/Jobcenter) und gib sie EXAKT in diesem JSON-Schema zurück:
 
 ${jsonSchema}

@@ -1,9 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Upload, Copy, Check, Sparkles, Loader2, X, FileImage, Shield, Image, Download, Settings2, FileText, RotateCcw } from 'lucide-react';
-import { FormData } from '@/types/form';
+import { FormData, FormMode } from '@/types/form';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
@@ -23,6 +23,7 @@ import { createPdfFromImages, downloadBlob, getImageDimensions, type ImageForPdf
 interface JsonImportDialogProps {
   formData: FormData;
   setFormData: (data: FormData) => void;
+  currentMode: FormMode;
 }
 
 interface UploadedFile {
@@ -39,8 +40,8 @@ interface UploadedFile {
   useOriginal: boolean; // Flag to use original instead of AI version
 }
 
-// Beispiel-JSON-Daten für alle Felder
-const createExampleJson = (): FormData => ({
+// Beispiel-JSON-Daten für Familienversicherung + Rundum
+const createFamilyExampleJson = (): Partial<FormData> => ({
   mode: 'familienversicherung_und_rundum',
   mitgliedName: 'Mustermann',
   mitgliedVorname: 'Max',
@@ -99,31 +100,7 @@ const createExampleJson = (): FormData => ({
       versichertennummer: 'C111222333',
       familienversichert: true,
     },
-    {
-      name: 'Mustermann',
-      vorname: 'Tom',
-      geschlecht: 'm',
-      geburtsdatum: '25.07.2018',
-      abweichendeAnschrift: '',
-      verwandtschaft: 'leiblich',
-      isEhegatteVerwandt: false,
-      bisherigEndeteAm: '31.12.2025',
-      bisherigBestandBei: 'AOK',
-      bisherigArt: 'familienversicherung',
-      bisherigVorname: 'Maria',
-      bisherigNachname: 'Mustermann',
-      bisherigBestehtWeiter: true,
-      bisherigBestehtWeiterBei: 'BKK GS',
-      geburtsname: '',
-      geburtsort: 'Musterstadt',
-      geburtsland: 'Deutschland',
-      staatsangehoerigkeit: 'deutsch',
-      versichertennummer: 'D444555666',
-      familienversichert: true,
-    },
   ],
-  unterschrift: '',
-  unterschriftFamilie: '',
   rundumSicherPaket: {
     iban: 'DE89370400440532013000',
     kontoinhaber: 'Max Mustermann',
@@ -132,10 +109,7 @@ const createExampleJson = (): FormData => ({
     datumRSP: '2026-01-10',
     arztMitglied: { name: 'Dr. Müller', ort: 'Musterstadt' },
     arztEhegatte: { name: 'Dr. Schmidt', ort: 'Musterstadt' },
-    aerzteKinder: [
-      { name: 'Dr. Kinderarzt', ort: 'Musterstadt' },
-      { name: 'Dr. Kinderarzt', ort: 'Musterstadt' },
-    ],
+    aerzteKinder: [{ name: 'Dr. Kinderarzt', ort: 'Musterstadt' }],
     zusatzversicherung1: 'zahnzusatz',
     zusatzversicherung2: 'unfall',
     jahresbeitrag: '500',
@@ -146,7 +120,39 @@ const createExampleJson = (): FormData => ({
   mitgliedVersichertennummer: 'A123456789',
 });
 
-export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, setFormData }) => {
+// Vereinfachtes JSON nur für Rundum-Sicher-Paket (ohne Ehegatte/Kinder)
+const createRundumOnlyExampleJson = (): Partial<FormData> => ({
+  mode: 'nur_rundum',
+  mitgliedName: 'Mustermann',
+  mitgliedVorname: 'Max',
+  mitgliedGeburtsdatum: '15.05.1985',
+  mitgliedKvNummer: 'A123456789',
+  mitgliedKrankenkasse: 'BKK GS',
+  familienstand: 'ledig',
+  telefon: '0123456789',
+  email: 'max.mustermann@example.com',
+  datum: '2026-01-10',
+  ort: 'Musterstadt',
+  rundumSicherPaket: {
+    iban: 'DE89370400440532013000',
+    kontoinhaber: 'Max Mustermann',
+    zeitraumVon: '2026-01-01',
+    zeitraumBis: '2026-12-31',
+    datumRSP: '2026-01-10',
+    arztMitglied: { name: 'Dr. Müller', ort: 'Musterstadt' },
+    arztEhegatte: { name: '', ort: '' },
+    aerzteKinder: [],
+    zusatzversicherung1: 'zahnzusatz',
+    zusatzversicherung2: '',
+    jahresbeitrag: '500',
+    datenschutz1: true,
+    datenschutz2: true,
+    unterschriftMakler: '',
+  },
+  mitgliedVersichertennummer: 'A123456789',
+});
+
+export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, setFormData, currentMode }) => {
   const [open, setOpen] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
   const [freitextInput, setFreitextInput] = useState('');
@@ -160,7 +166,15 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
   const [showScannerSettings, setShowScannerSettings] = useState(false);
   const [processingOptions, setProcessingOptions] = useState<ProcessingOptions>(defaultProcessingOptions);
 
-  const exampleJson = JSON.stringify(createExampleJson(), null, 2);
+  // Modus-abhängiges Beispiel-JSON
+  const exampleJson = useMemo(() => {
+    const exampleData = currentMode === 'nur_rundum' 
+      ? createRundumOnlyExampleJson() 
+      : createFamilyExampleJson();
+    return JSON.stringify(exampleData, null, 2);
+  }, [currentMode]);
+
+  const isRundumOnlyMode = currentMode === 'nur_rundum';
 
   const handleCopyExample = async () => {
     try {
@@ -346,7 +360,13 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
     setAnalysisProgress(10);
 
     try {
-      const requestBody: { text?: string; images?: { base64: string; mimeType: string }[] } = {};
+      const requestBody: { 
+        text?: string; 
+        images?: { base64: string; mimeType: string }[];
+        mode: FormMode;
+      } = {
+        mode: currentMode
+      };
       
       if (hasFiles) {
         requestBody.images = uploadedFiles.map(f => ({
@@ -482,8 +502,14 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
     }
   };
 
+  // Zeigt aktuelle Daten an - im nur_rundum Modus ohne ehegatte/kinder
   const handleShowCurrentData = () => {
-    setJsonInput(JSON.stringify(formData, null, 2));
+    if (isRundumOnlyMode) {
+      const { ehegatte, kinder, ehegatteKrankenkasse, beginnFamilienversicherung, unterschriftFamilie, ...restData } = formData;
+      setJsonInput(JSON.stringify(restData, null, 2));
+    } else {
+      setJsonInput(JSON.stringify(formData, null, 2));
+    }
   };
 
   const hasImages = uploadedFiles.some(f => f.mimeType.startsWith('image/'));

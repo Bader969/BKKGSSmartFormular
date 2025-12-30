@@ -155,7 +155,7 @@ const Index = () => {
                 BKK GS-Smart Formular
               </h1>
             </div>
-            <JsonImportDialog formData={formData} setFormData={setFormData} />
+            <JsonImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} />
           </div>
           <p className="text-primary-foreground/80 text-sm md:text-base">
             BKK GILDEMEISTER SEIDENSTICK - Online-Formular
