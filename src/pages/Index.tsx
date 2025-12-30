@@ -13,6 +13,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { LoginForm } from '@/components/LoginForm';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
+import { FreitextImportDialog } from '@/components/FreitextImportDialog';
 
 const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -155,7 +156,10 @@ const Index = () => {
                 BKK GS-Smart Formular
               </h1>
             </div>
-            <JsonImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} />
+            <div className="flex items-center gap-2">
+              <FreitextImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} />
+              <JsonImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} />
+            </div>
           </div>
           <p className="text-primary-foreground/80 text-sm md:text-base">
             BKK GILDEMEISTER SEIDENSTICK - Online-Formular
