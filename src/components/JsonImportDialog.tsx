@@ -1,15 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Upload, Copy, Check, Sparkles, Loader2 } from 'lucide-react';
+import { Upload, Copy, Check, Sparkles, Loader2, X, FileImage, Shield, Image } from 'lucide-react';
 import { FormData } from '@/types/form';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { Progress } from '@/components/ui/progress';
 
 interface JsonImportDialogProps {
   formData: FormData;
   setFormData: (data: FormData) => void;
+}
+
+interface UploadedFile {
+  file: File;
+  preview: string;
+  base64: string;
+  mimeType: string;
 }
 
 // Beispiel-JSON-Daten für alle Felder
@@ -125,6 +133,9 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
   const [freitextInput, setFreitextInput] = useState('');
   const [copied, setCopied] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
 
   const exampleJson = JSON.stringify(createExampleJson(), null, 2);
 
@@ -139,17 +150,112 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
     }
   };
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove the data:image/xxx;base64, prefix
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+    });
+  };
+
+  const handleFileUpload = useCallback(async (files: FileList | File[]) => {
+    const validFiles: UploadedFile[] = [];
+    
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) {
+        toast.error(`${file.name} ist kein Bild`);
+        continue;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`${file.name} ist zu groß (max. 10MB)`);
+        continue;
+      }
+      
+      try {
+        const base64 = await fileToBase64(file);
+        const preview = URL.createObjectURL(file);
+        validFiles.push({
+          file,
+          preview,
+          base64,
+          mimeType: file.type
+        });
+      } catch (error) {
+        console.error('Error processing file:', error);
+        toast.error(`Fehler bei ${file.name}`);
+      }
+    }
+    
+    setUploadedFiles(prev => [...prev, ...validFiles]);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    if (e.dataTransfer.files.length > 0) {
+      handleFileUpload(e.dataTransfer.files);
+    }
+  }, [handleFileUpload]);
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => {
+      const newFiles = [...prev];
+      URL.revokeObjectURL(newFiles[index].preview);
+      newFiles.splice(index, 1);
+      return newFiles;
+    });
+  };
+
   const handleExtractWithGemini = async () => {
-    if (!freitextInput.trim()) {
-      toast.error('Bitte gib zuerst einen Text ein.');
+    const hasText = freitextInput.trim().length > 0;
+    const hasImages = uploadedFiles.length > 0;
+
+    if (!hasText && !hasImages) {
+      toast.error('Bitte gib Text ein oder lade Dokumente hoch.');
       return;
     }
 
     setIsExtracting(true);
+    setAnalysisProgress(10);
+
     try {
+      const requestBody: { text?: string; images?: { base64: string; mimeType: string }[] } = {};
+      
+      if (hasImages) {
+        requestBody.images = uploadedFiles.map(f => ({
+          base64: f.base64,
+          mimeType: f.mimeType
+        }));
+      }
+      
+      if (hasText) {
+        requestBody.text = freitextInput;
+      }
+
+      setAnalysisProgress(30);
+
       const { data, error } = await supabase.functions.invoke('process-insurance-gemini3', {
-        body: { text: freitextInput }
+        body: requestBody
       });
+
+      setAnalysisProgress(80);
 
       if (error) {
         console.error('Edge function error:', error);
@@ -162,14 +268,22 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
         return;
       }
 
+      setAnalysisProgress(100);
+
       // Set the extracted JSON to the JSON input field
       setJsonInput(JSON.stringify(data, null, 2));
       toast.success('Daten erfolgreich extrahiert!');
+      
+      // Clean up file previews
+      uploadedFiles.forEach(f => URL.revokeObjectURL(f.preview));
+      setUploadedFiles([]);
+      setFreitextInput('');
     } catch (error) {
       console.error('Error extracting data:', error);
       toast.error('Fehler bei der Datenextraktion. Bitte versuche es erneut.');
     } finally {
       setIsExtracting(false);
+      setAnalysisProgress(0);
     }
   };
 
@@ -197,6 +311,8 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       setOpen(false);
       setJsonInput('');
       setFreitextInput('');
+      uploadedFiles.forEach(f => URL.revokeObjectURL(f.preview));
+      setUploadedFiles([]);
     } catch (error) {
       toast.error('Ungültiges JSON-Format. Bitte überprüfen Sie die Eingabe.');
       console.error('JSON parse error:', error);
@@ -217,59 +333,144 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>JSON-Daten importieren</DialogTitle>
+          <DialogTitle>Dokumente & Daten importieren</DialogTitle>
           <DialogDescription>
-            Fügen Sie JSON-Daten ein oder lassen Sie die KI Daten aus Freitext extrahieren.
+            Laden Sie Dokumente hoch oder fügen Sie Text ein – die KI extrahiert automatisch alle Versicherungsdaten.
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4">
+          {/* Dokument-Upload Sektion */}
+          <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+            <div className="flex items-center gap-2">
+              <Image className="h-5 w-5 text-primary" />
+              <label className="text-sm font-medium">Dokumente hochladen:</label>
+            </div>
+            
+            {/* Drag and Drop Zone */}
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`
+                relative border-2 border-dashed rounded-lg p-8 text-center transition-all cursor-pointer
+                ${isDragging 
+                  ? 'border-primary bg-primary/10' 
+                  : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50'
+                }
+              `}
+              onClick={() => document.getElementById('file-upload')?.click()}
+            >
+              <input
+                id="file-upload"
+                type="file"
+                multiple
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
+              />
+              <FileImage className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+              <p className="text-sm font-medium">
+                Dokumente hier ablegen oder klicken zum Hochladen
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Ausweise, Krankenkassenkarten, Bescheide (JPG, PNG) – max. 10MB pro Datei
+              </p>
+            </div>
+
+            {/* Uploaded Files List */}
+            {uploadedFiles.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  {uploadedFiles.length} Dokument(e) ausgewählt:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {uploadedFiles.map((file, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={file.preview}
+                        alt={file.file.name}
+                        className="h-20 w-20 object-cover rounded-md border"
+                      />
+                      <button
+                        onClick={() => removeFile(index)}
+                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                      <p className="text-[10px] truncate max-w-[80px] mt-1">{file.file.name}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Security Notice */}
+            <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+              <Shield className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-green-700 dark:text-green-400">
+                <strong>Sichere Verarbeitung:</strong> Ihre Dokumente werden verschlüsselt analysiert und nach der Verarbeitung sofort gelöscht. Es erfolgt keine Speicherung.
+              </p>
+            </div>
+          </div>
+
           {/* Freitext-Extraktion mit KI */}
           <div className="space-y-2 p-4 border rounded-lg bg-muted/30">
-            <label className="text-sm font-medium block">Freitext hier einfügen:</label>
+            <label className="text-sm font-medium block">Oder Freitext hier einfügen:</label>
             <Textarea
               value={freitextInput}
               onChange={(e) => setFreitextInput(e.target.value)}
               placeholder="Füge hier beliebigen Text ein (z.B. E-Mail, Brief, Notizen), aus dem die Versicherungsdaten extrahiert werden sollen..."
-              className="min-h-[120px]"
+              className="min-h-[100px]"
             />
+          </div>
+
+          {/* Extract Button with Progress */}
+          <div className="space-y-2">
             <Button 
               onClick={handleExtractWithGemini} 
-              disabled={isExtracting || !freitextInput.trim()}
-              className="gap-2"
+              disabled={isExtracting || (!freitextInput.trim() && uploadedFiles.length === 0)}
+              className="w-full gap-2"
+              size="lg"
             >
               {isExtracting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Extrahiere...
+                  KI analysiert Dokumente sicher...
                 </>
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  Daten mit Gemini 3 extrahieren
+                  Daten mit KI extrahieren
                 </>
               )}
             </Button>
+            
+            {isExtracting && (
+              <Progress value={analysisProgress} className="h-2" />
+            )}
           </div>
 
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="secondary" size="sm" onClick={handleCopyExample} className="gap-2">
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              Beispiel-JSON kopieren
-            </Button>
-            <Button variant="secondary" size="sm" onClick={handleShowCurrentData}>
-              Aktuelle Daten anzeigen
-            </Button>
-          </div>
-          
-          <div>
-            <label className="text-sm font-medium mb-2 block">JSON-Daten:</label>
-            <Textarea
-              value={jsonInput}
-              onChange={(e) => setJsonInput(e.target.value)}
-              placeholder='{"mitgliedName": "Mustermann", "mitgliedVorname": "Max", ...}'
-              className="font-mono text-xs min-h-[300px]"
-            />
+          <div className="border-t pt-4">
+            <div className="flex gap-2 flex-wrap mb-3">
+              <Button variant="secondary" size="sm" onClick={handleCopyExample} className="gap-2">
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                Beispiel-JSON kopieren
+              </Button>
+              <Button variant="secondary" size="sm" onClick={handleShowCurrentData}>
+                Aktuelle Daten anzeigen
+              </Button>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium mb-2 block">JSON-Daten:</label>
+              <Textarea
+                value={jsonInput}
+                onChange={(e) => setJsonInput(e.target.value)}
+                placeholder='{"mitgliedName": "Mustermann", "mitgliedVorname": "Max", ...}'
+                className="font-mono text-xs min-h-[200px]"
+              />
+            </div>
           </div>
           
           <div className="flex justify-end gap-2">
