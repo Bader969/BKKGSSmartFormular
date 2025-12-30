@@ -19,6 +19,7 @@ const createPDFHelpers = (form: ReturnType<PDFDocument["getForm"]>): PDFHelpers 
     try {
       const field = form.getTextField(fieldName);
       if (field && value) {
+        console.log(`Setting field "${fieldName}" to "${value}"`);
         field.setText(value);
       }
     } catch (e) {
@@ -165,7 +166,7 @@ const fillChildFields = (
   const nameField = `Kind ${childNum} Name`;
   const vornameField = `Kind ${childNum} Vorname`;
   const gebDatumField = `Kind${childNum} GebDatum`;
-  const anschriftField = `Kind${childNum} Anschrift`;
+  const anschriftField = `Kind${childNum} Anschrift`; // Format: "Kind1 Anschrift", "Kind2 Anschrift", etc.
   const endetAmField = `Kind${childNum} - letzte Vers endet am`;
 
   // Gender checkbox indices: Kind 1 = m2/w2/x2/d2, Kind 2 = m3/w3/x3/d3, Kind 3 = m4/w4/x4/d4
