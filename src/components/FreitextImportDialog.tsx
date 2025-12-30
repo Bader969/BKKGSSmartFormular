@@ -170,7 +170,7 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  Daten mit KI extrahieren
+                  Daten Validieren
                 </>
               )}
             </Button>

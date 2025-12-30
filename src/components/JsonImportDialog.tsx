@@ -569,7 +569,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  Daten mit KI extrahieren {hasPdfs && '(inkl. PDFs)'}
+                  Daten Validieren {hasPdfs && '(inkl. PDFs)'}
                 </>
               )}
             </Button>
