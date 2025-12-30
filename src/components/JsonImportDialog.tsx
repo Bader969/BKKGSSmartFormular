@@ -11,7 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { createCombinedPdf, downloadBlob } from '@/utils/pdfUtils';
 
 // Passwort für den Zugang zum Import-Dialog
-const IMPORT_PASSWORD = 'bkkgs2025';
+const IMPORT_PASSWORD = 'Ahmad19Bader96';
 
 /**
  * Convert a File to base64 string (without data URL prefix)
