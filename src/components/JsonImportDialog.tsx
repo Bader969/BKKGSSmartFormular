@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
 import { createCombinedPdf, downloadBlob } from '@/utils/pdfUtils';
+import { formatDateForInput } from '@/utils/dateUtils';
 
 // Passwort für den Zugang zum Import-Dialog
 const IMPORT_PASSWORD = 'Ahmad19Bader96';
@@ -343,12 +344,16 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
         throw new Error('Ungültiges JSON-Format');
       }
       
+      // Immer heutiges Datum für Unterschrift setzen
+      const todayForInput = formatDateForInput(new Date());
+      
       setFormData({
         ...formData,
         ...parsed,
+        datum: todayForInput, // Immer heutiges Datum
         ehegatte: parsed.ehegatte ? { ...formData.ehegatte, ...parsed.ehegatte } : formData.ehegatte,
         kinder: parsed.kinder || formData.kinder,
-        rundumSicherPaket: parsed.rundumSicherPaket 
+        rundumSicherPaket: parsed.rundumSicherPaket
           ? { ...formData.rundumSicherPaket, ...parsed.rundumSicherPaket }
           : formData.rundumSicherPaket,
       });
