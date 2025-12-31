@@ -9,10 +9,9 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
 
-interface QuickCopyData {
-  arbeitgeberAdresse: string;
-  kundenAdresse: string;
-  mitgliedGeburtsort: string;
+interface CopyBlockData {
+  copyBlockMitglied: string;
+  copyBlockEhegatte: string;
 }
 
 interface FreitextImportDialogProps {
@@ -28,27 +27,58 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
   const [isExtracting, setIsExtracting] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [copied, setCopied] = useState(false);
-  const [quickCopyData, setQuickCopyData] = useState<QuickCopyData | null>(null);
-  const [copiedFields, setCopiedFields] = useState<Record<string, boolean>>({});
+  const [copyBlockData, setCopyBlockData] = useState<CopyBlockData | null>(null);
+  const [copiedBlock, setCopiedBlock] = useState<string | null>(null);
 
   // Map FormMode to simple formMode for API
   const mapFormMode = (mode: FormMode): 'familie' | 'einzel' => {
     return mode === 'familienversicherung_und_rundum' ? 'familie' : 'einzel';
   };
 
-  const handleCopyField = async (fieldName: string, value: string) => {
-    if (!value.trim()) {
+  const handleCopyBlock = async (blockType: 'mitglied' | 'ehegatte', text: string) => {
+    if (!text.trim()) {
       toast.error('Kein Text zum Kopieren');
       return;
     }
     try {
-      await navigator.clipboard.writeText(value);
-      setCopiedFields(prev => ({ ...prev, [fieldName]: true }));
-      toast.success('Kopiert!');
-      setTimeout(() => setCopiedFields(prev => ({ ...prev, [fieldName]: false })), 2000);
+      await navigator.clipboard.writeText(text);
+      setCopiedBlock(blockType);
+      toast.success('Block in Zwischenablage kopiert!');
+      setTimeout(() => setCopiedBlock(null), 2500);
     } catch {
       toast.error('Kopieren fehlgeschlagen');
     }
+  };
+
+  // Build formatted copy block from extracted data
+  const buildCopyBlock = (data: any, type: 'mitglied' | 'ehegatte'): string => {
+    const lines: string[] = [];
+    
+    if (type === 'mitglied') {
+      if (data.mitgliedName) lines.push(`Name: ${data.mitgliedName}`);
+      if (data.mitgliedVorname) lines.push(`Vorname: ${data.mitgliedVorname}`);
+      if (data.mitgliedGeburtsdatum) lines.push(`Geburtsdatum: ${data.mitgliedGeburtsdatum}`);
+      if (data.mitgliedGeburtsort) lines.push(`Geburtsort: ${data.mitgliedGeburtsort}`);
+      if (data.mitgliedStrasse) lines.push(`Straße: ${data.mitgliedStrasse}`);
+      if (data.mitgliedPLZ && data.mitgliedOrt) lines.push(`PLZ/Ort: ${data.mitgliedPLZ} ${data.mitgliedOrt}`);
+      if (data.mitgliedTelefon) lines.push(`Telefon: ${data.mitgliedTelefon}`);
+      if (data.mitgliedEmail) lines.push(`E-Mail: ${data.mitgliedEmail}`);
+      if (data.mitgliedIBAN) lines.push(`IBAN: ${data.mitgliedIBAN}`);
+      if (data.arbeitgeberAdresse) lines.push(`\nArbeitgeber:\n${data.arbeitgeberAdresse}`);
+      if (data.kundenAdresse) lines.push(`\nKunden-Adresse:\n${data.kundenAdresse}`);
+    } else if (type === 'ehegatte' && data.ehegatte) {
+      const e = data.ehegatte;
+      if (e.name) lines.push(`Name: ${e.name}`);
+      if (e.vorname) lines.push(`Vorname: ${e.vorname}`);
+      if (e.geburtsdatum) lines.push(`Geburtsdatum: ${e.geburtsdatum}`);
+      if (e.geburtsort) lines.push(`Geburtsort: ${e.geburtsort}`);
+      if (e.strasse) lines.push(`Straße: ${e.strasse}`);
+      if (e.plz && e.ort) lines.push(`PLZ/Ort: ${e.plz} ${e.ort}`);
+      if (e.telefon) lines.push(`Telefon: ${e.telefon}`);
+      if (e.email) lines.push(`E-Mail: ${e.email}`);
+    }
+    
+    return lines.join('\n');
   };
 
   const handleExtractWithGemini = async () => {
@@ -59,7 +89,7 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
 
     setIsExtracting(true);
     setAnalysisProgress(10);
-    setQuickCopyData(null);
+    setCopyBlockData(null);
 
     try {
       const formMode = mapFormMode(currentMode);
@@ -93,13 +123,15 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
       toast.success('Daten erfolgreich extrahiert!');
 
       // Extract the actual form data (exclude improvedImages if present)
-      const { improvedImages, arbeitgeberAdresse, kundenAdresse, mitgliedGeburtsort, ...formDataFromAi } = data;
+      const { improvedImages, ...formDataFromAi } = data;
       
-      // Store quick copy data
-      setQuickCopyData({
-        arbeitgeberAdresse: arbeitgeberAdresse || '',
-        kundenAdresse: kundenAdresse || '',
-        mitgliedGeburtsort: mitgliedGeburtsort || ''
+      // Build copy blocks
+      const mitgliedBlock = buildCopyBlock(data, 'mitglied');
+      const ehegatteBlock = data.ehegatte ? buildCopyBlock(data, 'ehegatte') : '';
+      
+      setCopyBlockData({
+        copyBlockMitglied: mitgliedBlock,
+        copyBlockEhegatte: ehegatteBlock
       });
       
       setJsonInput(JSON.stringify(formDataFromAi, null, 2));
@@ -168,35 +200,52 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
     if (!isOpen) {
       setFreitextInput('');
       setJsonInput('');
-      setQuickCopyData(null);
-      setCopiedFields({});
+      setCopyBlockData(null);
+      setCopiedBlock(null);
     }
   };
 
-  const QuickCopyField = ({ label, value, fieldName }: { label: string; value: string; fieldName: string }) => (
-    <div className="space-y-1">
-      <label className="text-sm font-medium text-muted-foreground">{label}</label>
-      <div className="flex gap-2">
-        <Input
-          value={value}
-          readOnly
-          className="bg-muted/50 text-sm"
-          placeholder="—"
-        />
+  const CopyBlockSection = ({ 
+    label, 
+    text, 
+    blockType 
+  }: { 
+    label: string; 
+    text: string; 
+    blockType: 'mitglied' | 'ehegatte';
+  }) => (
+    <div className="space-y-2 p-4 rounded-lg bg-muted/30 border border-border">
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-semibold text-foreground">{label}</label>
         <Button
-          variant="outline"
-          size="icon"
-          onClick={() => handleCopyField(fieldName, value)}
-          disabled={!value.trim()}
-          className="shrink-0"
+          onClick={() => handleCopyBlock(blockType, text)}
+          disabled={!text.trim()}
+          size="sm"
+          className={`gap-2 transition-all duration-300 ${
+            copiedBlock === blockType 
+              ? 'bg-green-600 hover:bg-green-600 text-white' 
+              : ''
+          }`}
         >
-          {copiedFields[fieldName] ? (
-            <Check className="h-4 w-4 text-green-500" />
+          {copiedBlock === blockType ? (
+            <>
+              <Check className="h-4 w-4 animate-scale-in" />
+              Kopiert!
+            </>
           ) : (
-            <Clipboard className="h-4 w-4" />
+            <>
+              <Clipboard className="h-4 w-4" />
+              Gesamten Block kopieren
+            </>
           )}
         </Button>
       </div>
+      <Textarea
+        value={text}
+        readOnly
+        className="font-mono text-sm bg-background/50 min-h-[120px] resize-none"
+        placeholder="Keine Daten verfügbar"
+      />
     </div>
   );
 
@@ -254,27 +303,28 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
             )}
           </div>
 
-          {/* Schnell-Kopie Section */}
-          {quickCopyData && (
-            <div className="border-t pt-4 space-y-3">
-              <label className="text-sm font-medium block">Schnell-Kopie:</label>
-              <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-3">
-                <QuickCopyField 
-                  label="Arbeitgeber-Adresse" 
-                  value={quickCopyData.arbeitgeberAdresse} 
-                  fieldName="arbeitgeberAdresse" 
+          {/* Daten-Kopie Section */}
+          {copyBlockData && (
+            <div className="border-t pt-4 space-y-4">
+              <label className="text-base font-semibold block text-foreground">📋 Daten-Kopie</label>
+              
+              {/* Mitglied Block */}
+              {copyBlockData.copyBlockMitglied && (
+                <CopyBlockSection 
+                  label="Mitglied-Daten" 
+                  text={copyBlockData.copyBlockMitglied}
+                  blockType="mitglied"
                 />
-                <QuickCopyField 
-                  label="Kunden-Adresse" 
-                  value={quickCopyData.kundenAdresse} 
-                  fieldName="kundenAdresse" 
+              )}
+              
+              {/* Ehegatte Block (only if data exists) */}
+              {copyBlockData.copyBlockEhegatte && (
+                <CopyBlockSection 
+                  label="Ehegatte-Daten (als eigenes Mitglied)" 
+                  text={copyBlockData.copyBlockEhegatte}
+                  blockType="ehegatte"
                 />
-                <QuickCopyField 
-                  label="Geburtsort (Mitglied)" 
-                  value={quickCopyData.mitgliedGeburtsort} 
-                  fieldName="mitgliedGeburtsort" 
-                />
-              </div>
+              )}
             </div>
           )}
 
