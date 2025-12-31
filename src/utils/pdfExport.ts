@@ -415,9 +415,6 @@ const downloadPDF = (pdfBytes: Uint8Array, filename: string) => {
 // Export nur Rundum-Sicher-Paket für Einzelmitglied
 export const exportRundumSicherPaketOnly = async (formData: FormData): Promise<void> => {
   try {
-    const datumFormatted = formatInputDate(formData.rundumSicherPaket.datumRSP);
-    const rundumBaseName = `Rundum-Sicher-Paket_${datumFormatted.replace(/\./g, "-")}`;
-
     // Nur Mitglied
     const mitgliedPerson: PersonInfo = {
       vorname: formData.mitgliedVorname,
@@ -427,7 +424,8 @@ export const exportRundumSicherPaketOnly = async (formData: FormData): Promise<v
       type: "mitglied",
     };
     const mitgliedRspBytes = await createRundumSicherPaketPDF(formData, mitgliedPerson);
-    downloadPDF(mitgliedRspBytes, `${rundumBaseName}_Mitglied_${formData.mitgliedName}.pdf`);
+    const mitgliedRspName = `${formData.mitgliedVorname || ''}_${formData.mitgliedName || ''}`.replace(/^_|_$/g, '') || 'Mitglied';
+    downloadPDF(mitgliedRspBytes, `Rundum-Sicher-Paket_${mitgliedRspName}.pdf`);
   } catch (error) {
     console.error("Error exporting Rundum-Sicher-Paket PDF:", error);
     throw error;
@@ -436,8 +434,8 @@ export const exportRundumSicherPaketOnly = async (formData: FormData): Promise<v
 
 export const exportFilledPDF = async (formData: FormData): Promise<void> => {
   try {
-    const datumFormatted = formatInputDate(formData.datum);
-    const baseName = `Familienversicherung_${formData.mitgliedName || "Antrag"}_${datumFormatted.replace(/\./g, "-")}`;
+    const memberFullName = `${formData.mitgliedVorname || ''}_${formData.mitgliedName || ''}`.replace(/^_|_$/g, '') || 'Antrag';
+    const baseName = `Familienversicherung_${memberFullName}`;
 
     const children = formData.kinder;
     const numberOfPDFs = Math.max(1, Math.ceil(children.length / 3));
@@ -457,8 +455,6 @@ export const exportFilledPDF = async (formData: FormData): Promise<void> => {
     }
 
     // Export Rundum-Sicher-Paket PDFs
-    const rundumBaseName = `Rundum-Sicher-Paket_${datumFormatted.replace(/\./g, "-")}`;
-
     // Mitglied
     const mitgliedPerson: PersonInfo = {
       vorname: formData.mitgliedVorname,
@@ -468,7 +464,8 @@ export const exportFilledPDF = async (formData: FormData): Promise<void> => {
       type: "mitglied",
     };
     const mitgliedRspBytes = await createRundumSicherPaketPDF(formData, mitgliedPerson);
-    downloadPDF(mitgliedRspBytes, `${rundumBaseName}_Mitglied_${formData.mitgliedName}.pdf`);
+    const mitgliedRspName = `${formData.mitgliedVorname || ''}_${formData.mitgliedName || ''}`.replace(/^_|_$/g, '') || 'Mitglied';
+    downloadPDF(mitgliedRspBytes, `Rundum-Sicher-Paket_${mitgliedRspName}.pdf`);
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Ehegatte - eigene Versichertennummer
@@ -481,7 +478,8 @@ export const exportFilledPDF = async (formData: FormData): Promise<void> => {
         type: "ehegatte",
       };
       const ehegatteRspBytes = await createRundumSicherPaketPDF(formData, ehegattePerson);
-      downloadPDF(ehegatteRspBytes, `${rundumBaseName}_Ehegatte_${formData.ehegatte.name}.pdf`);
+      const ehegatteRspName = `${formData.ehegatte.vorname || ''}_${formData.ehegatte.name || ''}`.replace(/^_|_$/g, '') || 'Ehegatte';
+      downloadPDF(ehegatteRspBytes, `Rundum-Sicher-Paket_${ehegatteRspName}.pdf`);
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
@@ -498,7 +496,8 @@ export const exportFilledPDF = async (formData: FormData): Promise<void> => {
           kindIndex: i + 1,
         };
         const kindRspBytes = await createRundumSicherPaketPDF(formData, kindPerson);
-        downloadPDF(kindRspBytes, `${rundumBaseName}_Kind${i + 1}_${kind.name}.pdf`);
+        const kindRspName = `${kind.vorname || ''}_${kind.name || ''}`.replace(/^_|_$/g, '') || `Kind${i + 1}`;
+        downloadPDF(kindRspBytes, `Rundum-Sicher-Paket_${kindRspName}.pdf`);
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
