@@ -121,11 +121,18 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
         throw new Error('Ungültiges JSON-Format');
       }
       
+      // Bei Kindern immer bisherigBestehtWeiter = true und bisherigBestehtWeiterBei = 'BKK GS' setzen
+      const processedKinder = parsed.kinder?.map(kind => ({
+        ...kind,
+        bisherigBestehtWeiter: true,
+        bisherigBestehtWeiterBei: 'BKK GS',
+      })) || formData.kinder;
+      
       setFormData({
         ...formData,
         ...parsed,
         ehegatte: parsed.ehegatte ? { ...formData.ehegatte, ...parsed.ehegatte } : formData.ehegatte,
-        kinder: parsed.kinder || formData.kinder,
+        kinder: processedKinder,
         rundumSicherPaket: parsed.rundumSicherPaket 
           ? { ...formData.rundumSicherPaket, ...parsed.rundumSicherPaket }
           : formData.rundumSicherPaket,

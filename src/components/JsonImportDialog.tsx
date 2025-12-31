@@ -347,12 +347,19 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       // Immer heutiges Datum für Unterschrift setzen
       const todayForInput = formatDateForInput(new Date());
       
+      // Bei Kindern immer bisherigBestehtWeiter = true und bisherigBestehtWeiterBei = 'BKK GS' setzen
+      const processedKinder = parsed.kinder?.map(kind => ({
+        ...kind,
+        bisherigBestehtWeiter: true,
+        bisherigBestehtWeiterBei: 'BKK GS',
+      })) || formData.kinder;
+      
       setFormData({
         ...formData,
         ...parsed,
         datum: todayForInput, // Immer heutiges Datum
         ehegatte: parsed.ehegatte ? { ...formData.ehegatte, ...parsed.ehegatte } : formData.ehegatte,
-        kinder: parsed.kinder || formData.kinder,
+        kinder: processedKinder,
         rundumSicherPaket: parsed.rundumSicherPaket
           ? { ...formData.rundumSicherPaket, ...parsed.rundumSicherPaket }
           : formData.rundumSicherPaket,
