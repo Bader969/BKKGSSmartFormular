@@ -2,6 +2,7 @@ import React from 'react';
 import { FormSection } from './FormSection';
 import { FamilyMemberForm } from './FamilyMemberForm';
 import { FormData, FamilyMember, createEmptyFamilyMember } from '@/types/form';
+import { CopyBlockButton } from './CopyBlockButton';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -102,6 +103,36 @@ export const ChildrenSection: React.FC<ChildrenSectionProps> = ({ formData, upda
                   </div>
                 </div>
               </div>
+              
+              {/* Copy Block für Kind-Daten */}
+              <CopyBlockButton
+                label={`Kind ${index + 1} Daten`}
+                data={{
+                  vorname: kind.vorname,
+                  name: kind.name,
+                  geburtsdatum: kind.geburtsdatum,
+                  geburtsname: kind.geburtsname || kind.name,
+                  geburtsort: kind.geburtsort,
+                  geburtsland: kind.geburtsland,
+                  staatsangehoerigkeit: kind.staatsangehoerigkeit,
+                  geschlecht: kind.geschlecht === 'm' ? 'Männlich' : kind.geschlecht === 'w' ? 'Weiblich' : kind.geschlecht,
+                  verwandtschaft: kind.verwandtschaft === 'leiblich' ? 'Leibliches Kind' : 
+                                  kind.verwandtschaft === 'stief' ? 'Stiefkind' : 
+                                  kind.verwandtschaft === 'enkel' ? 'Enkelkind' : 
+                                  kind.verwandtschaft === 'pflege' ? 'Pflegekind' : kind.verwandtschaft,
+                }}
+                fieldLabels={{
+                  vorname: 'Vorname',
+                  name: 'Name',
+                  geburtsdatum: 'Geburtsdatum',
+                  geburtsname: 'Geburtsname',
+                  geburtsort: 'Geburtsort',
+                  geburtsland: 'Geburtsland',
+                  staatsangehoerigkeit: 'Staatsangehörigkeit',
+                  geschlecht: 'Geschlecht',
+                  verwandtschaft: 'Verwandtschaft',
+                }}
+              />
               
               {index < formData.kinder.length - 1 && (
                 <hr className="my-6 border-accent/30" />

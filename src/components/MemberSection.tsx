@@ -2,6 +2,7 @@ import React from 'react';
 import { FormSection } from './FormSection';
 import { FormField } from './FormField';
 import { FormData } from '@/types/form';
+import { CopyBlockButton } from './CopyBlockButton';
 import { 
   validateName, 
   validateGeburtsdatum, 
@@ -157,6 +158,33 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           </div>
         </div>
       </div>
+      
+      {/* Copy Block für Mitglied-Daten */}
+      <CopyBlockButton
+        label="Mitglied-Daten"
+        data={{
+          vorname: formData.mitgliedVorname,
+          name: formData.mitgliedName,
+          geburtsdatum: formData.mitgliedGeburtsdatum,
+          kvNummer: formData.mitgliedKvNummer,
+          krankenkasse: formData.mitgliedKrankenkasse,
+          familienstand: formData.familienstand,
+          ort: formData.ort,
+          telefon: formData.telefon,
+          email: formData.email,
+        }}
+        fieldLabels={{
+          vorname: 'Vorname',
+          name: 'Name',
+          geburtsdatum: 'Geburtsdatum',
+          kvNummer: 'KV-Nummer',
+          krankenkasse: 'Krankenkasse',
+          familienstand: 'Familienstand',
+          ort: 'Ort',
+          telefon: 'Telefon',
+          email: 'E-Mail',
+        }}
+      />
     </FormSection>
   );
 };
