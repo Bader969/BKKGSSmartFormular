@@ -3,6 +3,7 @@ import { FormSection } from './FormSection';
 import { FamilyMemberForm } from './FamilyMemberForm';
 import { FormField } from './FormField';
 import { FormData, FamilyMember } from '@/types/form';
+import { CopyBlockButton } from './CopyBlockButton';
 import { validateName, validateOrt, validateStaatsangehoerigkeit, validateKrankenkasse } from '@/utils/validation';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -176,6 +177,33 @@ export const SpouseSection: React.FC<SpouseSectionProps> = ({ formData, updateFo
               </label>
             </div>
           </div>
+          
+          {/* Copy Block für Ehegatte-Daten */}
+          <CopyBlockButton
+            label="Ehegatte-Daten"
+            data={{
+              vorname: formData.ehegatte.vorname,
+              name: formData.ehegatte.name,
+              geburtsdatum: formData.ehegatte.geburtsdatum,
+              geburtsname: formData.ehegatte.geburtsname || formData.ehegatte.name,
+              geburtsort: formData.ehegatte.geburtsort,
+              geburtsland: formData.ehegatte.geburtsland,
+              staatsangehoerigkeit: formData.ehegatte.staatsangehoerigkeit,
+              krankenkasse: formData.ehegatteKrankenkasse,
+              geschlecht: formData.ehegatte.geschlecht === 'm' ? 'Männlich' : formData.ehegatte.geschlecht === 'w' ? 'Weiblich' : formData.ehegatte.geschlecht,
+            }}
+            fieldLabels={{
+              vorname: 'Vorname',
+              name: 'Name',
+              geburtsdatum: 'Geburtsdatum',
+              geburtsname: 'Geburtsname',
+              geburtsort: 'Geburtsort',
+              geburtsland: 'Geburtsland',
+              staatsangehoerigkeit: 'Staatsangehörigkeit',
+              krankenkasse: 'Krankenkasse',
+              geschlecht: 'Geschlecht',
+            }}
+          />
         </>
       )}
     </FormSection>
