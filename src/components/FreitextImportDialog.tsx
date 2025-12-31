@@ -1,12 +1,19 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { FileText, Sparkles, Loader2, Copy, Check } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { FileText, Sparkles, Loader2, Copy, Check, Clipboard } from 'lucide-react';
 import { FormData, FormMode } from '@/types/form';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
+
+interface QuickCopyData {
+  arbeitgeberAdresse: string;
+  kundenAdresse: string;
+  mitgliedGeburtsort: string;
+}
 
 interface FreitextImportDialogProps {
   formData: FormData;
@@ -21,6 +28,28 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
   const [isExtracting, setIsExtracting] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [quickCopyData, setQuickCopyData] = useState<QuickCopyData | null>(null);
+  const [copiedFields, setCopiedFields] = useState<Record<string, boolean>>({});
+
+  // Map FormMode to simple formMode for API
+  const mapFormMode = (mode: FormMode): 'familie' | 'einzel' => {
+    return mode === 'familienversicherung_und_rundum' ? 'familie' : 'einzel';
+  };
+
+  const handleCopyField = async (fieldName: string, value: string) => {
+    if (!value.trim()) {
+      toast.error('Kein Text zum Kopieren');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedFields(prev => ({ ...prev, [fieldName]: true }));
+      toast.success('Kopiert!');
+      setTimeout(() => setCopiedFields(prev => ({ ...prev, [fieldName]: false })), 2000);
+    } catch {
+      toast.error('Kopieren fehlgeschlagen');
+    }
+  };
 
   const handleExtractWithGemini = async () => {
     if (!freitextInput.trim()) {
@@ -30,14 +59,15 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
 
     setIsExtracting(true);
     setAnalysisProgress(10);
+    setQuickCopyData(null);
 
     try {
-      const requestBody: { 
-        text: string; 
-        mode: FormMode;
-      } = {
+      const formMode = mapFormMode(currentMode);
+      
+      const requestBody = {
         text: freitextInput,
-        mode: currentMode
+        mode: currentMode,
+        formMode: formMode  // Send mapped mode
       };
 
       setAnalysisProgress(30);
@@ -63,7 +93,15 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
       toast.success('Daten erfolgreich extrahiert!');
 
       // Extract the actual form data (exclude improvedImages if present)
-      const { improvedImages, ...formDataFromAi } = data;
+      const { improvedImages, arbeitgeberAdresse, kundenAdresse, mitgliedGeburtsort, ...formDataFromAi } = data;
+      
+      // Store quick copy data
+      setQuickCopyData({
+        arbeitgeberAdresse: arbeitgeberAdresse || '',
+        kundenAdresse: kundenAdresse || '',
+        mitgliedGeburtsort: mitgliedGeburtsort || ''
+      });
+      
       setJsonInput(JSON.stringify(formDataFromAi, null, 2));
       
     } catch (error) {
@@ -123,8 +161,37 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
     if (!isOpen) {
       setFreitextInput('');
       setJsonInput('');
+      setQuickCopyData(null);
+      setCopiedFields({});
     }
   };
+
+  const QuickCopyField = ({ label, value, fieldName }: { label: string; value: string; fieldName: string }) => (
+    <div className="space-y-1">
+      <label className="text-sm font-medium text-muted-foreground">{label}</label>
+      <div className="flex gap-2">
+        <Input
+          value={value}
+          readOnly
+          className="bg-muted/50 text-sm"
+          placeholder="—"
+        />
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => handleCopyField(fieldName, value)}
+          disabled={!value.trim()}
+          className="shrink-0"
+        >
+          {copiedFields[fieldName] ? (
+            <Check className="h-4 w-4 text-green-500" />
+          ) : (
+            <Clipboard className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <Dialog open={open} onOpenChange={handleDialogClose}>
@@ -179,6 +246,30 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
               <Progress value={analysisProgress} className="h-2" />
             )}
           </div>
+
+          {/* Schnell-Kopie Section */}
+          {quickCopyData && (
+            <div className="border-t pt-4 space-y-3">
+              <label className="text-sm font-medium block">Schnell-Kopie:</label>
+              <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-3">
+                <QuickCopyField 
+                  label="Arbeitgeber-Adresse" 
+                  value={quickCopyData.arbeitgeberAdresse} 
+                  fieldName="arbeitgeberAdresse" 
+                />
+                <QuickCopyField 
+                  label="Kunden-Adresse" 
+                  value={quickCopyData.kundenAdresse} 
+                  fieldName="kundenAdresse" 
+                />
+                <QuickCopyField 
+                  label="Geburtsort (Mitglied)" 
+                  value={quickCopyData.mitgliedGeburtsort} 
+                  fieldName="mitgliedGeburtsort" 
+                />
+              </div>
+            </div>
+          )}
 
           {/* JSON Ergebnis */}
           {jsonInput && (
