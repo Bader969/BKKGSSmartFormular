@@ -183,6 +183,9 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
       {/* Ärzte - pro Person */}
       <div className="space-y-4 mb-6">
         <h4 className="font-medium text-foreground">Ärzte (optional)</h4>
+        <p className="text-xs text-muted-foreground">
+          Der Ort wird automatisch vom Unterschrifts-Ort übernommen. Im Formular wird die vollständige Adresse angezeigt, im PDF nur der Ort.
+        </p>
         
         {/* Arzt für Mitglied */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -201,12 +204,9 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
             type="text"
             label="Ort Arzt (Mitglied)"
             id="arztMitgliedOrt"
-            value={formData.rundumSicherPaket.arztMitglied?.ort || ''}
-            onChange={(value) => updateRundumSicherPaket({ 
-              arztMitglied: { ...(formData.rundumSicherPaket.arztMitglied || { name: '', ort: '' }), ort: value }
-            })}
-            placeholder="Ort"
-            validate={validateOrt}
+            value={formData.ort}
+            onChange={(value) => updateFormData({ ort: value })}
+            placeholder="Straße + Hausnummer, PLZ Ort"
           />
         </div>
 
@@ -224,17 +224,10 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
               placeholder="Name des Arztes"
               validate={validateArztName}
             />
-            <FormField
-              type="text"
-              label="Ort Arzt (Ehegatte)"
-              id="arztEhegatteOrt"
-              value={formData.rundumSicherPaket.arztEhegatte?.ort || ''}
-              onChange={(value) => updateRundumSicherPaket({ 
-                arztEhegatte: { ...(formData.rundumSicherPaket.arztEhegatte || { name: '', ort: '' }), ort: value }
-              })}
-              placeholder="Ort"
-              validate={validateOrt}
-            />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Ort Arzt (Ehegatte)</label>
+              <p className="text-sm text-muted-foreground bg-muted px-3 py-2 rounded-md">{formData.ort || 'Wird automatisch übernommen'}</p>
+            </div>
           </div>
         )}
 
@@ -250,15 +243,10 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
               placeholder="Name des Arztes"
               validate={validateArztName}
             />
-            <FormField
-              type="text"
-              label={`Ort Arzt (Kind ${index + 1})`}
-              id={`arztKindOrt${index}`}
-              value={formData.rundumSicherPaket.aerzteKinder[index]?.ort || ''}
-              onChange={(value) => updateArztKind(index, { ort: value })}
-              placeholder="Ort"
-              validate={validateOrt}
-            />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Ort Arzt (Kind {index + 1})</label>
+              <p className="text-sm text-muted-foreground bg-muted px-3 py-2 rounded-md">{formData.ort || 'Wird automatisch übernommen'}</p>
+            </div>
           </div>
         ))}
       </div>
