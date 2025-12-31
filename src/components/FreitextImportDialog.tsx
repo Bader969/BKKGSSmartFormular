@@ -50,32 +50,80 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
     }
   };
 
-  // Build formatted copy block from extracted data
+  // Build compact formatted copy block from extracted data
   const buildCopyBlock = (data: any, type: 'mitglied' | 'ehegatte'): string => {
     const lines: string[] = [];
     
     if (type === 'mitglied') {
-      if (data.mitgliedName) lines.push(`Name: ${data.mitgliedName}`);
-      if (data.mitgliedVorname) lines.push(`Vorname: ${data.mitgliedVorname}`);
-      if (data.mitgliedGeburtsdatum) lines.push(`Geburtsdatum: ${data.mitgliedGeburtsdatum}`);
-      if (data.mitgliedGeburtsort) lines.push(`Geburtsort: ${data.mitgliedGeburtsort}`);
-      if (data.mitgliedStrasse) lines.push(`Straße: ${data.mitgliedStrasse}`);
-      if (data.mitgliedPLZ && data.mitgliedOrt) lines.push(`PLZ/Ort: ${data.mitgliedPLZ} ${data.mitgliedOrt}`);
-      if (data.mitgliedTelefon) lines.push(`Telefon: ${data.mitgliedTelefon}`);
-      if (data.mitgliedEmail) lines.push(`E-Mail: ${data.mitgliedEmail}`);
-      if (data.mitgliedIBAN) lines.push(`IBAN: ${data.mitgliedIBAN}`);
-      if (data.arbeitgeberAdresse) lines.push(`\nArbeitgeber:\n${data.arbeitgeberAdresse}`);
-      if (data.kundenAdresse) lines.push(`\nKunden-Adresse:\n${data.kundenAdresse}`);
+      // Zeile 1: Name Vorname  Geburtsdatum, Geburtsort, Nationalität
+      const nameParts = [data.mitgliedName, data.mitgliedVorname].filter(Boolean).join(' ');
+      const birthParts = [data.mitgliedGeburtsdatum, data.mitgliedGeburtsort, data.mitgliedStaatsangehoerigkeit || 'DE'].filter(Boolean).join(', ');
+      if (nameParts || birthParts) {
+        lines.push([nameParts, birthParts].filter(Boolean).join('  '));
+      }
+      
+      // Zeile 2: Straße PLZ Ort
+      const addressParts = [data.mitgliedStrasse, data.mitgliedPLZ, data.mitgliedOrt].filter(Boolean).join(' ');
+      if (addressParts) lines.push(addressParts);
+      
+      // Zeile 3: Bisherige Kasse: Mitgliedsnummer
+      if (data.mitgliedBisherigKrankenkasse || data.mitgliedMitgliedsnummer) {
+        const kasseParts = [data.mitgliedBisherigKrankenkasse, data.mitgliedMitgliedsnummer].filter(Boolean).join(': ');
+        if (kasseParts) lines.push(kasseParts);
+      }
+      
+      // Zeile 4: Email, Telefon
+      const contactParts = [data.mitgliedEmail, data.mitgliedTelefon].filter(Boolean).join(', ');
+      if (contactParts) lines.push(contactParts);
+      
+      // Zeile 5: Arbeitgeber * Arbeitgeber-Adresse
+      if (data.arbeitgeberName || data.arbeitgeberAdresse) {
+        const arbeitgeberParts = [data.arbeitgeberName, data.arbeitgeberAdresse].filter(Boolean).join(' * ');
+        if (arbeitgeberParts) lines.push(arbeitgeberParts);
+      }
+      
+      // Zeile 6: Familienstand
+      if (data.mitgliedFamilienstand) {
+        lines.push(data.mitgliedFamilienstand);
+      }
+      
+      // Zeile 7: IBAN (falls vorhanden)
+      if (data.mitgliedIBAN) {
+        lines.push(`IBAN: ${data.mitgliedIBAN}`);
+      }
     } else if (type === 'ehegatte' && data.ehegatte) {
       const e = data.ehegatte;
-      if (e.name) lines.push(`Name: ${e.name}`);
-      if (e.vorname) lines.push(`Vorname: ${e.vorname}`);
-      if (e.geburtsdatum) lines.push(`Geburtsdatum: ${e.geburtsdatum}`);
-      if (e.geburtsort) lines.push(`Geburtsort: ${e.geburtsort}`);
-      if (e.strasse) lines.push(`Straße: ${e.strasse}`);
-      if (e.plz && e.ort) lines.push(`PLZ/Ort: ${e.plz} ${e.ort}`);
-      if (e.telefon) lines.push(`Telefon: ${e.telefon}`);
-      if (e.email) lines.push(`E-Mail: ${e.email}`);
+      
+      // Zeile 1: Name Vorname  Geburtsdatum, Geburtsort, Nationalität
+      const nameParts = [e.name, e.vorname].filter(Boolean).join(' ');
+      const birthParts = [e.geburtsdatum, e.geburtsort, e.staatsangehoerigkeit || 'DE'].filter(Boolean).join(', ');
+      if (nameParts || birthParts) {
+        lines.push([nameParts, birthParts].filter(Boolean).join('  '));
+      }
+      
+      // Zeile 2: Straße PLZ Ort
+      const addressParts = [e.strasse, e.plz, e.ort].filter(Boolean).join(' ');
+      if (addressParts) lines.push(addressParts);
+      
+      // Zeile 3: Bisherige Kasse: Mitgliedsnummer
+      if (e.bisherigKrankenkasse || e.mitgliedsnummer) {
+        const kasseParts = [e.bisherigKrankenkasse, e.mitgliedsnummer].filter(Boolean).join(': ');
+        if (kasseParts) lines.push(kasseParts);
+      }
+      
+      // Zeile 4: Email, Telefon
+      const contactParts = [e.email, e.telefon].filter(Boolean).join(', ');
+      if (contactParts) lines.push(contactParts);
+      
+      // Zeile 5: Arbeitgeber (falls vorhanden)
+      if (e.arbeitgeber) {
+        lines.push(e.arbeitgeber);
+      }
+      
+      // Zeile 6: Familienstand
+      if (e.familienstand) {
+        lines.push(e.familienstand);
+      }
     }
     
     return lines.join('\n');
