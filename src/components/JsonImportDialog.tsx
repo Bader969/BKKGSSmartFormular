@@ -266,7 +266,8 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       }));
 
       const pdfBlob = await createCombinedPdf(filesForPdf);
-      const filename = `dokumente-${new Date().toISOString().slice(0, 10)}.pdf`;
+      const memberName = `${formData.mitgliedVorname || ''}_${formData.mitgliedName || ''}`.replace(/^_|_$/g, '') || 'Dokumente';
+      const filename = `${memberName}.pdf`;
       downloadBlob(pdfBlob, filename);
       toast.success('PDF erfolgreich erstellt!');
     } catch (error) {
