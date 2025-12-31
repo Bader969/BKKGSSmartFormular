@@ -9,6 +9,38 @@ const formatInputDate = (dateStr: string): string => {
   return `${parts[2]}.${parts[1]}.${parts[0]}`;
 };
 
+// Extrahiert nur den Ort aus einer vollständigen Adresse
+// Beispiel: "Musterstraße 123, 12345 Musterstadt" -> "Musterstadt"
+// Beispiel: "12345 Musterstadt" -> "Musterstadt"
+// Beispiel: "Musterstadt" -> "Musterstadt"
+const extractCityFromAddress = (address: string): string => {
+  if (!address) return "";
+  
+  // Entferne führende/nachfolgende Leerzeichen
+  const trimmed = address.trim();
+  
+  // Versuche PLZ + Ort zu finden (z.B. "12345 Musterstadt")
+  const plzOrtMatch = trimmed.match(/\d{5}\s+(.+)$/);
+  if (plzOrtMatch) {
+    return plzOrtMatch[1].trim();
+  }
+  
+  // Wenn es ein Komma gibt, nimm den Teil nach dem letzten Komma
+  if (trimmed.includes(',')) {
+    const parts = trimmed.split(',');
+    const lastPart = parts[parts.length - 1].trim();
+    // Prüfe ob der letzte Teil eine PLZ + Ort hat
+    const plzMatch = lastPart.match(/\d{5}\s+(.+)$/);
+    if (plzMatch) {
+      return plzMatch[1].trim();
+    }
+    return lastPart;
+  }
+  
+  // Andernfalls nimm die ganze Eingabe als Ort
+  return trimmed;
+};
+
 interface PDFHelpers {
   setTextField: (fieldName: string, value: string) => void;
   setCheckbox: (fieldName: string, checked: boolean) => void;
@@ -94,8 +126,8 @@ const fillBasicFields = (
   setCheckbox("15", true);
   setCheckbox("16", false);
 
-  // === Ort, Datum ===
-  setTextField("Ort, Datum", `${formData.ort}, ${datumFormatted}`);
+  // === Ort, Datum (nur Ort extrahieren, nicht vollständige Adresse) ===
+  setTextField("Ort, Datum", `${extractCityFromAddress(formData.ort)}, ${datumFormatted}`);
 };
 
 const fillSpouseFields = (formData: FormData, helpers: PDFHelpers, endDate: string) => {
@@ -312,17 +344,18 @@ const createRundumSicherPaketPDF = async (formData: FormData, person: PersonInfo
   const zeitraumBis = formatInputDate(rsp.zeitraumBis);
   setTextField("Zeitraum", `${zeitraumVon} - ${zeitraumBis}`);
 
-  // Arzt - je nach Person unterschiedlich
-  let arzt = { name: "", ort: "" };
+  // Arzt - Name je nach Person unterschiedlich, Ort immer vom formData.ort
+  let arztName = "";
   if (person.type === "mitglied") {
-    arzt = rsp.arztMitglied;
+    arztName = rsp.arztMitglied?.name || "";
   } else if (person.type === "ehegatte") {
-    arzt = rsp.arztEhegatte;
+    arztName = rsp.arztEhegatte?.name || "";
   } else if (person.type === "kind" && person.kindIndex !== undefined) {
-    arzt = rsp.aerzteKinder[person.kindIndex - 1] || { name: "", ort: "" };
+    arztName = rsp.aerzteKinder[person.kindIndex - 1]?.name || "";
   }
-  setTextField("Name Arzt 1", arzt.name);
-  setTextField("Ort Arzt 1", arzt.ort);
+  setTextField("Name Arzt 1", arztName);
+  // Ort immer vom formData.ort nehmen (nur Stadt extrahieren)
+  setTextField("Ort Arzt 1", extractCityFromAddress(formData.ort));
 
   // Zusatzversicherung - kombiniere beide Felder
   const zusatzversicherungLabels: Record<string, string> = {
