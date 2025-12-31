@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { LoginForm } from '@/components/LoginForm';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { FreitextImportDialog } from '@/components/FreitextImportDialog';
+import { DocumentMergeDialog } from '@/components/DocumentMergeDialog';
 
 const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -157,6 +158,7 @@ const Index = () => {
               </h1>
             </div>
             <div className="flex items-center gap-2">
+              <DocumentMergeDialog />
               <FreitextImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} />
               <JsonImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} />
             </div>
