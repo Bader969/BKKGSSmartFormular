@@ -224,10 +224,16 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
               placeholder="Name des Arztes"
               validate={validateArztName}
             />
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Ort Arzt (Ehegatte)</label>
-              <p className="text-sm text-muted-foreground bg-muted px-3 py-2 rounded-md">{formData.ort || 'Wird automatisch übernommen'}</p>
-            </div>
+            <FormField
+              type="text"
+              label="Ort Arzt (Ehegatte)"
+              id="arztEhegatteOrt"
+              value={formData.rundumSicherPaket.arztEhegatte?.ort || formData.ort}
+              onChange={(value) => updateRundumSicherPaket({ 
+                arztEhegatte: { ...(formData.rundumSicherPaket.arztEhegatte || { name: '', ort: '' }), ort: value }
+              })}
+              placeholder="Wird vom Unterschrifts-Ort übernommen"
+            />
           </div>
         )}
 
