@@ -76,6 +76,9 @@ export interface FormData {
   mitgliedVorname: string;
   mitgliedGeburtsdatum: string;
   mitgliedGeburtsort: string;
+  mitgliedStrasse: string;
+  mitgliedHausnummer: string;
+  mitgliedPlz: string;
   mitgliedKvNummer: string;
   mitgliedKrankenkasse: string;
   
@@ -184,6 +187,9 @@ export const createInitialFormData = (): FormData => {
     mitgliedVorname: '',
     mitgliedGeburtsdatum: '',
     mitgliedGeburtsort: '',
+    mitgliedStrasse: '',
+    mitgliedHausnummer: '',
+    mitgliedPlz: '',
     mitgliedKvNummer: '',
     mitgliedKrankenkasse: '',
     familienstand: '',
