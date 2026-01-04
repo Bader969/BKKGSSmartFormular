@@ -55,9 +55,9 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
     const lines: string[] = [];
     
     if (type === 'mitglied') {
-      // Zeile 1: Name Vorname  Geburtsdatum, Geburtsort, Nationalität
+      // Zeile 1: Name Vorname  Geburtsdatum, Geburtsort, Geburtsland, Nationalität
       const nameParts = [data.mitgliedName, data.mitgliedVorname].filter(Boolean).join(' ');
-      const birthParts = [data.mitgliedGeburtsdatum, data.mitgliedGeburtsort, data.mitgliedStaatsangehoerigkeit || 'DE'].filter(Boolean).join(', ');
+      const birthParts = [data.mitgliedGeburtsdatum, data.mitgliedGeburtsort, data.mitgliedGeburtsland, data.mitgliedStaatsangehoerigkeit || 'DE'].filter(Boolean).join(', ');
       if (nameParts || birthParts) {
         lines.push([nameParts, birthParts].filter(Boolean).join('  '));
       }
@@ -210,9 +210,17 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
         bisherigBestehtWeiterBei: 'BKK GS',
       })) || formData.kinder;
       
+      // Synchronisierung: mitgliedVersichertennummer = mitgliedKvNummer
+      const mitgliedVersichertennummer = parsed.mitgliedKvNummer || parsed.mitgliedVersichertennummer || formData.mitgliedVersichertennummer;
+      
+      // Synchronisierung: ehegatteKrankenkasse → vom mitgliedKrankenkasse falls nicht gesetzt
+      const ehegatteKrankenkasse = parsed.ehegatteKrankenkasse || parsed.mitgliedKrankenkasse || formData.ehegatteKrankenkasse;
+      
       setFormData({
         ...formData,
         ...parsed,
+        mitgliedVersichertennummer: mitgliedVersichertennummer,
+        ehegatteKrankenkasse: ehegatteKrankenkasse,
         ehegatte: parsed.ehegatte ? { ...formData.ehegatte, ...parsed.ehegatte } : formData.ehegatte,
         kinder: processedKinder,
         rundumSicherPaket: parsed.rundumSicherPaket 
