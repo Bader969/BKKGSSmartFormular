@@ -50,6 +50,7 @@ const createFamilyExampleJson = (): Partial<FormData> => ({
   mitgliedVorname: 'Max',
   mitgliedGeburtsdatum: '15.05.1985',
   mitgliedGeburtsort: 'Berlin',
+  mitgliedGeburtsland: 'Deutschland',
   mitgliedStrasse: 'Musterstraße',
   mitgliedHausnummer: '12a',
   mitgliedPlz: '12345',
@@ -134,6 +135,7 @@ const createRundumOnlyExampleJson = (): Partial<FormData> => ({
   mitgliedVorname: 'Max',
   mitgliedGeburtsdatum: '15.05.1985',
   mitgliedGeburtsort: 'Berlin',
+  mitgliedGeburtsland: 'Deutschland',
   mitgliedStrasse: 'Musterstraße',
   mitgliedHausnummer: '12a',
   mitgliedPlz: '12345',
@@ -362,10 +364,18 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
         bisherigBestehtWeiterBei: 'BKK GS',
       })) || formData.kinder;
       
+      // Synchronisierung: mitgliedVersichertennummer = mitgliedKvNummer
+      const mitgliedVersichertennummer = parsed.mitgliedKvNummer || parsed.mitgliedVersichertennummer || formData.mitgliedVersichertennummer;
+      
+      // Synchronisierung: ehegatteKrankenkasse → vom mitgliedKrankenkasse falls nicht gesetzt
+      const ehegatteKrankenkasse = parsed.ehegatteKrankenkasse || parsed.mitgliedKrankenkasse || formData.ehegatteKrankenkasse;
+      
       setFormData({
         ...formData,
         ...parsed,
         datum: todayForInput, // Immer heutiges Datum
+        mitgliedVersichertennummer: mitgliedVersichertennummer,
+        ehegatteKrankenkasse: ehegatteKrankenkasse,
         ehegatte: parsed.ehegatte ? { ...formData.ehegatte, ...parsed.ehegatte } : formData.ehegatte,
         kinder: processedKinder,
         rundumSicherPaket: parsed.rundumSicherPaket

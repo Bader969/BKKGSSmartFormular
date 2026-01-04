@@ -69,6 +69,15 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           placeholder="z.B. Berlin"
           validate={validateOrt}
         />
+        <FormField
+          type="text"
+          label="Geburtsland"
+          id="mitgliedGeburtsland"
+          value={formData.mitgliedGeburtsland}
+          onChange={(value) => updateFormData({ mitgliedGeburtsland: value })}
+          placeholder="z.B. Deutschland"
+          validate={validateOrt}
+        />
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
@@ -204,6 +213,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           name: formData.mitgliedName,
           geburtsdatum: formData.mitgliedGeburtsdatum,
           geburtsort: formData.mitgliedGeburtsort,
+          geburtsland: formData.mitgliedGeburtsland,
           strasse: formData.mitgliedStrasse,
           hausnummer: formData.mitgliedHausnummer,
           plz: formData.mitgliedPlz,
@@ -219,6 +229,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           name: 'Name',
           geburtsdatum: 'Geburtsdatum',
           geburtsort: 'Geburtsort',
+          geburtsland: 'Geburtsland',
           strasse: 'Straße',
           hausnummer: 'Hausnummer',
           plz: 'PLZ',
