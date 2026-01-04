@@ -387,8 +387,12 @@ const createRundumSicherPaketPDF = async (formData: FormData, person: PersonInfo
     await embedSignatureAtPosition(pdfDoc, rsp.unterschriftMakler, 400, 494, 1);
   }
 
-  // Person-Unterschrift (neben "Datum") - immer Mitglied-Unterschrift
-  const personSignature = formData.unterschrift;
+  // Person-Unterschrift (neben "Datum")
+  // Für Ehegatte: Familienmitglieder-Unterschrift verwenden
+  // Für Mitglied und Kinder: Mitglied-Unterschrift verwenden
+  const personSignature = person.type === "ehegatte" 
+    ? formData.unterschriftFamilie 
+    : formData.unterschrift;
 
   if (personSignature) {
     await embedSignatureAtPosition(pdfDoc, personSignature, 160, 713, 1);
