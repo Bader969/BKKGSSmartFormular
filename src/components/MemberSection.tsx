@@ -60,6 +60,15 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           required
           validate={validateGeburtsdatum}
         />
+        <FormField
+          type="text"
+          label="Geburtsort"
+          id="mitgliedGeburtsort"
+          value={formData.mitgliedGeburtsort}
+          onChange={(value) => updateFormData({ mitgliedGeburtsort: value })}
+          placeholder="z.B. Berlin"
+          validate={validateOrt}
+        />
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -166,6 +175,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           vorname: formData.mitgliedVorname,
           name: formData.mitgliedName,
           geburtsdatum: formData.mitgliedGeburtsdatum,
+          geburtsort: formData.mitgliedGeburtsort,
           kvNummer: formData.mitgliedKvNummer,
           krankenkasse: formData.mitgliedKrankenkasse,
           familienstand: formData.familienstand,
@@ -177,6 +187,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           vorname: 'Vorname',
           name: 'Name',
           geburtsdatum: 'Geburtsdatum',
+          geburtsort: 'Geburtsort',
           kvNummer: 'KV-Nummer',
           krankenkasse: 'Krankenkasse',
           familienstand: 'Familienstand',
