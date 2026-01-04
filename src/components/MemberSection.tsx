@@ -71,6 +71,47 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
         />
       </div>
       
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+        <FormField
+          type="text"
+          label="Straße"
+          id="mitgliedStrasse"
+          value={formData.mitgliedStrasse}
+          onChange={(value) => updateFormData({ mitgliedStrasse: value })}
+          placeholder="z.B. Musterstraße"
+          required
+          validate={validateOrt}
+        />
+        <FormField
+          type="text"
+          label="Hausnummer"
+          id="mitgliedHausnummer"
+          value={formData.mitgliedHausnummer}
+          onChange={(value) => updateFormData({ mitgliedHausnummer: value })}
+          placeholder="z.B. 12a"
+          required
+        />
+        <FormField
+          type="text"
+          label="PLZ"
+          id="mitgliedPlz"
+          value={formData.mitgliedPlz}
+          onChange={(value) => updateFormData({ mitgliedPlz: value })}
+          placeholder="z.B. 12345"
+          required
+        />
+        <FormField
+          type="text"
+          label="Ort"
+          id="ort"
+          value={formData.ort}
+          onChange={(value) => updateFormData({ ort: value })}
+          placeholder="z.B. Berlin"
+          required
+          validate={validateOrt}
+        />
+      </div>
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <FormField
           type="text"
@@ -97,19 +138,6 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           placeholder="z.B. BKK GS"
           required
           validate={validateKrankenkasse}
-        />
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-        <FormField
-          type="text"
-          label="Ort"
-          id="ort"
-          value={formData.ort}
-          onChange={(value) => updateFormData({ ort: value })}
-          placeholder="z.B. Berlin"
-          required
-          validate={validateOrt}
         />
       </div>
       
@@ -176,10 +204,13 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           name: formData.mitgliedName,
           geburtsdatum: formData.mitgliedGeburtsdatum,
           geburtsort: formData.mitgliedGeburtsort,
+          strasse: formData.mitgliedStrasse,
+          hausnummer: formData.mitgliedHausnummer,
+          plz: formData.mitgliedPlz,
+          ort: formData.ort,
           kvNummer: formData.mitgliedKvNummer,
           krankenkasse: formData.mitgliedKrankenkasse,
           familienstand: formData.familienstand,
-          ort: formData.ort,
           telefon: formData.telefon,
           email: formData.email,
         }}
@@ -188,10 +219,13 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           name: 'Name',
           geburtsdatum: 'Geburtsdatum',
           geburtsort: 'Geburtsort',
+          strasse: 'Straße',
+          hausnummer: 'Hausnummer',
+          plz: 'PLZ',
+          ort: 'Ort',
           kvNummer: 'KV-Nummer',
           krankenkasse: 'Krankenkasse',
           familienstand: 'Familienstand',
-          ort: 'Ort',
           telefon: 'Telefon',
           email: 'E-Mail',
         }}

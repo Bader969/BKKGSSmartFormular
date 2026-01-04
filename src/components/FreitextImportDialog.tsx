@@ -62,18 +62,20 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
         lines.push([nameParts, birthParts].filter(Boolean).join('  '));
       }
       
-      // Zeile 2: Straße PLZ Ort
-      const addressParts = [data.mitgliedStrasse, data.mitgliedPLZ, data.mitgliedOrt].filter(Boolean).join(' ');
+      // Zeile 2: Straße Hausnummer, PLZ Ort
+      const streetParts = [data.mitgliedStrasse, data.mitgliedHausnummer].filter(Boolean).join(' ');
+      const cityParts = [data.mitgliedPlz, data.ort].filter(Boolean).join(' ');
+      const addressParts = [streetParts, cityParts].filter(Boolean).join(', ');
       if (addressParts) lines.push(addressParts);
       
-      // Zeile 3: Bisherige Kasse: Mitgliedsnummer
-      if (data.mitgliedBisherigKrankenkasse || data.mitgliedMitgliedsnummer) {
-        const kasseParts = [data.mitgliedBisherigKrankenkasse, data.mitgliedMitgliedsnummer].filter(Boolean).join(': ');
+      // Zeile 3: Bisherige Kasse: KV-Nummer
+      if (data.mitgliedKrankenkasse || data.mitgliedKvNummer) {
+        const kasseParts = [data.mitgliedKrankenkasse, data.mitgliedKvNummer].filter(Boolean).join(': ');
         if (kasseParts) lines.push(kasseParts);
       }
       
       // Zeile 4: Email, Telefon
-      const contactParts = [data.mitgliedEmail, data.mitgliedTelefon].filter(Boolean).join(', ');
+      const contactParts = [data.email, data.telefon].filter(Boolean).join(', ');
       if (contactParts) lines.push(contactParts);
       
       // Zeile 5: Arbeitgeber * Arbeitgeber-Adresse
@@ -83,13 +85,13 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
       }
       
       // Zeile 6: Familienstand
-      if (data.mitgliedFamilienstand) {
-        lines.push(data.mitgliedFamilienstand);
+      if (data.familienstand) {
+        lines.push(data.familienstand);
       }
       
       // Zeile 7: IBAN (falls vorhanden)
-      if (data.mitgliedIBAN) {
-        lines.push(`IBAN: ${data.mitgliedIBAN}`);
+      if (data.rundumSicherPaket?.iban) {
+        lines.push(`IBAN: ${data.rundumSicherPaket.iban}`);
       }
     } else if (type === 'ehegatte' && data.ehegatte) {
       const e = data.ehegatte;
