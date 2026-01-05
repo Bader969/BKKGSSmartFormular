@@ -61,53 +61,53 @@
   }
 
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 213 31% 91%;
+    --background: 220 20% 10%;
+    --foreground: 210 20% 95%;
 
-    --card: 224 42% 15%;
-    --card-foreground: 213 31% 91%;
+    --card: 220 20% 13%;
+    --card-foreground: 210 20% 95%;
 
-    --popover: 224 42% 15%;
-    --popover-foreground: 213 31% 91%;
+    --popover: 220 20% 13%;
+    --popover-foreground: 210 20% 95%;
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
+    --primary: 210 80% 55%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 160 64% 45%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 145 60% 45%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 223 35% 22%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 220 15% 20%;
+    --muted-foreground: 210 10% 60%;
 
-    --accent: 38 92% 50%;
-    --accent-foreground: 222 47% 11%;
+    --accent: 35 90% 55%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 63% 55%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 223 30% 28%;
-    --input: 223 38% 18%;
-    --ring: 217 91% 60%;
+    --border: 220 15% 25%;
+    --input: 220 15% 25%;
+    --ring: 210 80% 55%;
 
-    --section-member: 217 80% 65%;
-    --section-member-bg: 222 45% 18%;
-    --section-spouse: 160 55% 50%;
-    --section-spouse-bg: 165 40% 14%;
-    --section-child: 38 85% 55%;
-    --section-child-bg: 35 45% 14%;
-    --section-signature: 265 60% 65%;
-    --section-signature-bg: 265 40% 16%;
-    --section-info: 200 70% 55%;
-    --section-info-bg: 205 45% 15%;
+    --section-member: 217 70% 55%;
+    --section-member-bg: 217 40% 18%;
+    --section-spouse: 173 55% 45%;
+    --section-spouse-bg: 173 35% 16%;
+    --section-child: 43 85% 55%;
+    --section-child-bg: 43 50% 16%;
+    --section-signature: 262 50% 58%;
+    --section-signature-bg: 262 35% 17%;
+    --section-info: 200 65% 50%;
+    --section-info-bg: 200 40% 16%;
 
-    --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 213 31% 91%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 222 47% 11%;
-    --sidebar-accent: 223 35% 18%;
-    --sidebar-accent-foreground: 213 31% 91%;
-    --sidebar-border: 223 30% 22%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
 
@@ -129,27 +129,27 @@
   
   .section-member {
     border-left-color: hsl(var(--section-member));
-    background: linear-gradient(135deg, hsl(var(--section-member-bg)) 0%, hsl(var(--section-member-bg) / 0.7) 100%);
+    background: linear-gradient(135deg, hsl(217 55% 93%) 0%, hsl(217 50% 96%) 100%);
   }
   
   .section-spouse {
     border-left-color: hsl(var(--section-spouse));
-    background: linear-gradient(135deg, hsl(var(--section-spouse-bg)) 0%, hsl(var(--section-spouse-bg) / 0.7) 100%);
+    background: linear-gradient(135deg, hsl(173 45% 92%) 0%, hsl(173 40% 95%) 100%);
   }
   
   .section-child {
     border-left-color: hsl(var(--section-child));
-    background: linear-gradient(135deg, hsl(var(--section-child-bg)) 0%, hsl(var(--section-child-bg) / 0.7) 100%);
+    background: linear-gradient(135deg, hsl(43 65% 92%) 0%, hsl(43 55% 95%) 100%);
   }
   
   .section-signature {
     border-left-color: hsl(var(--section-signature));
-    background: linear-gradient(135deg, hsl(var(--section-signature-bg)) 0%, hsl(var(--section-signature-bg) / 0.7) 100%);
+    background: linear-gradient(135deg, hsl(262 40% 93%) 0%, hsl(262 35% 96%) 100%);
   }
   
   .section-info {
     border-left-color: hsl(var(--section-info));
-    background: linear-gradient(135deg, hsl(var(--section-info-bg)) 0%, hsl(var(--section-info-bg) / 0.7) 100%);
+    background: linear-gradient(135deg, hsl(200 50% 92%) 0%, hsl(200 45% 95%) 100%);
   }
   
   .section-title {
