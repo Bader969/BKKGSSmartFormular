@@ -11,7 +11,10 @@ import {
   validateSelect,
   validateTelefon,
   validateEmail,
-  validateOrt
+  validateOrt,
+  validatePlz,
+  validateHausnummer,
+  validateStrasse
 } from '@/utils/validation';
 
 interface MemberSectionProps {
@@ -89,7 +92,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           onChange={(value) => updateFormData({ mitgliedStrasse: value })}
           placeholder="z.B. Musterstraße"
           required
-          validate={validateOrt}
+          validate={validateStrasse}
         />
         <FormField
           type="text"
@@ -99,6 +102,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           onChange={(value) => updateFormData({ mitgliedHausnummer: value })}
           placeholder="z.B. 12a"
           required
+          validate={validateHausnummer}
         />
         <FormField
           type="text"
@@ -108,6 +112,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           onChange={(value) => updateFormData({ mitgliedPlz: value })}
           placeholder="z.B. 12345"
           required
+          validate={validatePlz}
         />
         <FormField
           type="text"
