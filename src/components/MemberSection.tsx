@@ -91,6 +91,8 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           value={formData.mitgliedStrasse}
           onChange={(value) => updateFormData({ mitgliedStrasse: value })}
           placeholder="z.B. Musterstraße"
+          required
+          validate={validateStrasse}
         />
         <FormField
           type="text"
@@ -99,6 +101,8 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           value={formData.mitgliedHausnummer}
           onChange={(value) => updateFormData({ mitgliedHausnummer: value })}
           placeholder="z.B. 12a"
+          required
+          validate={validateHausnummer}
         />
         <FormField
           type="text"
@@ -107,6 +111,8 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           value={formData.mitgliedPlz}
           onChange={(value) => updateFormData({ mitgliedPlz: value })}
           placeholder="z.B. 12345"
+          required
+          validate={validatePlz}
         />
         <FormField
           type="text"
