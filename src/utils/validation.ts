@@ -224,6 +224,45 @@ export const validateSelect = (value: string): ValidationResult => {
   return { isValid: true };
 };
 
+// PLZ-Validierung (5-stellig für Deutschland)
+export const validatePlz = (value: string): ValidationResult => {
+  if (!value.trim()) {
+    return { isValid: false, message: 'Dieses Feld ist erforderlich' };
+  }
+  const regex = /^[0-9]{5}$/;
+  if (!regex.test(value.trim())) {
+    return { isValid: false, message: 'PLZ muss 5 Ziffern haben' };
+  }
+  return { isValid: true };
+};
+
+// Hausnummer-Validierung
+export const validateHausnummer = (value: string): ValidationResult => {
+  if (!value.trim()) {
+    return { isValid: false, message: 'Dieses Feld ist erforderlich' };
+  }
+  const regex = /^[0-9]+[a-zA-Z]?[\-\/]?[0-9]*[a-zA-Z]?$/;
+  if (!regex.test(value.trim())) {
+    return { isValid: false, message: 'Ungültige Hausnummer (z.B. 12, 12a, 12-14)' };
+  }
+  return { isValid: true };
+};
+
+// Straße-Validierung
+export const validateStrasse = (value: string): ValidationResult => {
+  if (!value.trim()) {
+    return { isValid: false, message: 'Dieses Feld ist erforderlich' };
+  }
+  const regex = /^[a-zA-ZäöüÄÖÜßéèêëàâáåãæçíìîïñóòôõøúùûýÿžšđ0-9\s\-\.]+$/;
+  if (!regex.test(value)) {
+    return { isValid: false, message: 'Ungültige Zeichen im Straßennamen' };
+  }
+  if (value.length < 2) {
+    return { isValid: false, message: 'Mindestens 2 Zeichen erforderlich' };
+  }
+  return { isValid: true };
+};
+
 // Allgemeine Pflichtfeld-Validierung
 export const validateRequired = (value: string): ValidationResult => {
   if (!value || !value.trim()) {
