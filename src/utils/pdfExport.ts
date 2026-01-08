@@ -371,7 +371,8 @@ const createRundumSicherPaketPDF = async (formData: FormData, person: PersonInfo
   setTextField("Art Zusatzversicherung", artZusatzversicherung);
   setTextField("Jahresbeitrag", rsp.jahresbeitrag);
 
-  // Datum
+  // Datum (für Makler-Bereich und Unterschrift)
+  setTextField("Datum Makler", datumFormatted);
   setTextField("Datum", datumFormatted);
 
   // Datenschutz
