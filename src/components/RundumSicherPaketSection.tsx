@@ -325,15 +325,6 @@ export const RundumSicherPaketSection: React.FC<RundumSicherPaketSectionProps> =
         </div>
       </div>
 
-      {/* Unterschrift Makler */}
-      <div className="space-y-4 mb-6">
-        <h4 className="font-medium text-foreground">Unterschrift Makler <span className="text-destructive">*</span></h4>
-        <SignaturePad
-          signature={formData.rundumSicherPaket.unterschriftMakler}
-          onSignatureChange={(sig) => updateRundumSicherPaket({ unterschriftMakler: sig })}
-        />
-      </div>
-
       {/* Datenschutz - Pflichtfelder */}
       <div className="space-y-4">
         <h4 className="font-medium text-foreground">Datenschutz <span className="text-destructive">*</span></h4>

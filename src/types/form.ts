@@ -53,7 +53,7 @@ export interface RundumSicherPaketData {
   kontoinhaber: string;
   zeitraumVon: string;
   zeitraumBis: string;
-  datumRSP: string; // Gemeinsames Datum für "Datum Makler" und "Datum"
+  datumRSP: string; // Datum für die Unterschrift
   arztMitglied: ArztDaten;
   arztEhegatte: ArztDaten;
   aerzteKinder: ArztDaten[];
@@ -62,7 +62,6 @@ export interface RundumSicherPaketData {
   jahresbeitrag: string;
   datenschutz1: boolean;
   datenschutz2: boolean;
-  unterschriftMakler: string;
 }
 
 export type FormMode = 'familienversicherung_und_rundum' | 'nur_rundum';
@@ -137,7 +136,6 @@ export const createEmptyRundumSicherPaket = (): RundumSicherPaketData => ({
   jahresbeitrag: '',
   datenschutz1: false,
   datenschutz2: false,
-  unterschriftMakler: '',
 });
 
 export const createEmptyFamilyMember = (): FamilyMember => ({

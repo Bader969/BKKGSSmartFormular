@@ -371,21 +371,12 @@ const createRundumSicherPaketPDF = async (formData: FormData, person: PersonInfo
   setTextField("Art Zusatzversicherung", artZusatzversicherung);
   setTextField("Jahresbeitrag", rsp.jahresbeitrag);
 
-  // Datum (identisch für beide Felder)
-  setTextField("Datum Makler", datumFormatted);
+  // Datum
   setTextField("Datum", datumFormatted);
 
   // Datenschutz
   setCheckbox("Datenschutz 1", rsp.datenschutz1);
   setCheckbox("Datenschutz 2", rsp.datenschutz2);
-
-  // Unterschriften einbetten
-  const pages = pdfDoc.getPages();
-
-  // Makler-Unterschrift (neben "Datum Makler")
-  if (rsp.unterschriftMakler) {
-    await embedSignatureAtPosition(pdfDoc, rsp.unterschriftMakler, 400, 494, 1);
-  }
 
   // Person-Unterschrift (neben "Datum")
   // Für Ehegatte: Familienmitglieder-Unterschrift verwenden
