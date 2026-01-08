@@ -114,10 +114,7 @@ const Index = () => {
       return;
     }
     
-    if (!formData.rundumSicherPaket.unterschriftMakler) {
-      toast.error('Bitte fügen Sie die Unterschrift des Maklers hinzu.');
-      return;
-    }
+    // Datenschutz-Validierung
     
     // Datenschutz-Validierung
     if (!formData.rundumSicherPaket.datenschutz1 || !formData.rundumSicherPaket.datenschutz2) {

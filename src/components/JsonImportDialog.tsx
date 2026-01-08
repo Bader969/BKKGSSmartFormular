@@ -123,7 +123,6 @@ const createFamilyExampleJson = (): Partial<FormData> => ({
     jahresbeitrag: '500',
     datenschutz1: true,
     datenschutz2: true,
-    unterschriftMakler: '',
   },
   mitgliedVersichertennummer: 'A123456789',
 });
@@ -160,7 +159,6 @@ const createRundumOnlyExampleJson = (): Partial<FormData> => ({
     jahresbeitrag: '500',
     datenschutz1: true,
     datenschutz2: true,
-    unterschriftMakler: '',
   },
   mitgliedVersichertennummer: 'A123456789',
 });
