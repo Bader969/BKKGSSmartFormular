@@ -371,9 +371,19 @@ const createRundumSicherPaketPDF = async (formData: FormData, person: PersonInfo
   setTextField("Art Zusatzversicherung", artZusatzversicherung);
   setTextField("Jahresbeitrag", rsp.jahresbeitrag);
 
-  // Datum (für Makler-Bereich und Unterschrift)
-  setTextField("Datum Makler", datumFormatted);
-  setTextField("Datum", datumFormatted);
+  // Datum (für Makler-Bereich und Unterschrift des Antragstellers)
+  // Verwende aktuelles Datum für die Unterschriftsbereiche
+  const heuteDatum = new Date().toLocaleDateString('de-DE', { 
+    day: '2-digit', 
+    month: '2-digit', 
+    year: 'numeric' 
+  });
+  setTextField("Datum Makler", heuteDatum);
+  setTextField("Datum", heuteDatum);
+  
+  // Debug: Log field names to console
+  console.log("Setting Datum Makler:", heuteDatum);
+  console.log("Setting Datum:", heuteDatum);
 
   // Datenschutz
   setCheckbox("Datenschutz 1", rsp.datenschutz1);
