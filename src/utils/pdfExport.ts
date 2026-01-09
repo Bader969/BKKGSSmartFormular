@@ -323,6 +323,15 @@ const createRundumSicherPaketPDF = async (formData: FormData, person: PersonInfo
   const existingPdfBytes = await fetch(pdfUrl).then((res) => res.arrayBuffer());
   const pdfDoc = await PDFDocument.load(existingPdfBytes);
   const form = pdfDoc.getForm();
+  
+  // Debug: Liste alle Feldnamen auf
+  const allFields = form.getFields();
+  console.log("=== ALLE PDF FELDER ===");
+  allFields.forEach(field => {
+    console.log(`Feld: "${field.getName()}" - Typ: ${field.constructor.name}`);
+  });
+  console.log("=== ENDE FELDLISTE ===");
+  
   const helpers = createPDFHelpers(form);
   const { setTextField, setCheckbox } = helpers;
 
