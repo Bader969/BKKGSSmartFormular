@@ -324,19 +324,10 @@ const createRundumSicherPaketPDF = async (formData: FormData, person: PersonInfo
   const pdfDoc = await PDFDocument.load(existingPdfBytes);
   const form = pdfDoc.getForm();
   
-  // Debug: Liste alle Feldnamen auf
-  const allFields = form.getFields();
-  console.log("=== ALLE PDF FELDER ===");
-  allFields.forEach(field => {
-    console.log(`Feld: "${field.getName()}" - Typ: ${field.constructor.name}`);
-  });
-  console.log("=== ENDE FELDLISTE ===");
-  
   const helpers = createPDFHelpers(form);
   const { setTextField, setCheckbox } = helpers;
 
   const rsp = formData.rundumSicherPaket;
-  const datumFormatted = formatInputDate(rsp.datumRSP);
 
   // Person-Daten
   setTextField("Vorname", person.vorname);
@@ -380,33 +371,27 @@ const createRundumSicherPaketPDF = async (formData: FormData, person: PersonInfo
   setTextField("Art Zusatzversicherung", artZusatzversicherung);
   setTextField("Jahresbeitrag", rsp.jahresbeitrag);
 
-  // Datum (für Makler-Bereich und Unterschrift des Antragstellers)
-  // Verwende aktuelles Datum für die Unterschriftsbereiche
-  const heuteDatum = new Date().toLocaleDateString('de-DE', { 
-    day: '2-digit', 
-    month: '2-digit', 
-    year: 'numeric' 
-  });
-  setTextField("Datum Makler", heuteDatum);
-  setTextField("Datum", heuteDatum);
-  
-  // Debug: Log field names to console
-  console.log("Setting Datum Makler:", heuteDatum);
-  console.log("Setting Datum:", heuteDatum);
+  // Datum für Makler-Bereich und Unterschrift des Antragstellers
+  // Verwende das im Formular eingegebene Datum (datumRSP)
+  const datumFormatted = formatInputDate(rsp.datumRSP);
+  setTextField("Datum Makler", datumFormatted);
+  setTextField("Datum", datumFormatted);
 
   // Datenschutz
   setCheckbox("Datenschutz 1", rsp.datenschutz1);
   setCheckbox("Datenschutz 2", rsp.datenschutz2);
 
-  // Person-Unterschrift (neben "Datum")
+  // Person-Unterschrift (neben "Datum" auf Seite 2)
   // Für Ehegatte: Familienmitglieder-Unterschrift verwenden
   // Für Mitglied und Kinder: Mitglied-Unterschrift verwenden
   const personSignature = person.type === "ehegatte" 
     ? formData.unterschriftFamilie 
     : formData.unterschrift;
 
+  // Laut CSV: "Datum" bei Left=53.33, Top=713.08, Width=105.67, Height=16.22
+  // Unterschrift sollte rechts davon platziert werden (nach dem Datum-Feld)
   if (personSignature) {
-    await embedSignatureAtPosition(pdfDoc, personSignature, 160, 713, 1);
+    await embedSignatureAtPosition(pdfDoc, personSignature, 165, 713, 1);
   }
 
   return await pdfDoc.save();
