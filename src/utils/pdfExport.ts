@@ -384,9 +384,8 @@ const createRundumSicherPaketPDF = async (formData: FormData, person: PersonInfo
   // Datum für Makler-Bereich und Unterschrift des Antragstellers
   // Verwende das im Formular eingegebene Datum (datumRSP)
   const datumFormatted = formatInputDate(rsp.datumRSP);
-  console.log("Datum formatiert:", datumFormatted);
-  setTextField("Datum Makler", datumFormatted);
-  setTextField("Datum", datumFormatted);
+  setTextField("Stempel Datum Unterschrift", datumFormatted); // Makler-Stempel/Datum
+  setTextField("Datum Unterschrift", datumFormatted); // Unterschrift Antragsteller
 
   // Datenschutz
   setCheckbox("Datenschutz 1", rsp.datenschutz1);
