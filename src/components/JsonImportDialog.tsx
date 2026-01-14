@@ -329,11 +329,41 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       }
 
       setAnalysisProgress(100);
-      toast.success('Daten erfolgreich extrahiert!');
 
       // Extract the actual form data (exclude improvedImages if present)
       const { improvedImages, ...formDataFromAi } = data;
-      setJsonInput(JSON.stringify(formDataFromAi, null, 2));
+      const parsed = formDataFromAi as FormData;
+      
+      // Auto-Import: Direkt nach erfolgreicher Extraktion importieren
+      const todayForInput = formatDateForInput(new Date());
+      
+      const processedKinder = parsed.kinder?.map(kind => ({
+        ...kind,
+        bisherigBestehtWeiter: true,
+        bisherigBestehtWeiterBei: 'BKK GS',
+      })) || formData.kinder;
+      
+      const mitgliedVersichertennummer = parsed.mitgliedKvNummer || parsed.mitgliedVersichertennummer || formData.mitgliedVersichertennummer;
+      const ehegatteKrankenkasse = parsed.ehegatteKrankenkasse || parsed.mitgliedKrankenkasse || formData.ehegatteKrankenkasse;
+      
+      setFormData({
+        ...formData,
+        ...parsed,
+        datum: todayForInput,
+        mitgliedVersichertennummer: mitgliedVersichertennummer,
+        ehegatteKrankenkasse: ehegatteKrankenkasse,
+        ehegatte: parsed.ehegatte ? { ...formData.ehegatte, ...parsed.ehegatte } : formData.ehegatte,
+        kinder: processedKinder,
+        rundumSicherPaket: parsed.rundumSicherPaket
+          ? { ...formData.rundumSicherPaket, ...parsed.rundumSicherPaket }
+          : formData.rundumSicherPaket,
+      });
+      
+      toast.success('Daten erfolgreich extrahiert und importiert!');
+      setOpen(false);
+      setJsonInput('');
+      uploadedFiles.forEach(f => URL.revokeObjectURL(f.preview));
+      setUploadedFiles([]);
       
     } catch (error) {
       console.error('Error extracting data:', error);
