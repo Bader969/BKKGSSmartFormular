@@ -128,7 +128,7 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
 
   // === AUTOMATISCH AUSGEFÜLLT ===
   
-  // Datum Mitgliedschaft: +3 Kalendermonate
+  // Datum Mitgliedschaft: +3 Kalendermonate (1. des Monats)
   setTextField("Datum Mitgliedschaft", getDatumMitgliedschaft());
   
   // versichert bis: Ende des 3. Monats
@@ -151,8 +151,12 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   setTextField("Geburtsname", formData.mitgliedName);
   
   // Staatsangehörigkeit (falls verfügbar)
-  // Im aktuellen FormData nicht vorhanden - Standard: Deutschland
   setTextField("Staatsangehörigkeit", "deutsch");
+
+  // === GESCHLECHT ===
+  setCheckbox("weiblich", formData.viactivGeschlecht === "weiblich");
+  setCheckbox("männlich", formData.viactivGeschlecht === "maennlich");
+  setCheckbox("divers", formData.viactivGeschlecht === "divers");
 
   // === ADRESSE ===
   setTextField("Straße", formData.mitgliedStrasse || "");
@@ -169,8 +173,40 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   setCheckbox("verheiratet", formData.familienstand === "verheiratet");
   setCheckbox("Lebenspartnerschaft", formData.familienstand === "verheiratet"); // Fallback
 
+  // === BESCHÄFTIGUNGSSTATUS ===
+  setCheckbox("Ich bin beschäftigt", formData.viactivBeschaeftigung === "beschaeftigt");
+  setCheckbox("Ich bin in Ausbildung", formData.viactivBeschaeftigung === "ausbildung");
+  setCheckbox("Ich beziehe Rente", formData.viactivBeschaeftigung === "rente");
+  setCheckbox("Ich bin freiwillig versichert", formData.viactivBeschaeftigung === "freiwillig_versichert");
+  setCheckbox("ich studiere", formData.viactivBeschaeftigung === "studiere");
+  setCheckbox("ich beziehe AL-Geld I", formData.viactivBeschaeftigung === "al_geld_1");
+  setCheckbox("ich beziehe AL-Geld II", formData.viactivBeschaeftigung === "al_geld_2");
+  setCheckbox("ich habe einen Minijob (bis zu 450 Euro)", formData.viactivBeschaeftigung === "minijob");
+  setCheckbox("ich bin selbstständig", formData.viactivBeschaeftigung === "selbststaendig");
+  setCheckbox("Einkommen über 64.350 Euro-Stand 2022", formData.viactivBeschaeftigung === "einkommen_ueber_grenze");
+
+  // === ARBEITGEBER ===
+  const ag = formData.viactivArbeitgeber;
+  setTextField("Name des Arbeitgebers", ag.name || "");
+  setTextField("Arbeitgeber Straße", ag.strasse || "");
+  setTextField("Arbeitgeber Hausnummer", ag.hausnummer || "");
+  setTextField("Arbeitgeber PLZ", ag.plz || "");
+  setTextField("Arbeitgeber Ort", ag.ort || "");
+  setTextField("Beschäftigt seit", formatInputDate(ag.beschaeftigtSeit) || "");
+
+  // === BISHERIGE VERSICHERUNGSART ===
+  setCheckbox("pflichtversichert", formData.viactivVersicherungsart === "pflichtversichert");
+  setCheckbox("privat", formData.viactivVersicherungsart === "privat");
+  setCheckbox("freiwillig versichert", formData.viactivVersicherungsart === "freiwillig_versichert");
+  setCheckbox("nicht gesetzl. versichert", formData.viactivVersicherungsart === "nicht_gesetzlich");
+  setCheckbox("familienversichert", formData.viactivVersicherungsart === "familienversichert");
+  setCheckbox("Zuzug aus dem Ausland", formData.viactivVersicherungsart === "zuzug_ausland");
+
   // === BISHERIGE KRANKENKASSE ===
   setTextField("Name der letzten KrankenkasseKrankenversicherung", formData.mitgliedKrankenkasse || "");
+
+  // === FAMILIENANGEHÖRIGE MITVERSICHERN ===
+  setCheckbox("Familienangehörige sollen mitversichert werden", formData.viactivFamilienangehoerigeMitversichern);
 
   // === DATUM UND UNTERSCHRIFT ===
   const today = new Date();
@@ -178,7 +214,6 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   setTextField("Datum und Unterschrift", datumHeute);
 
   // Unterschrift einbetten (Position basierend auf PDF-Analyse)
-  // "Datum und Unterschrift" ist bei Left=58, Top=721.76
   if (formData.unterschrift) {
     await embedSignature(pdfDoc, formData.unterschrift, 180, 735, 0);
   }
