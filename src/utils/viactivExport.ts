@@ -1,0 +1,205 @@
+import { PDFDocument } from "pdf-lib";
+import { FormData } from "@/types/form";
+
+/**
+ * VIACTIV Beitrittserklärung PDF Export
+ * Dateiname: Viactiv_Nachname, Vorname_BE_Datum.pdf
+ */
+
+const formatInputDate = (dateStr: string): string => {
+  if (!dateStr) return "";
+  const parts = dateStr.split("-");
+  if (parts.length !== 3) return dateStr;
+  return `${parts[2]}.${parts[1]}.${parts[0]}`;
+};
+
+const formatDateGerman = (date: Date): string => {
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}.${month}.${year}`;
+};
+
+/**
+ * Berechnet Datum Mitgliedschaft: Immer +3 Kalendermonate (1. des Monats)
+ * Z.B. heute 23.01.2026 → 01.04.2026
+ */
+const getDatumMitgliedschaft = (): string => {
+  const today = new Date();
+  const targetDate = new Date(today.getFullYear(), today.getMonth() + 3, 1);
+  return formatDateGerman(targetDate);
+};
+
+/**
+ * Berechnet "versichert bis" Datum: Ende des 3. Monats ab jetzt
+ * Z.B. heute 23.01.2026 → 31.03.2026
+ */
+const getVersichertBis = (): string => {
+  const today = new Date();
+  // Ende des 3. Monats = Tag 0 des 4. Monats (letzter Tag des Vormonats)
+  const endOfThirdMonth = new Date(today.getFullYear(), today.getMonth() + 3, 0);
+  return formatDateGerman(endOfThirdMonth);
+};
+
+interface PDFHelpers {
+  setTextField: (fieldName: string, value: string) => void;
+  setCheckbox: (fieldName: string, checked: boolean) => void;
+}
+
+const createPDFHelpers = (form: ReturnType<PDFDocument["getForm"]>): PDFHelpers => {
+  const setTextField = (fieldName: string, value: string) => {
+    try {
+      const field = form.getTextField(fieldName);
+      if (field && value) {
+        field.setText(value);
+      }
+    } catch (e) {
+      console.warn(`VIACTIV Field not found: ${fieldName}`);
+    }
+  };
+
+  const setCheckbox = (fieldName: string, checked: boolean) => {
+    try {
+      const field = form.getCheckBox(fieldName);
+      if (field) {
+        if (checked) {
+          field.check();
+        } else {
+          field.uncheck();
+        }
+      }
+    } catch (e) {
+      console.warn(`VIACTIV Checkbox not found: ${fieldName}`);
+    }
+  };
+
+  return { setTextField, setCheckbox };
+};
+
+const downloadPDF = (pdfBytes: Uint8Array, filename: string) => {
+  const blob = new Blob([new Uint8Array(pdfBytes)], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+const embedSignature = async (
+  pdfDoc: PDFDocument,
+  signatureData: string,
+  x: number,
+  y: number,
+  pageIndex: number = 0,
+) => {
+  if (!signatureData) return;
+
+  try {
+    const pages = pdfDoc.getPages();
+    const page = pages[pageIndex];
+    const { height } = page.getSize();
+
+    const signatureImage = await pdfDoc.embedPng(signatureData);
+    const sigDims = signatureImage.scale(0.2);
+
+    page.drawImage(signatureImage, {
+      x,
+      y: height - y,
+      width: Math.min(sigDims.width, 100),
+      height: Math.min(sigDims.height, 30),
+    });
+  } catch (e) {
+    console.error("Could not embed signature:", e);
+  }
+};
+
+export const createViactivBeitrittserklaerungPDF = async (formData: FormData): Promise<Uint8Array> => {
+  const pdfUrl = "/viactiv-beitrittserklaerung.pdf";
+  const existingPdfBytes = await fetch(pdfUrl).then((res) => res.arrayBuffer());
+  const pdfDoc = await PDFDocument.load(existingPdfBytes);
+  const form = pdfDoc.getForm();
+  
+  const helpers = createPDFHelpers(form);
+  const { setTextField, setCheckbox } = helpers;
+
+  // === AUTOMATISCH AUSGEFÜLLT ===
+  
+  // Datum Mitgliedschaft: +3 Kalendermonate
+  setTextField("Datum Mitgliedschaft", getDatumMitgliedschaft());
+  
+  // versichert bis: Ende des 3. Monats
+  setTextField("versichert bis (Datum)", getVersichertBis());
+  
+  // versichert von: leer lassen (nicht setzen)
+  
+  // Immer angekreuzt
+  setCheckbox("Mein Versicherungsstatus ist unverändert", true);
+  setCheckbox("Datenschutz- und werberechliche Einwilligungserklärung", true);
+
+  // === PERSÖNLICHE DATEN ===
+  setTextField("Name", formData.mitgliedName);
+  setTextField("Vorname", formData.mitgliedVorname);
+  setTextField("Geburtsdatum", formatInputDate(formData.mitgliedGeburtsdatum));
+  setTextField("Geburtsort", formData.mitgliedGeburtsort || "");
+  setTextField("Geburtsland", formData.mitgliedGeburtsland || "");
+  
+  // Geburtsname - falls vorhanden im Formular, sonst Nachname
+  setTextField("Geburtsname", formData.mitgliedName);
+  
+  // Staatsangehörigkeit (falls verfügbar)
+  // Im aktuellen FormData nicht vorhanden - Standard: Deutschland
+  setTextField("Staatsangehörigkeit", "deutsch");
+
+  // === ADRESSE ===
+  setTextField("Straße", formData.mitgliedStrasse || "");
+  setTextField("Hausnummer", formData.mitgliedHausnummer || "");
+  setTextField("PLZ", formData.mitgliedPlz || "");
+  setTextField("Ort", formData.ort || "");
+  
+  // === KONTAKT ===
+  setTextField("Telefon", formData.telefon || "");
+  setTextField("E-Mail", formData.email || "");
+
+  // === FAMILIENSTAND ===
+  setCheckbox("ledig", formData.familienstand === "ledig");
+  setCheckbox("verheiratet", formData.familienstand === "verheiratet");
+  setCheckbox("Lebenspartnerschaft", formData.familienstand === "verheiratet"); // Fallback
+
+  // === BISHERIGE KRANKENKASSE ===
+  setTextField("Name der letzten KrankenkasseKrankenversicherung", formData.mitgliedKrankenkasse || "");
+
+  // === DATUM UND UNTERSCHRIFT ===
+  const today = new Date();
+  const datumHeute = formatDateGerman(today);
+  setTextField("Datum und Unterschrift", datumHeute);
+
+  // Unterschrift einbetten (Position basierend auf PDF-Analyse)
+  // "Datum und Unterschrift" ist bei Left=58, Top=721.76
+  if (formData.unterschrift) {
+    await embedSignature(pdfDoc, formData.unterschrift, 180, 735, 0);
+  }
+
+  return await pdfDoc.save();
+};
+
+export const exportViactivBeitrittserklaerung = async (formData: FormData): Promise<void> => {
+  try {
+    const pdfBytes = await createViactivBeitrittserklaerungPDF(formData);
+    
+    // Dateiname: Viactiv_Nachname, Vorname_BE_Datum.pdf
+    const today = new Date();
+    const datumForFilename = formatDateGerman(today).replace(/\./g, '-');
+    const nachname = formData.mitgliedName || 'Nachname';
+    const vorname = formData.mitgliedVorname || 'Vorname';
+    const filename = `Viactiv_${nachname}, ${vorname}_BE_${datumForFilename}.pdf`;
+    
+    downloadPDF(pdfBytes, filename);
+  } catch (error) {
+    console.error("Error exporting VIACTIV PDF:", error);
+    throw error;
+  }
+};

@@ -66,9 +66,20 @@ export interface RundumSicherPaketData {
 
 export type FormMode = 'familienversicherung_und_rundum' | 'nur_rundum';
 
+// Krankenkassen-Auswahl
+export type Krankenkasse = 'bkk_gs' | 'viactiv';
+
+export const KRANKENKASSEN_OPTIONS = [
+  { value: 'bkk_gs' as Krankenkasse, label: 'BKK GILDEMEISTER SEIDENSTICK' },
+  { value: 'viactiv' as Krankenkasse, label: 'VIACTIV Krankenkasse' },
+] as const;
+
 export interface FormData {
   // Formular-Modus
   mode: FormMode;
+  
+  // Ausgewählte Krankenkasse für Export
+  selectedKrankenkasse: Krankenkasse;
   
   // Mitglied Angaben
   mitgliedName: string;
@@ -182,6 +193,7 @@ export const createInitialFormData = (): FormData => {
 
   return {
     mode: 'familienversicherung_und_rundum',
+    selectedKrankenkasse: 'bkk_gs',
     mitgliedName: '',
     mitgliedVorname: '',
     mitgliedGeburtsdatum: '',
