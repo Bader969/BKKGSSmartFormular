@@ -324,20 +324,10 @@ const createRundumSicherPaketPDF = async (formData: FormData, person: PersonInfo
   const pdfDoc = await PDFDocument.load(existingPdfBytes);
   const form = pdfDoc.getForm();
   
-  // Debug: Liste alle Feldnamen auf
-  const allFields = form.getFields();
-  console.log("=== RSP PDF FELDER ===");
-  allFields.forEach(field => {
-    console.log(`Feld: "${field.getName()}" - Typ: ${field.constructor.name}`);
-  });
-  console.log("=== ENDE FELDLISTE ===");
-  
   const helpers = createPDFHelpers(form);
   const { setTextField, setCheckbox } = helpers;
 
   const rsp = formData.rundumSicherPaket;
-  
-  console.log("RSP datumRSP Wert:", rsp.datumRSP);
 
   // Person-Daten
   setTextField("Vorname", person.vorname);
