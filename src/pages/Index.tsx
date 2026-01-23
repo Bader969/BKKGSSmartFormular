@@ -5,6 +5,7 @@ import { SpouseSection } from '@/components/SpouseSection';
 import { ChildrenSection } from '@/components/ChildrenSection';
 import { SignatureSection } from '@/components/SignatureSection';
 import { RundumSicherPaketSection } from '@/components/RundumSicherPaketSection';
+import { ViactivSection } from '@/components/ViactivSection';
 import { Button } from '@/components/ui/button';
 import { FileDown, FileText, AlertCircle, Users, User, Building2 } from 'lucide-react';
 import { exportFilledPDF, exportRundumSicherPaketOnly } from '@/utils/pdfExport';
@@ -78,8 +79,19 @@ const Index = () => {
         toast.error('Bitte geben Sie den Ort ein.');
         return;
       }
-      // VIACTIV braucht weniger Felder
-    } 
+      if (!formData.viactivGeschlecht) {
+        toast.error('Bitte wählen Sie das Geschlecht aus.');
+        return;
+      }
+      if (!formData.viactivBeschaeftigung) {
+        toast.error('Bitte wählen Sie den Beschäftigungsstatus aus.');
+        return;
+      }
+      if (!formData.viactivVersicherungsart) {
+        toast.error('Bitte wählen Sie die bisherige Versicherungsart aus.');
+        return;
+      }
+    }
     // BKK GS-spezifische Validierung
     else {
       if (!formData.mitgliedKvNummer) {
@@ -296,6 +308,11 @@ const Index = () => {
               )}
               <RundumSicherPaketSection formData={formData} updateFormData={updateFormData} />
             </>
+          )}
+          
+          {/* VIACTIV-spezifische Sektionen */}
+          {formData.selectedKrankenkasse === 'viactiv' && (
+            <ViactivSection formData={formData} updateFormData={updateFormData} />
           )}
           
           <SignatureSection formData={formData} updateFormData={updateFormData} />

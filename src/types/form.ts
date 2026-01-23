@@ -74,6 +74,78 @@ export const KRANKENKASSEN_OPTIONS = [
   { value: 'viactiv' as Krankenkasse, label: 'VIACTIV Krankenkasse' },
 ] as const;
 
+// VIACTIV-spezifische Typen
+export type ViactivGeschlecht = 'weiblich' | 'maennlich' | 'divers' | '';
+
+export type ViactivBeschaeftigung = 
+  | 'beschaeftigt'
+  | 'ausbildung'
+  | 'rente'
+  | 'freiwillig_versichert'
+  | 'studiere'
+  | 'al_geld_1'
+  | 'al_geld_2'
+  | 'minijob'
+  | 'selbststaendig'
+  | 'einkommen_ueber_grenze'
+  | '';
+
+export type ViactivVersicherungsart = 
+  | 'pflichtversichert'
+  | 'privat'
+  | 'freiwillig_versichert'
+  | 'nicht_gesetzlich'
+  | 'familienversichert'
+  | 'zuzug_ausland'
+  | '';
+
+export const VIACTIV_GESCHLECHT_OPTIONS = [
+  { value: 'weiblich' as ViactivGeschlecht, label: 'Weiblich' },
+  { value: 'maennlich' as ViactivGeschlecht, label: 'Männlich' },
+  { value: 'divers' as ViactivGeschlecht, label: 'Divers' },
+] as const;
+
+export const VIACTIV_BESCHAEFTIGUNG_OPTIONS = [
+  { value: 'beschaeftigt' as ViactivBeschaeftigung, label: 'Ich bin beschäftigt' },
+  { value: 'ausbildung' as ViactivBeschaeftigung, label: 'Ich bin in Ausbildung' },
+  { value: 'rente' as ViactivBeschaeftigung, label: 'Ich beziehe Rente' },
+  { value: 'freiwillig_versichert' as ViactivBeschaeftigung, label: 'Ich bin freiwillig versichert' },
+  { value: 'studiere' as ViactivBeschaeftigung, label: 'Ich studiere' },
+  { value: 'al_geld_1' as ViactivBeschaeftigung, label: 'Ich beziehe AL-Geld I' },
+  { value: 'al_geld_2' as ViactivBeschaeftigung, label: 'Ich beziehe AL-Geld II' },
+  { value: 'minijob' as ViactivBeschaeftigung, label: 'Ich habe einen Minijob (bis zu 450 Euro)' },
+  { value: 'selbststaendig' as ViactivBeschaeftigung, label: 'Ich bin selbstständig' },
+  { value: 'einkommen_ueber_grenze' as ViactivBeschaeftigung, label: 'Einkommen über 64.350 Euro (Stand 2022)' },
+] as const;
+
+export const VIACTIV_VERSICHERUNGSART_OPTIONS = [
+  { value: 'pflichtversichert' as ViactivVersicherungsart, label: 'Pflichtversichert' },
+  { value: 'privat' as ViactivVersicherungsart, label: 'Privat versichert' },
+  { value: 'freiwillig_versichert' as ViactivVersicherungsart, label: 'Freiwillig versichert' },
+  { value: 'nicht_gesetzlich' as ViactivVersicherungsart, label: 'Nicht gesetzlich versichert' },
+  { value: 'familienversichert' as ViactivVersicherungsart, label: 'Familienversichert' },
+  { value: 'zuzug_ausland' as ViactivVersicherungsart, label: 'Zuzug aus dem Ausland' },
+] as const;
+
+// Arbeitgeber-Daten für VIACTIV
+export interface ArbeitgeberDaten {
+  name: string;
+  strasse: string;
+  hausnummer: string;
+  plz: string;
+  ort: string;
+  beschaeftigtSeit: string;
+}
+
+export const createEmptyArbeitgeberDaten = (): ArbeitgeberDaten => ({
+  name: '',
+  strasse: '',
+  hausnummer: '',
+  plz: '',
+  ort: '',
+  beschaeftigtSeit: '',
+});
+
 export interface FormData {
   // Formular-Modus
   mode: FormMode;
@@ -126,6 +198,13 @@ export interface FormData {
   
   // Mitglied Versichertennummer für Rundum-Sicher-Paket
   mitgliedVersichertennummer: string;
+  
+  // VIACTIV-spezifische Felder
+  viactivGeschlecht: ViactivGeschlecht;
+  viactivBeschaeftigung: ViactivBeschaeftigung;
+  viactivVersicherungsart: ViactivVersicherungsart;
+  viactivArbeitgeber: ArbeitgeberDaten;
+  viactivFamilienangehoerigeMitversichern: boolean;
 }
 
 export const createEmptyArztDaten = (): ArztDaten => ({
@@ -217,5 +296,11 @@ export const createInitialFormData = (): FormData => {
     unterschriftFamilie: '',
     rundumSicherPaket: createEmptyRundumSicherPaket(),
     mitgliedVersichertennummer: '',
+    // VIACTIV-spezifische Felder
+    viactivGeschlecht: '',
+    viactivBeschaeftigung: '',
+    viactivVersicherungsart: '',
+    viactivArbeitgeber: createEmptyArbeitgeberDaten(),
+    viactivFamilienangehoerigeMitversichern: false,
   };
 };
