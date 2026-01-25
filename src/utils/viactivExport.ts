@@ -47,14 +47,19 @@ interface PDFHelpers {
 }
 
 const createPDFHelpers = (form: ReturnType<PDFDocument["getForm"]>): PDFHelpers => {
+  // Debug: Log all available field names
+  const fields = form.getFields();
+  console.log("Available PDF fields:", fields.map(f => ({ name: f.getName(), type: f.constructor.name })));
+
   const setTextField = (fieldName: string, value: string) => {
     try {
       const field = form.getTextField(fieldName);
-      if (field && value) {
-        field.setText(value);
+      if (field) {
+        field.setText(value || "");
+        console.log(`✓ Set text field "${fieldName}" = "${value}"`);
       }
     } catch (e) {
-      console.warn(`VIACTIV Field not found: ${fieldName}`);
+      console.warn(`✗ VIACTIV Text field not found: ${fieldName}`);
     }
   };
 
@@ -67,9 +72,10 @@ const createPDFHelpers = (form: ReturnType<PDFDocument["getForm"]>): PDFHelpers 
         } else {
           field.uncheck();
         }
+        console.log(`✓ Set checkbox "${fieldName}" = ${checked}`);
       }
     } catch (e) {
-      console.warn(`VIACTIV Checkbox not found: ${fieldName}`);
+      console.warn(`✗ VIACTIV Checkbox not found: ${fieldName}`);
     }
   };
 
