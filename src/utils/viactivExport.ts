@@ -142,9 +142,13 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   
   // versichert von: leer lassen (nicht setzen)
   
-  // Immer angekreuzt
+  // Immer angekreuzt - PDF-Feldnamen aus Acrobat-Analyse verwenden
   setCheckbox("Mein Versicherungsstatus ist unverändert", true);
+  // Fallback mit UTF-8 Encoding-Problem
+  setCheckbox("Mein Versicherungsstatus ist unverÃ¤ndert", true);
   setCheckbox("Datenschutz- und werberechliche Einwilligungserklärung", true);
+  // Fallback mit UTF-8 Encoding-Problem
+  setCheckbox("Datenschutz- und werberechliche EinwilligungserklÃ¤rung", true);
 
   // === PERSÖNLICHE DATEN ===
   setTextField("Name", formData.mitgliedName);
@@ -156,16 +160,19 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   // Geburtsname - falls vorhanden im Formular, sonst Nachname
   setTextField("Geburtsname", formData.mitgliedName);
   
-  // Staatsangehörigkeit (falls verfügbar)
+  // Staatsangehörigkeit (versuche beide Varianten)
   setTextField("Staatsangehörigkeit", "deutsch");
+  setTextField("StaatsangehÃ¶rigkeit", "deutsch");
 
-  // === GESCHLECHT ===
+  // === GESCHLECHT === (PDF-Feldnamen aus Acrobat-Analyse)
   setCheckbox("weiblich", formData.viactivGeschlecht === "weiblich");
   setCheckbox("männlich", formData.viactivGeschlecht === "maennlich");
+  setCheckbox("mÃ¤nnlich", formData.viactivGeschlecht === "maennlich");
   setCheckbox("divers", formData.viactivGeschlecht === "divers");
 
-  // === ADRESSE ===
+  // === ADRESSE === (PDF-Feldnamen mit Umlaut-Problem)
   setTextField("Straße", formData.mitgliedStrasse || "");
+  setTextField("StraÃŸe", formData.mitgliedStrasse || "");
   setTextField("Hausnummer", formData.mitgliedHausnummer || "");
   setTextField("PLZ", formData.mitgliedPlz || "");
   setTextField("Ort", formData.ort || "");
@@ -179,7 +186,8 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   setCheckbox("verheiratet", formData.familienstand === "verheiratet");
   setCheckbox("Lebenspartnerschaft", formData.familienstand === "verheiratet"); // Fallback
 
-  // === BESCHÄFTIGUNGSSTATUS ===
+  // === BESCHÄFTIGUNGSSTATUS === (PDF-Feldnamen aus Acrobat-Analyse)
+  // Normale Varianten
   setCheckbox("Ich bin beschäftigt", formData.viactivBeschaeftigung === "beschaeftigt");
   setCheckbox("Ich bin in Ausbildung", formData.viactivBeschaeftigung === "ausbildung");
   setCheckbox("Ich beziehe Rente", formData.viactivBeschaeftigung === "rente");
@@ -190,15 +198,22 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   setCheckbox("ich habe einen Minijob (bis zu 450 Euro)", formData.viactivBeschaeftigung === "minijob");
   setCheckbox("ich bin selbstständig", formData.viactivBeschaeftigung === "selbststaendig");
   setCheckbox("Einkommen über 64.350 Euro-Stand 2022", formData.viactivBeschaeftigung === "einkommen_ueber_grenze");
+  
+  // UTF-8 Fallback-Varianten aus PDF-Analyse
+  setCheckbox("Ich bin beschÃ¤ftigt", formData.viactivBeschaeftigung === "beschaeftigt");
+  setCheckbox("ich bin selbststÃ¤ndig", formData.viactivBeschaeftigung === "selbststaendig");
+  setCheckbox("Einkommen Ã¼ber 64.350 Euro-Stand 2022", formData.viactivBeschaeftigung === "einkommen_ueber_grenze");
 
-  // === ARBEITGEBER ===
+  // === ARBEITGEBER === (PDF-Feldnamen aus Acrobat-Analyse)
   const ag = formData.viactivArbeitgeber;
   setTextField("Name des Arbeitgebers", ag.name || "");
   setTextField("Arbeitgeber Straße", ag.strasse || "");
+  setTextField("Arbeitgeber StraÃŸe", ag.strasse || "");
   setTextField("Arbeitgeber Hausnummer", ag.hausnummer || "");
   setTextField("Arbeitgeber PLZ", ag.plz || "");
   setTextField("Arbeitgeber Ort", ag.ort || "");
   setTextField("Beschäftigt seit", formatInputDate(ag.beschaeftigtSeit) || "");
+  setTextField("BeschÃ¤ftigt seit", formatInputDate(ag.beschaeftigtSeit) || "");
 
   // === BISHERIGE VERSICHERUNGSART ===
   setCheckbox("pflichtversichert", formData.viactivVersicherungsart === "pflichtversichert");
@@ -213,6 +228,11 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
 
   // === FAMILIENANGEHÖRIGE MITVERSICHERN ===
   setCheckbox("Familienangehörige sollen mitversichert werden", formData.viactivFamilienangehoerigeMitversichern);
+  setCheckbox("FamilienangehÃ¶rige sollen mitversichert werden", formData.viactivFamilienangehoerigeMitversichern);
+
+  // === ÄNDERUNG VERSICHERUNGSSTATUS ===
+  setCheckbox("Änderung meines Versicherungsstatus", false);
+  setCheckbox("Ã„nderung meines Versicherungsstatus", false);
 
   // === DATUM UND UNTERSCHRIFT ===
   const today = new Date();
