@@ -5,7 +5,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { ValidationResult } from '@/utils/validation';
 import { cn } from '@/lib/utils';
-
 interface BaseFieldProps {
   label: string;
   id: string;
@@ -14,14 +13,12 @@ interface BaseFieldProps {
   required?: boolean;
   validate?: (value: string) => ValidationResult;
 }
-
 interface InputFieldProps extends BaseFieldProps {
   type: 'text' | 'date' | 'email' | 'tel';
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
 }
-
 interface SelectFieldProps extends BaseFieldProps {
   type: 'select';
   value: string;
@@ -32,13 +29,11 @@ interface SelectFieldProps extends BaseFieldProps {
   }[];
   placeholder?: string;
 }
-
 interface CheckboxFieldProps extends BaseFieldProps {
   type: 'checkbox';
   checked: boolean;
   onChange: (checked: boolean) => void;
 }
-
 type FormFieldProps = InputFieldProps | SelectFieldProps | CheckboxFieldProps;
 
 // Konvertiert deutsches Datum (TT.MM.JJJJ) zu ISO (JJJJ-MM-TT)
@@ -69,7 +64,6 @@ const isoToGerman = (isoDate: string): string => {
 const isGermanFormat = (value: string): boolean => {
   return /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(value);
 };
-
 export const FormField: React.FC<FormFieldProps> = props => {
   const {
     label,
@@ -79,10 +73,9 @@ export const FormField: React.FC<FormFieldProps> = props => {
     required = false,
     validate
   } = props;
-
   const [error, setError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
-  
+
   // Für Datumsfelder: lokaler Anzeige-Wert im deutschen Format
   const [localDateValue, setLocalDateValue] = useState<string>(() => {
     if (props.type === 'date' && props.value) {
@@ -90,7 +83,6 @@ export const FormField: React.FC<FormFieldProps> = props => {
     }
     return '';
   });
-
   const handleBlur = useCallback(() => {
     setTouched(true);
     if (props.type !== 'checkbox' && validate) {
@@ -99,7 +91,6 @@ export const FormField: React.FC<FormFieldProps> = props => {
       setError(result.isValid ? null : result.message || 'Ungültige Eingabe');
     }
   }, [props, validate]);
-
   const handleChange = useCallback((value: string) => {
     if (props.type !== 'checkbox') {
       props.onChange(value);
@@ -110,10 +101,9 @@ export const FormField: React.FC<FormFieldProps> = props => {
       }
     }
   }, [props, touched, validate]);
-
   const handleDateChange = useCallback((inputValue: string) => {
     setLocalDateValue(inputValue);
-    
+
     // Wenn deutsches Format erkannt wird, konvertiere zu ISO
     if (isGermanFormat(inputValue)) {
       const isoValue = germanToISO(inputValue);
@@ -147,108 +137,51 @@ export const FormField: React.FC<FormFieldProps> = props => {
       setLocalDateValue('');
     }
   }, [props.type === 'date' ? props.value : null]);
-
   if (props.type === 'checkbox') {
-    return (
-      <div className={cn('flex items-center space-x-2', className)}>
-        <Checkbox
-          id={id}
-          checked={props.checked}
-          onCheckedChange={props.onChange}
-          disabled={disabled}
-        />
+    return <div className={cn('flex items-center space-x-2', className)}>
+        <Checkbox id={id} checked={props.checked} onCheckedChange={props.onChange} disabled={disabled} />
         <Label htmlFor={id} className="text-sm font-medium cursor-pointer">
           {label}
           {required && <span className="text-destructive ml-1">*</span>}
         </Label>
-      </div>
-    );
+      </div>;
   }
-
   if (props.type === 'select') {
-    return (
-      <div className={cn('space-y-2', className)}>
+    return <div className={cn('space-y-2', className)}>
         <Label htmlFor={id} className="text-sm font-medium">
           {label}
           {required && <span className="text-destructive ml-1">*</span>}
         </Label>
-        <Select 
-          value={props.value} 
-          onValueChange={(value) => {
-            props.onChange(value);
-            if (validate) {
-              const result = validate(value);
-              setError(result.isValid ? null : result.message || 'Ungültige Eingabe');
-            }
-          }} 
-          disabled={disabled}
-        >
-          <SelectTrigger 
-            id={id} 
-            className={cn('bg-card', touched && error && 'border-destructive focus:ring-destructive')}
-            onBlur={handleBlur}
-          >
+        <Select value={props.value} onValueChange={value => {
+        props.onChange(value);
+        if (validate) {
+          const result = validate(value);
+          setError(result.isValid ? null : result.message || 'Ungültige Eingabe');
+        }
+      }} disabled={disabled}>
+          <SelectTrigger id={id} className={cn('bg-card', touched && error && 'border-destructive focus:ring-destructive')} onBlur={handleBlur}>
             <SelectValue placeholder={props.placeholder || 'Auswählen...'} />
           </SelectTrigger>
           <SelectContent className="bg-card">
-            {props.options.map(option => (
-              <SelectItem key={option.value} value={option.value}>
+            {props.options.map(option => <SelectItem key={option.value} value={option.value}>
                 {option.label}
-              </SelectItem>
-            ))}
+              </SelectItem>)}
           </SelectContent>
         </Select>
-        {touched && error && (
-          <p className="text-xs text-destructive mt-1">{error}</p>
-        )}
-      </div>
-    );
+        {touched && error && <p className="text-xs text-destructive mt-1">{error}</p>}
+      </div>;
   }
 
   // Spezielle Behandlung für Datumsfelder
   if (props.type === 'date') {
-    return (
-      <div className={cn('space-y-2', className)}>
-        <Label htmlFor={id} className="text-sm font-medium">
-          {label}
-          {required && <span className="text-destructive ml-1">*</span>}
-        </Label>
-        <Input 
-          id={id} 
-          type="text"
-          value={localDateValue} 
-          onChange={e => handleDateChange(e.target.value)} 
-          onBlur={handleBlur}
-          placeholder="TT.MM.JJJJ"
-          disabled={disabled} 
-          className={cn('bg-card', touched && error && 'border-destructive focus:ring-destructive')} 
-        />
-        {touched && error && (
-          <p className="text-xs text-destructive mt-1">{error}</p>
-        )}
-      </div>
-    );
+    return;
   }
-
-  return (
-    <div className={cn('space-y-2', className)}>
+  return <div className={cn('space-y-2', className)}>
       <Label htmlFor={id} className="text-sm font-medium">
         {label}
         {required && <span className="text-destructive ml-1">*</span>}
       </Label>
-      <Input 
-        id={id} 
-        type={props.type} 
-        value={props.value} 
-        onChange={e => handleChange(e.target.value)} 
-        onBlur={handleBlur}
-        placeholder={props.placeholder} 
-        disabled={disabled} 
-        className={cn('bg-card', touched && error && 'border-destructive focus:ring-destructive')} 
-      />
-      {touched && error && (
-        <p className="text-xs text-destructive mt-1">{error}</p>
-      )}
-    </div>
-  );
+      <Input id={id} type={props.type} value={props.value} onChange={e => handleChange(e.target.value)} onBlur={handleBlur} placeholder={props.placeholder} disabled={disabled} className={cn('bg-card', touched && error && 'border-destructive focus:ring-destructive')} />
+      {touched && error && <p className="text-xs text-destructive mt-1">{error}</p>}
+    </div>;
 };
