@@ -48,19 +48,24 @@ interface PDFHelpers {
 
 const createPDFHelpers = (form: ReturnType<PDFDocument["getForm"]>): PDFHelpers => {
   const trySetTextField = (fieldNames: string[], value: string): boolean => {
+    if (!value) {
+      console.log(`VIACTIV Skipping empty value for: ${fieldNames[0]}`);
+      return false;
+    }
+    
     for (const fieldName of fieldNames) {
       try {
         const field = form.getTextField(fieldName);
-        if (field && value) {
+        if (field) {
           field.setText(value);
-          console.log(`VIACTIV Field set: ${fieldName} = ${value}`);
+          console.log(`VIACTIV Field set: "${fieldName}" = "${value}"`);
           return true;
         }
       } catch (e) {
-        // Try next field name
+        console.log(`VIACTIV Field "${fieldName}" error:`, e);
       }
     }
-    console.warn(`VIACTIV Field not found: ${fieldNames.join(' / ')}`);
+    console.warn(`VIACTIV Field NOT FOUND: ${fieldNames.join(' / ')}`);
     return false;
   };
 
@@ -90,13 +95,14 @@ const createPDFHelpers = (form: ReturnType<PDFDocument["getForm"]>): PDFHelpers 
           } else {
             field.uncheck();
           }
+          console.log(`VIACTIV Checkbox set: "${name}" = ${checked}`);
           return;
         }
       } catch (e) {
         // Try next variation
       }
     }
-    console.warn(`VIACTIV Checkbox not found: ${fieldName}`);
+    console.warn(`VIACTIV Checkbox NOT FOUND: ${fieldName}`);
   };
 
   return { setTextField, setCheckbox };
