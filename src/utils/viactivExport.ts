@@ -4,6 +4,8 @@ import { FormData } from "@/types/form";
 /**
  * VIACTIV Beitrittserklärung PDF Export
  * Dateiname: Viactiv_Nachname, Vorname_BE_Datum.pdf
+ * 
+ * Geburtsland wird als 2-Buchstaben ISO-Code exportiert (z.B. DE, SY, TR)
  */
 
 const formatInputDate = (dateStr: string): string => {
@@ -193,6 +195,7 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   setTextField("Geburtsdatum", geburtsdatumFormatted);
   
   setTextField("Geburtsort", formData.mitgliedGeburtsort || "");
+  // Geburtsland als 2-Buchstaben ISO-Code (z.B. "DE", "SY", "TR")
   setTextField("Geburtsland", formData.mitgliedGeburtsland || "");
   
   // Geburtsname - falls vorhanden im Formular, sonst Nachname

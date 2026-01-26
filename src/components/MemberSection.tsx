@@ -3,6 +3,7 @@ import { FormSection } from './FormSection';
 import { FormField } from './FormField';
 import { FormData } from '@/types/form';
 import { CopyBlockButton } from './CopyBlockButton';
+import { countries } from '@/utils/countries';
 import { 
   validateName, 
   validateGeburtsdatum, 
@@ -73,13 +74,13 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           validate={validateOrt}
         />
         <FormField
-          type="text"
+          type="select"
           label="Geburtsland"
           id="mitgliedGeburtsland"
           value={formData.mitgliedGeburtsland}
           onChange={(value) => updateFormData({ mitgliedGeburtsland: value })}
-          placeholder="z.B. Deutschland"
-          validate={validateOrt}
+          options={countries.map(c => ({ value: c.code, label: c.name }))}
+          placeholder="Land auswählen"
         />
       </div>
       
