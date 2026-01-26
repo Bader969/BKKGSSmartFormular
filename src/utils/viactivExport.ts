@@ -170,22 +170,10 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
 
   // === AUTOMATISCH AUSGEFÜLLT ===
   
-  // Eintrittsdatum / versichert von: +3 Kalendermonate (1. des Monats)
+  // Eintrittsdatum: +3 Kalendermonate (1. des Monats)
   const datumMitgliedschaft = getDatumMitgliedschaft();
-  console.log("VIACTIV Setting Eintrittsdatum (versichert von):", datumMitgliedschaft);
-  
-  // Direkt das Feld setzen ohne Helper (für Debugging)
-  try {
-    const versichertVonField = form.getTextField("versichert von (Datum)");
-    if (versichertVonField) {
-      versichertVonField.setText(datumMitgliedschaft);
-      console.log("VIACTIV: versichert von (Datum) erfolgreich gesetzt:", datumMitgliedschaft);
-    } else {
-      console.error("VIACTIV: versichert von (Datum) Feld nicht gefunden!");
-    }
-  } catch (e) {
-    console.error("VIACTIV: Fehler beim Setzen von versichert von (Datum):", e);
-  }
+  console.log("VIACTIV Setting Datum Mitgliedschaft:", datumMitgliedschaft);
+  setTextField("Datum Mitgliedschaft", datumMitgliedschaft);
   
   // versichert bis: Ende des 3. Monats
   const versichertBis = getVersichertBis();
