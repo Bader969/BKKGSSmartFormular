@@ -205,6 +205,7 @@ export interface FormData {
   viactivVersicherungsart: ViactivVersicherungsart;
   viactivArbeitgeber: ArbeitgeberDaten;
   viactivFamilienangehoerigeMitversichern: boolean;
+  viactivStaatsangehoerigkeit: string;
 }
 
 export const createEmptyArztDaten = (): ArztDaten => ({
@@ -302,5 +303,6 @@ export const createInitialFormData = (): FormData => {
     viactivVersicherungsart: '',
     viactivArbeitgeber: createEmptyArbeitgeberDaten(),
     viactivFamilienangehoerigeMitversichern: false,
+    viactivStaatsangehoerigkeit: 'deutsch',
   };
 };
