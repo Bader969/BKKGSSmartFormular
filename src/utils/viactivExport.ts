@@ -211,9 +211,10 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   // Geburtsname - falls vorhanden im Formular, sonst Nachname
   setTextField("Geburtsname", formData.mitgliedName);
   
-  // Staatsangehörigkeit (versuche beide Varianten)
-  setTextField("Staatsangehörigkeit", "deutsch");
-  setTextField("StaatsangehÃ¶rigkeit", "deutsch");
+  // Staatsangehörigkeit (aus Formular oder Default "deutsch")
+  const staatsang = formData.mitgliedStaatsangehoerigkeit || "deutsch";
+  setTextField("Staatsangehörigkeit", staatsang);
+  setTextField("StaatsangehÃ¶rigkeit", staatsang);
 
   // === GESCHLECHT === (PDF-Feldnamen aus Acrobat-Analyse)
   setCheckbox("weiblich", formData.viactivGeschlecht === "weiblich");
