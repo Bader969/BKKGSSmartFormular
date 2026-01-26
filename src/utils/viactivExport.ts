@@ -168,22 +168,29 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
 
   // === AUTOMATISCH AUSGEFÜLLT ===
   
-  // Datum Mitgliedschaft: +3 Kalendermonate (1. des Monats)
-  setTextField("Datum Mitgliedschaft", getDatumMitgliedschaft());
+  // Eintrittsdatum / versichert von: +3 Kalendermonate (1. des Monats)
+  // WICHTIG: Das Feld heißt "versichert von (Datum)", NICHT "Datum Mitgliedschaft"!
+  const datumMitgliedschaft = getDatumMitgliedschaft();
+  console.log("VIACTIV Setting Eintrittsdatum:", datumMitgliedschaft);
+  setTextField("versichert von (Datum)", datumMitgliedschaft);
   
   // versichert bis: Ende des 3. Monats
-  setTextField("versichert bis (Datum)", getVersichertBis());
-  
-  // versichert von: leer lassen (nicht setzen)
+  const versichertBis = getVersichertBis();
+  console.log("VIACTIV Setting versichert bis:", versichertBis);
+  setTextField("versichert bis (Datum)", versichertBis);
   
   // Immer angekreuzt
   setCheckbox("Mein Versicherungsstatus ist unverändert", true);
-  setCheckbox("Datenschutz- und werberechliche Einwilligungserklärung", true);
 
   // === PERSÖNLICHE DATEN ===
   setTextField("Name", formData.mitgliedName);
   setTextField("Vorname", formData.mitgliedVorname);
-  setTextField("Geburtsdatum", formatInputDate(formData.mitgliedGeburtsdatum));
+  
+  // Geburtsdatum formatieren und setzen
+  const geburtsdatumFormatted = formatInputDate(formData.mitgliedGeburtsdatum);
+  console.log("VIACTIV Setting Geburtsdatum:", geburtsdatumFormatted);
+  setTextField("Geburtsdatum", geburtsdatumFormatted);
+  
   setTextField("Geburtsort", formData.mitgliedGeburtsort || "");
   setTextField("Geburtsland", formData.mitgliedGeburtsland || "");
   
