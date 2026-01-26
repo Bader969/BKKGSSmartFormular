@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { FileDown, FileText, AlertCircle, Users, User, Building2 } from 'lucide-react';
 import { exportFilledPDF, exportRundumSicherPaketOnly } from '@/utils/pdfExport';
 import { exportViactivBeitrittserklaerung } from '@/utils/viactivExport';
+import { exportViactivFamilienversicherung } from '@/utils/viactivFamilyExport';
 import { toast } from 'sonner';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -149,10 +150,17 @@ const Index = () => {
     try {
       // VIACTIV Export
       if (formData.selectedKrankenkasse === 'viactiv') {
-        toast.info('VIACTIV Beitrittserklärung wird erstellt...');
-        await exportViactivBeitrittserklaerung(formData);
-        toast.success('VIACTIV PDF erfolgreich exportiert!');
-      } 
+        if (formData.viactivFamilienangehoerigeMitversichern) {
+          const numberOfFamilyPDFs = Math.max(1, Math.ceil(formData.kinder.length / 3));
+          toast.info(`Es werden 1 Beitrittserklärung und ${numberOfFamilyPDFs} Familienversicherungs-PDF(s) erstellt...`);
+          await exportViactivBeitrittserklaerung(formData);
+          await exportViactivFamilienversicherung(formData);
+        } else {
+          toast.info('VIACTIV Beitrittserklärung wird erstellt...');
+          await exportViactivBeitrittserklaerung(formData);
+        }
+        toast.success('VIACTIV PDF(s) erfolgreich exportiert!');
+      }
       // BKK GS Export
       else {
         if (formData.mode === 'nur_rundum') {
