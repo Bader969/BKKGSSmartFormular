@@ -47,30 +47,56 @@ interface PDFHelpers {
 }
 
 const createPDFHelpers = (form: ReturnType<PDFDocument["getForm"]>): PDFHelpers => {
-  const setTextField = (fieldName: string, value: string) => {
-    try {
-      const field = form.getTextField(fieldName);
-      if (field && value) {
-        field.setText(value);
+  const trySetTextField = (fieldNames: string[], value: string): boolean => {
+    for (const fieldName of fieldNames) {
+      try {
+        const field = form.getTextField(fieldName);
+        if (field && value) {
+          field.setText(value);
+          console.log(`VIACTIV Field set: ${fieldName} = ${value}`);
+          return true;
+        }
+      } catch (e) {
+        // Try next field name
       }
-    } catch (e) {
-      console.warn(`VIACTIV Field not found: ${fieldName}`);
     }
+    console.warn(`VIACTIV Field not found: ${fieldNames.join(' / ')}`);
+    return false;
+  };
+
+  const setTextField = (fieldName: string, value: string) => {
+    // Try with original name and common encoding variations
+    const variations = [
+      fieldName,
+      fieldName.replace(/ä/g, 'Ã¤').replace(/ö/g, 'Ã¶').replace(/ü/g, 'Ã¼').replace(/ß/g, 'ÃŸ'),
+      fieldName.replace(/Ä/g, 'Ã„').replace(/Ö/g, 'Ã–').replace(/Ü/g, 'Ãœ'),
+    ];
+    trySetTextField(variations, value);
   };
 
   const setCheckbox = (fieldName: string, checked: boolean) => {
-    try {
-      const field = form.getCheckBox(fieldName);
-      if (field) {
-        if (checked) {
-          field.check();
-        } else {
-          field.uncheck();
+    const variations = [
+      fieldName,
+      fieldName.replace(/ä/g, 'Ã¤').replace(/ö/g, 'Ã¶').replace(/ü/g, 'Ã¼').replace(/ß/g, 'ÃŸ'),
+      fieldName.replace(/Ä/g, 'Ã„').replace(/Ö/g, 'Ã–').replace(/Ü/g, 'Ãœ'),
+    ];
+    
+    for (const name of variations) {
+      try {
+        const field = form.getCheckBox(name);
+        if (field) {
+          if (checked) {
+            field.check();
+          } else {
+            field.uncheck();
+          }
+          return;
         }
+      } catch (e) {
+        // Try next variation
       }
-    } catch (e) {
-      console.warn(`VIACTIV Checkbox not found: ${fieldName}`);
     }
+    console.warn(`VIACTIV Checkbox not found: ${fieldName}`);
   };
 
   return { setTextField, setCheckbox };
@@ -122,6 +148,14 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   const existingPdfBytes = await fetch(pdfUrl).then((res) => res.arrayBuffer());
   const pdfDoc = await PDFDocument.load(existingPdfBytes);
   const form = pdfDoc.getForm();
+  
+  // Debug: List all field names in the PDF
+  const fields = form.getFields();
+  console.log("=== VIACTIV PDF Fields ===");
+  fields.forEach(field => {
+    console.log(`Field: "${field.getName()}" - Type: ${field.constructor.name}`);
+  });
+  console.log("=== END VIACTIV PDF Fields ===");
   
   const helpers = createPDFHelpers(form);
   const { setTextField, setCheckbox } = helpers;
