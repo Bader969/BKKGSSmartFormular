@@ -37,25 +37,6 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
     <>
       {/* Zusätzliche persönliche Angaben für VIACTIV */}
       <FormSection title="Zusätzliche Angaben für VIACTIV" variant="member">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <FormField
-            type="date"
-            label="Geburtsdatum"
-            id="viactivGeburtsdatum"
-            value={formData.mitgliedGeburtsdatum}
-            onChange={(value) => updateFormData({ mitgliedGeburtsdatum: value })}
-            required
-          />
-          <FormField
-            type="text"
-            label="Staatsangehörigkeit"
-            id="viactivStaatsangehoerigkeit"
-            value={formData.mitgliedStaatsangehoerigkeit}
-            onChange={(value) => updateFormData({ mitgliedStaatsangehoerigkeit: value })}
-            placeholder="z.B. deutsch"
-            required
-          />
-        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField
             type="select"

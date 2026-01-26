@@ -47,86 +47,29 @@ interface PDFHelpers {
 }
 
 const createPDFHelpers = (form: ReturnType<PDFDocument["getForm"]>): PDFHelpers => {
-  // Debug: Log all available field names
-  const fields = form.getFields();
-  const fieldNames = fields.map(f => f.getName());
-  console.log("Available PDF fields:", fields.map(f => ({ name: f.getName(), type: f.constructor.name })));
-
-  // Hilfsfunktion zum Finden eines Feldes mit teilweiser Übereinstimmung
-  const findFieldByPartialMatch = (searchName: string): string | null => {
-    // Exakte Übereinstimmung zuerst
-    if (fieldNames.includes(searchName)) {
-      return searchName;
-    }
-    // Partielle Übereinstimmung (für Encoding-Probleme)
-    const normalizedSearch = searchName.toLowerCase().replace(/[äöüß]/g, match => {
-      const map: Record<string, string> = { 'ä': 'a', 'ö': 'o', 'ü': 'u', 'ß': 's' };
-      return map[match] || match;
-    });
-    
-    for (const name of fieldNames) {
-      const normalizedName = name.toLowerCase().replace(/[äöüß]/g, match => {
-        const map: Record<string, string> = { 'ä': 'a', 'ö': 'o', 'ü': 'u', 'ß': 's' };
-        return map[match] || match;
-      });
-      if (normalizedName === normalizedSearch || name.includes(searchName) || searchName.includes(name)) {
-        return name;
-      }
-    }
-    return null;
-  };
-
   const setTextField = (fieldName: string, value: string) => {
     try {
-      // Versuche zuerst exakte Übereinstimmung
-      let field;
-      try {
-        field = form.getTextField(fieldName);
-      } catch {
-        // Versuche partielle Übereinstimmung
-        const matchedName = findFieldByPartialMatch(fieldName);
-        if (matchedName) {
-          console.log(`Found partial match: "${fieldName}" → "${matchedName}"`);
-          field = form.getTextField(matchedName);
-        }
-      }
-      
-      if (field) {
-        field.setText(value || "");
-        console.log(`✓ Set text field "${fieldName}" = "${value}"`);
-      } else {
-        console.warn(`✗ VIACTIV Text field not found: ${fieldName}`);
+      const field = form.getTextField(fieldName);
+      if (field && value) {
+        field.setText(value);
       }
     } catch (e) {
-      console.warn(`✗ VIACTIV Text field error for "${fieldName}":`, e);
+      console.warn(`VIACTIV Field not found: ${fieldName}`);
     }
   };
 
   const setCheckbox = (fieldName: string, checked: boolean) => {
     try {
-      let field;
-      try {
-        field = form.getCheckBox(fieldName);
-      } catch {
-        const matchedName = findFieldByPartialMatch(fieldName);
-        if (matchedName) {
-          console.log(`Found partial match: "${fieldName}" → "${matchedName}"`);
-          field = form.getCheckBox(matchedName);
-        }
-      }
-      
+      const field = form.getCheckBox(fieldName);
       if (field) {
         if (checked) {
           field.check();
         } else {
           field.uncheck();
         }
-        console.log(`✓ Set checkbox "${fieldName}" = ${checked}`);
-      } else {
-        console.warn(`✗ VIACTIV Checkbox not found: ${fieldName}`);
       }
     } catch (e) {
-      console.warn(`✗ VIACTIV Checkbox error for "${fieldName}":`, e);
+      console.warn(`VIACTIV Checkbox not found: ${fieldName}`);
     }
   };
 
@@ -193,13 +136,9 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   
   // versichert von: leer lassen (nicht setzen)
   
-  // Immer angekreuzt - PDF-Feldnamen aus Acrobat-Analyse verwenden
+  // Immer angekreuzt
   setCheckbox("Mein Versicherungsstatus ist unverändert", true);
-  // Fallback mit UTF-8 Encoding-Problem
-  setCheckbox("Mein Versicherungsstatus ist unverÃ¤ndert", true);
   setCheckbox("Datenschutz- und werberechliche Einwilligungserklärung", true);
-  // Fallback mit UTF-8 Encoding-Problem
-  setCheckbox("Datenschutz- und werberechliche EinwilligungserklÃ¤rung", true);
 
   // === PERSÖNLICHE DATEN ===
   setTextField("Name", formData.mitgliedName);
@@ -211,20 +150,16 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   // Geburtsname - falls vorhanden im Formular, sonst Nachname
   setTextField("Geburtsname", formData.mitgliedName);
   
-  // Staatsangehörigkeit (aus Formular oder Default "deutsch")
-  const staatsang = formData.mitgliedStaatsangehoerigkeit || "deutsch";
-  setTextField("Staatsangehörigkeit", staatsang);
-  setTextField("StaatsangehÃ¶rigkeit", staatsang);
+  // Staatsangehörigkeit (falls verfügbar)
+  setTextField("Staatsangehörigkeit", "deutsch");
 
-  // === GESCHLECHT === (PDF-Feldnamen aus Acrobat-Analyse)
+  // === GESCHLECHT ===
   setCheckbox("weiblich", formData.viactivGeschlecht === "weiblich");
   setCheckbox("männlich", formData.viactivGeschlecht === "maennlich");
-  setCheckbox("mÃ¤nnlich", formData.viactivGeschlecht === "maennlich");
   setCheckbox("divers", formData.viactivGeschlecht === "divers");
 
-  // === ADRESSE === (PDF-Feldnamen mit Umlaut-Problem)
+  // === ADRESSE ===
   setTextField("Straße", formData.mitgliedStrasse || "");
-  setTextField("StraÃŸe", formData.mitgliedStrasse || "");
   setTextField("Hausnummer", formData.mitgliedHausnummer || "");
   setTextField("PLZ", formData.mitgliedPlz || "");
   setTextField("Ort", formData.ort || "");
@@ -238,8 +173,7 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   setCheckbox("verheiratet", formData.familienstand === "verheiratet");
   setCheckbox("Lebenspartnerschaft", formData.familienstand === "verheiratet"); // Fallback
 
-  // === BESCHÄFTIGUNGSSTATUS === (PDF-Feldnamen aus Acrobat-Analyse)
-  // Normale Varianten
+  // === BESCHÄFTIGUNGSSTATUS ===
   setCheckbox("Ich bin beschäftigt", formData.viactivBeschaeftigung === "beschaeftigt");
   setCheckbox("Ich bin in Ausbildung", formData.viactivBeschaeftigung === "ausbildung");
   setCheckbox("Ich beziehe Rente", formData.viactivBeschaeftigung === "rente");
@@ -250,22 +184,15 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   setCheckbox("ich habe einen Minijob (bis zu 450 Euro)", formData.viactivBeschaeftigung === "minijob");
   setCheckbox("ich bin selbstständig", formData.viactivBeschaeftigung === "selbststaendig");
   setCheckbox("Einkommen über 64.350 Euro-Stand 2022", formData.viactivBeschaeftigung === "einkommen_ueber_grenze");
-  
-  // UTF-8 Fallback-Varianten aus PDF-Analyse
-  setCheckbox("Ich bin beschÃ¤ftigt", formData.viactivBeschaeftigung === "beschaeftigt");
-  setCheckbox("ich bin selbststÃ¤ndig", formData.viactivBeschaeftigung === "selbststaendig");
-  setCheckbox("Einkommen Ã¼ber 64.350 Euro-Stand 2022", formData.viactivBeschaeftigung === "einkommen_ueber_grenze");
 
-  // === ARBEITGEBER === (PDF-Feldnamen aus Acrobat-Analyse)
+  // === ARBEITGEBER ===
   const ag = formData.viactivArbeitgeber;
   setTextField("Name des Arbeitgebers", ag.name || "");
   setTextField("Arbeitgeber Straße", ag.strasse || "");
-  setTextField("Arbeitgeber StraÃŸe", ag.strasse || "");
   setTextField("Arbeitgeber Hausnummer", ag.hausnummer || "");
   setTextField("Arbeitgeber PLZ", ag.plz || "");
   setTextField("Arbeitgeber Ort", ag.ort || "");
   setTextField("Beschäftigt seit", formatInputDate(ag.beschaeftigtSeit) || "");
-  setTextField("BeschÃ¤ftigt seit", formatInputDate(ag.beschaeftigtSeit) || "");
 
   // === BISHERIGE VERSICHERUNGSART ===
   setCheckbox("pflichtversichert", formData.viactivVersicherungsart === "pflichtversichert");
@@ -280,11 +207,6 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
 
   // === FAMILIENANGEHÖRIGE MITVERSICHERN ===
   setCheckbox("Familienangehörige sollen mitversichert werden", formData.viactivFamilienangehoerigeMitversichern);
-  setCheckbox("FamilienangehÃ¶rige sollen mitversichert werden", formData.viactivFamilienangehoerigeMitversichern);
-
-  // === ÄNDERUNG VERSICHERUNGSSTATUS ===
-  setCheckbox("Änderung meines Versicherungsstatus", false);
-  setCheckbox("Ã„nderung meines Versicherungsstatus", false);
 
   // === DATUM UND UNTERSCHRIFT ===
   const today = new Date();

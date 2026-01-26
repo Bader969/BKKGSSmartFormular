@@ -31,7 +31,6 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
     { value: 'verwitwet', label: 'Verwitwet' },
   ];
 
-  // Geburtsdatum-Feld muss in der ersten Zeile nach Vorname und Name erscheinen
   return (
     <FormSection title="Allgemeine Angaben des Mitglieds" variant="member">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
