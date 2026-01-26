@@ -10,14 +10,16 @@ const formatInputDate = (dateStr: string): string => {
   if (!dateStr) return "";
   const parts = dateStr.split("-");
   if (parts.length !== 3) return dateStr;
-  return `${parts[2]}.${parts[1]}.${parts[0]}`;
+  // Format: TTMMJJJJ (ohne Punkte für VIACTIV PDF)
+  return `${parts[2]}${parts[1]}${parts[0]}`;
 };
 
 const formatDateGerman = (date: Date): string => {
   const day = date.getDate().toString().padStart(2, '0');
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const year = date.getFullYear();
-  return `${day}.${month}.${year}`;
+  // Format: TTMMJJJJ (ohne Punkte für VIACTIV PDF)
+  return `${day}${month}${year}`;
 };
 
 /**
