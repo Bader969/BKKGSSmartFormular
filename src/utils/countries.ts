@@ -93,6 +93,16 @@ export const countries: Country[] = [
 ];
 
 /**
+ * Länder als Options für Select-Komponenten
+ */
+export const COUNTRY_OPTIONS = countries.map(c => ({
+  code: c.code,
+  name: c.name,
+  value: c.code,
+  label: c.name
+}));
+
+/**
  * Findet den Ländercode anhand des Ländernamens
  * @param name - Name des Landes (z.B. "Deutschland")
  * @returns ISO-Code (z.B. "DE") oder leeren String
