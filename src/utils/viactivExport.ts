@@ -49,23 +49,72 @@ interface PDFHelpers {
 const createPDFHelpers = (form: ReturnType<PDFDocument["getForm"]>): PDFHelpers => {
   // Debug: Log all available field names
   const fields = form.getFields();
+  const fieldNames = fields.map(f => f.getName());
   console.log("Available PDF fields:", fields.map(f => ({ name: f.getName(), type: f.constructor.name })));
+
+  // Hilfsfunktion zum Finden eines Feldes mit teilweiser Übereinstimmung
+  const findFieldByPartialMatch = (searchName: string): string | null => {
+    // Exakte Übereinstimmung zuerst
+    if (fieldNames.includes(searchName)) {
+      return searchName;
+    }
+    // Partielle Übereinstimmung (für Encoding-Probleme)
+    const normalizedSearch = searchName.toLowerCase().replace(/[äöüß]/g, match => {
+      const map: Record<string, string> = { 'ä': 'a', 'ö': 'o', 'ü': 'u', 'ß': 's' };
+      return map[match] || match;
+    });
+    
+    for (const name of fieldNames) {
+      const normalizedName = name.toLowerCase().replace(/[äöüß]/g, match => {
+        const map: Record<string, string> = { 'ä': 'a', 'ö': 'o', 'ü': 'u', 'ß': 's' };
+        return map[match] || match;
+      });
+      if (normalizedName === normalizedSearch || name.includes(searchName) || searchName.includes(name)) {
+        return name;
+      }
+    }
+    return null;
+  };
 
   const setTextField = (fieldName: string, value: string) => {
     try {
-      const field = form.getTextField(fieldName);
+      // Versuche zuerst exakte Übereinstimmung
+      let field;
+      try {
+        field = form.getTextField(fieldName);
+      } catch {
+        // Versuche partielle Übereinstimmung
+        const matchedName = findFieldByPartialMatch(fieldName);
+        if (matchedName) {
+          console.log(`Found partial match: "${fieldName}" → "${matchedName}"`);
+          field = form.getTextField(matchedName);
+        }
+      }
+      
       if (field) {
         field.setText(value || "");
         console.log(`✓ Set text field "${fieldName}" = "${value}"`);
+      } else {
+        console.warn(`✗ VIACTIV Text field not found: ${fieldName}`);
       }
     } catch (e) {
-      console.warn(`✗ VIACTIV Text field not found: ${fieldName}`);
+      console.warn(`✗ VIACTIV Text field error for "${fieldName}":`, e);
     }
   };
 
   const setCheckbox = (fieldName: string, checked: boolean) => {
     try {
-      const field = form.getCheckBox(fieldName);
+      let field;
+      try {
+        field = form.getCheckBox(fieldName);
+      } catch {
+        const matchedName = findFieldByPartialMatch(fieldName);
+        if (matchedName) {
+          console.log(`Found partial match: "${fieldName}" → "${matchedName}"`);
+          field = form.getCheckBox(matchedName);
+        }
+      }
+      
       if (field) {
         if (checked) {
           field.check();
@@ -73,9 +122,11 @@ const createPDFHelpers = (form: ReturnType<PDFDocument["getForm"]>): PDFHelpers 
           field.uncheck();
         }
         console.log(`✓ Set checkbox "${fieldName}" = ${checked}`);
+      } else {
+        console.warn(`✗ VIACTIV Checkbox not found: ${fieldName}`);
       }
     } catch (e) {
-      console.warn(`✗ VIACTIV Checkbox not found: ${fieldName}`);
+      console.warn(`✗ VIACTIV Checkbox error for "${fieldName}":`, e);
     }
   };
 
