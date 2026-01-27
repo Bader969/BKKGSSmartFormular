@@ -195,7 +195,7 @@ const createViactivFamilyPDF = async (
   setCheckbox("Familienstand getrennt lebend", formData.familienstand === "getrennt");
   setCheckbox("Familienstand geschieden", formData.familienstand === "geschieden");
   setCheckbox("Familienstand verwitwet", formData.familienstand === "verwitwet");
-  setCheckbox("eingetragene Lebenspartnerschaft", formData.familienstand === "verheiratet");
+  setCheckbox("eingetragene Lebenspartnerschaft", false);
 
   // === EHEPARTNER/-IN SELBST VERSICHERT ===
   const ehegatteSelbstVersichert = formData.ehegatte.bisherigArt === 'mitgliedschaft';
