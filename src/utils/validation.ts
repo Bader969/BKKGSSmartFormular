@@ -183,10 +183,10 @@ export const validateGeburtsdatum = (value: string): ValidationResult => {
   return { isValid: true };
 };
 
-// Telefon-Validierung (optional)
+// Telefon-Validierung (Pflichtfeld)
 export const validateTelefon = (value: string): ValidationResult => {
   if (!value.trim()) {
-    return { isValid: true }; // Optional
+    return { isValid: false, message: 'Dieses Feld ist erforderlich' };
   }
   // Erlaubt: +, Zahlen, Leerzeichen, Bindestriche, Klammern
   const regex = /^[\+0-9\s\-\(\)\/]+$/;
@@ -204,10 +204,10 @@ export const validateTelefon = (value: string): ValidationResult => {
   return { isValid: true };
 };
 
-// E-Mail-Validierung (optional)
+// E-Mail-Validierung (Pflichtfeld)
 export const validateEmail = (value: string): ValidationResult => {
   if (!value.trim()) {
-    return { isValid: true }; // Optional
+    return { isValid: false, message: 'Dieses Feld ist erforderlich' };
   }
   const regex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
   if (!regex.test(value)) {

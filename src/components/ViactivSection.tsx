@@ -333,7 +333,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                   type="text"
                   label="Versicherung bestand bei"
                   id="viactiv-ehegatte-bestand-bei"
-                  value={formData.ehegatte.bisherigBestandBei}
+                  value={formData.ehegatte.bisherigBestandBei || formData.mitgliedKrankenkasse}
                   onChange={(value) => updateEhegatte({ bisherigBestandBei: value })}
                   placeholder="Name der Krankenkasse"
                 />
@@ -499,7 +499,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                           type="text"
                           label="Versicherung bestand bei"
                           id={`viactiv-kind${index}-bestand-bei`}
-                          value={kind.bisherigBestandBei}
+                          value={kind.bisherigBestandBei || formData.mitgliedKrankenkasse}
                           onChange={(value) => updateKind(index, { bisherigBestandBei: value })}
                           placeholder="Name der Krankenkasse"
                         />
