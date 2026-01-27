@@ -26,6 +26,16 @@ const formatDateGermanWithDots = (date: Date): string => {
   return `${day}.${month}.${year}`;
 };
 
+/**
+ * Berechnet "versichert bis" Datum: Ende des 3. Monats ab jetzt
+ * Format: TT.MM.JJJJ (mit Punkten für Familienversicherung)
+ */
+const getVersichertBisWithDots = (): string => {
+  const today = new Date();
+  const endOfThirdMonth = new Date(today.getFullYear(), today.getMonth() + 3, 0);
+  return formatDateGermanWithDots(endOfThirdMonth);
+};
+
 interface PDFHelpers {
   setTextField: (fieldName: string, value: string) => void;
   setCheckbox: (fieldName: string, checked: boolean) => void;
@@ -224,8 +234,11 @@ const createViactivFamilyPDF = async (
     setTextField("Ehepartner/-in abweichende Anschrift", ehegatte.abweichendeAnschrift || "");
     
     // Seite 2: Bisherige Versicherung Ehepartner
-    setTextField("EhepartnerinDie bisherige Versicherung endete am", ehegatte.bisherigEndeteAm || "");
-    setTextField("EhepartnerinDie Versicherung bestand bei Name der Krankenkasse", ehegatte.bisherigBestandBei || "");
+    // Automatische Synchronisierung: Fallback auf berechnetes Datum und Hauptmitglied-Krankenkasse
+    const ehegatteEndeteAm = ehegatte.bisherigEndeteAm || getVersichertBisWithDots();
+    const ehegatteBestandBei = ehegatte.bisherigBestandBei || formData.mitgliedKrankenkasse || "";
+    setTextField("EhepartnerinDie bisherige Versicherung endete am", ehegatteEndeteAm);
+    setTextField("EhepartnerinDie Versicherung bestand bei Name der Krankenkasse", ehegatteBestandBei);
     
     // Versicherungsart Ehepartner
     setCheckbox("Ehepartner/-in Mitgliedschaft", ehegatte.bisherigArt === 'mitgliedschaft');
@@ -286,8 +299,11 @@ const createViactivFamilyPDF = async (
     setCheckbox(verwFields.pflege, kind.verwandtschaft === 'pflege');
     
     // Bisherige Versicherung Kind
-    setTextField(fields.endete, kind.bisherigEndeteAm || "");
-    setTextField(fields.bestand, kind.bisherigBestandBei || "");
+    // Automatische Synchronisierung: Fallback auf berechnetes Datum und Hauptmitglied-Krankenkasse
+    const kindEndeteAm = kind.bisherigEndeteAm || getVersichertBisWithDots();
+    const kindBestandBei = kind.bisherigBestandBei || formData.mitgliedKrankenkasse || "";
+    setTextField(fields.endete, kindEndeteAm);
+    setTextField(fields.bestand, kindBestandBei);
     
     // Versicherungsart Kind
     setCheckbox(fields.mitglied, kind.bisherigArt === 'mitgliedschaft');
