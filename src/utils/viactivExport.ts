@@ -286,8 +286,137 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   return await pdfDoc.save();
 };
 
+/**
+ * Erstellt eine Beitrittserklärung für den Ehegatten, wenn dieser eine eigene Mitgliedschaft hat
+ */
+export const createViactivBeitrittserklaerungForSpouse = async (formData: FormData): Promise<Uint8Array> => {
+  const pdfUrl = "/viactiv-beitrittserklaerung.pdf";
+  const existingPdfBytes = await fetch(pdfUrl).then((res) => res.arrayBuffer());
+  const pdfDoc = await PDFDocument.load(existingPdfBytes);
+  const form = pdfDoc.getForm();
+  
+  const helpers = createPDFHelpers(form);
+  const { setTextField, setCheckbox } = helpers;
+
+  const spouse = formData.ehegatte;
+
+  // === AUTOMATISCH AUSGEFÜLLT ===
+  
+  // Eintrittsdatum: +3 Kalendermonate (1. des Monats)
+  const datumMitgliedschaft = getDatumMitgliedschaft();
+  setTextField("Datum Mitgliedschaft", datumMitgliedschaft);
+  
+  // versichert bis: Ende des 3. Monats
+  const versichertBis = getVersichertBis();
+  setTextField("versichert bis (Datum)", versichertBis);
+  
+  // Immer angekreuzt
+  setCheckbox("Mein Versicherungsstatus ist unverändert", true);
+  setCheckbox("Datenschutz- und werberechliche Einwilligungserklärung", true);
+
+  // === PERSÖNLICHE DATEN DES EHEGATTEN ===
+  setTextField("Name", spouse.name);
+  setTextField("Vorname", spouse.vorname);
+  
+  // Geburtsdatum formatieren und setzen
+  const geburtsdatumFormatted = formatInputDate(spouse.geburtsdatum);
+  setTextField("Geburtsdatum", geburtsdatumFormatted);
+  
+  // Geburtsort/-land (Format: "Ort, Land")
+  const geburtsortParts = (spouse.geburtsort || "").split(",");
+  const geburtsort = geburtsortParts[0]?.trim() || "";
+  const geburtsland = geburtsortParts[1]?.trim() || spouse.geburtsland || "";
+  setTextField("Geburtsort", geburtsort);
+  setTextField("Geburtsland", geburtsland);
+  
+  // Geburtsname
+  setTextField("Geburtsname", spouse.geburtsname || spouse.name);
+  
+  // Staatsangehörigkeit vollständig ausschreiben
+  const staatsangehoerigkeitVoll = getNationalityName(spouse.staatsangehoerigkeit) || spouse.staatsangehoerigkeit || "deutsch";
+  setTextField("Staatsangehörigkeit", staatsangehoerigkeitVoll);
+
+  // === GESCHLECHT ===
+  setCheckbox("weiblich", spouse.geschlecht === "w");
+  setCheckbox("männlich", spouse.geschlecht === "m");
+  setCheckbox("divers", spouse.geschlecht === "d" || spouse.geschlecht === "x");
+
+  // === ADRESSE (gleich wie Hauptmitglied, falls keine abweichende) ===
+  if (spouse.abweichendeAnschrift) {
+    // Wenn abweichende Anschrift vorhanden, diese parsen
+    setTextField("Straße", "");
+    setTextField("Hausnummer", "");
+    setTextField("PLZ", "");
+    setTextField("Ort", spouse.abweichendeAnschrift);
+  } else {
+    setTextField("Straße", formData.mitgliedStrasse || "");
+    setTextField("Hausnummer", formData.mitgliedHausnummer || "");
+    setTextField("PLZ", formData.mitgliedPlz || "");
+    setTextField("Ort", formData.ort || "");
+  }
+  
+  // === KONTAKT (vom Hauptmitglied übernehmen) ===
+  setTextField("Telefon", formData.telefon || "");
+  setTextField("E-Mail", formData.email || "");
+
+  // === FAMILIENSTAND ===
+  // Ehegatte ist verheiratet (mit dem Hauptmitglied)
+  setCheckbox("ledig", false);
+  setCheckbox("verheiratet", true);
+  setCheckbox("Lebenspartnerschaft", false);
+
+  // === BESCHÄFTIGUNGSSTATUS ===
+  // Standard: keine Checkbox angekreuzt, da wir keine spezifischen Daten haben
+  setCheckbox("Ich bin beschäftigt", false);
+  setCheckbox("Ich bin in Ausbildung", false);
+  setCheckbox("Ich beziehe Rente", false);
+  setCheckbox("Ich bin freiwillig versichert", false);
+  setCheckbox("ich studiere", false);
+  setCheckbox("ich beziehe AL-Geld I", false);
+  setCheckbox("ich beziehe AL-Geld II", false);
+  setCheckbox("ich habe einen Minijob (bis zu 450 Euro)", false);
+  setCheckbox("ich bin selbstständig", false);
+  setCheckbox("Einkommen über 64.350 Euro-Stand 2022", false);
+
+  // === ARBEITGEBER (leer lassen) ===
+  setTextField("Name des Arbeitgebers", "");
+  setTextField("Arbeitgeber Straße", "");
+  setTextField("Arbeitgeber Hausnummer", "");
+  setTextField("Arbeitgeber PLZ", "");
+  setTextField("Arbeitgeber Ort", "");
+  setTextField("Beschäftigt seit", "");
+
+  // === BISHERIGE VERSICHERUNGSART ===
+  // Ehegatte mit eigener Mitgliedschaft = pflichtversichert oder freiwillig
+  setCheckbox("pflichtversichert", true);
+  setCheckbox("privat", false);
+  setCheckbox("freiwillig versichert", false);
+  setCheckbox("nicht gesetzl. versichert", false);
+  setCheckbox("familienversichert", false);
+  setCheckbox("Zuzug aus dem Ausland", false);
+
+  // === BISHERIGE KRANKENKASSE ===
+  setTextField("Name der letzten KrankenkasseKrankenversicherung", spouse.bisherigBestandBei || formData.mitgliedKrankenkasse || "");
+
+  // === FAMILIENANGEHÖRIGE MITVERSICHERN (nein für Ehegatte) ===
+  setCheckbox("Familienangehörige sollen mitversichert werden", false);
+
+  // === DATUM UND UNTERSCHRIFT ===
+  const today = new Date();
+  const datumHeute = formatDateGermanWithDots(today);
+  setTextField("Datum und Unterschrift", datumHeute);
+
+  // Unterschrift einbetten
+  if (formData.unterschrift) {
+    await embedSignature(pdfDoc, formData.unterschrift, 180, 735, 0);
+  }
+
+  return await pdfDoc.save();
+};
+
 export const exportViactivBeitrittserklaerung = async (formData: FormData): Promise<void> => {
   try {
+    // Hauptmitglied BE exportieren
     const pdfBytes = await createViactivBeitrittserklaerungPDF(formData);
     
     // Dateiname: Viactiv_Nachname, Vorname_BE_Datum.pdf (Datum mit Punkten: TT.MM.JJJJ)
@@ -298,6 +427,21 @@ export const exportViactivBeitrittserklaerung = async (formData: FormData): Prom
     const filename = `Viactiv_${nachname}, ${vorname}_BE_${datumForFilename}.pdf`;
     
     downloadPDF(pdfBytes, filename);
+
+    // Wenn Ehegatte eigene Mitgliedschaft hat, separate BE für Ehegatte erstellen
+    if (formData.viactivFamilienangehoerigeMitversichern && 
+        formData.ehegatte.name && 
+        formData.ehegatte.bisherigArt === 'mitgliedschaft') {
+      console.log("VIACTIV: Erstelle separate Beitrittserklärung für Ehegatte mit eigener Mitgliedschaft");
+      
+      const spousePdfBytes = await createViactivBeitrittserklaerungForSpouse(formData);
+      
+      const spouseNachname = formData.ehegatte.name || 'Nachname';
+      const spouseVorname = formData.ehegatte.vorname || 'Vorname';
+      const spouseFilename = `Viactiv_${spouseNachname}, ${spouseVorname}_BE_${datumForFilename}.pdf`;
+      
+      downloadPDF(spousePdfBytes, spouseFilename);
+    }
   } catch (error) {
     console.error("Error exporting VIACTIV PDF:", error);
     throw error;

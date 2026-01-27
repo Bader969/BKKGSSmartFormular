@@ -152,7 +152,9 @@ const Index = () => {
       if (formData.selectedKrankenkasse === 'viactiv') {
         if (formData.viactivFamilienangehoerigeMitversichern) {
           const numberOfFamilyPDFs = Math.max(1, Math.ceil(formData.kinder.length / 3));
-          toast.info(`Es werden 1 Beitrittserklärung und ${numberOfFamilyPDFs} Familienversicherungs-PDF(s) erstellt...`);
+          const hasSpouseWithOwnMembership = formData.ehegatte.name && formData.ehegatte.bisherigArt === 'mitgliedschaft';
+          const numberOfBEs = hasSpouseWithOwnMembership ? 2 : 1;
+          toast.info(`Es werden ${numberOfBEs} Beitrittserklärung(en) und ${numberOfFamilyPDFs} Familienversicherungs-PDF(s) erstellt...`);
           await exportViactivBeitrittserklaerung(formData);
           await exportViactivFamilienversicherung(formData);
         } else {
