@@ -1,5 +1,6 @@
 import { PDFDocument } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
+import { getNationalityName } from "@/utils/countries";
 
 /**
  * VIACTIV Familienversicherung PDF Export
@@ -230,7 +231,8 @@ const createViactivFamilyPDF = async (
     
     setTextField("Ehepartner/-in Geburtsname", ehegatte.geburtsname || ehegatte.name);
     setTextField("Ehepartner/-in Geburtsort_Geburtsland", ehegatte.geburtsort || "");
-    setTextField("Ehepartner/-in Staatsangehörigkeit", ehegatte.staatsangehoerigkeit || "");
+    // Staatsangehörigkeit vollständig ausschreiben (nicht Ländercode)
+    setTextField("Ehepartner/-in Staatsangehörigkeit", getNationalityName(ehegatte.staatsangehoerigkeit) || ehegatte.staatsangehoerigkeit || "");
     setTextField("Ehepartner/-in abweichende Anschrift", ehegatte.abweichendeAnschrift || "");
     
     // Seite 2: Bisherige Versicherung Ehepartner
@@ -244,6 +246,14 @@ const createViactivFamilyPDF = async (
     setCheckbox("Ehepartner/-in Mitgliedschaft", ehegatte.bisherigArt === 'mitgliedschaft');
     setCheckbox("Ehepartner/-in familienversichert", ehegatte.bisherigArt === 'familienversicherung');
     setCheckbox("Ehepartner/-in nicht gesetzlich", ehegatte.bisherigArt === 'nicht_gesetzlich');
+    
+    // "war familienversichert bei" - Name des Hauptmitglieds, wenn familienversichert
+    if (ehegatte.bisherigArt === 'familienversicherung') {
+      const hauptmitgliedName = `${formData.mitgliedName}, ${formData.mitgliedVorname}`;
+      setTextField("Ehepartner/-in war familienversichert bei Name Vorname der Person", hauptmitgliedName);
+    } else {
+      setTextField("Ehepartner/-in war familienversichert bei Name Vorname der Person", "");
+    }
   }
 
   // === KINDER DATEN (max. 3 pro PDF) ===
@@ -271,6 +281,13 @@ const createViactivFamilyPDF = async (
     { leiblich: "leibliches Kind_3", stief: "Stiefkind_3", enkel: "Enkelkind_3", pflege: "Pflegekind_3" }
   ];
 
+  // Feldnamen für "war familienversichert bei" pro Kind
+  const familienversichertBeiFields = [
+    "Kind war familienversichert bei Name Vorname der Person",
+    "Kind_2 war familienversichert bei Name Vorname der Person",
+    "Kind_3 war familienversichert bei Name Vorname der Person"
+  ];
+
   childrenForPdf.forEach((kind, index) => {
     if (index >= 3) return; // Max 3 Kinder pro PDF
     
@@ -289,7 +306,8 @@ const createViactivFamilyPDF = async (
     
     setTextField(fields.gebName, kind.geburtsname || kind.name);
     setTextField(fields.gebOrt, kind.geburtsort || "");
-    setTextField(fields.staat, kind.staatsangehoerigkeit || "");
+    // Staatsangehörigkeit vollständig ausschreiben (nicht Ländercode)
+    setTextField(fields.staat, getNationalityName(kind.staatsangehoerigkeit) || kind.staatsangehoerigkeit || "");
     setTextField(fields.anschrift, kind.abweichendeAnschrift || "");
     
     // Verwandtschaft
@@ -309,6 +327,14 @@ const createViactivFamilyPDF = async (
     setCheckbox(fields.mitglied, kind.bisherigArt === 'mitgliedschaft');
     setCheckbox(fields.familie, kind.bisherigArt === 'familienversicherung');
     setCheckbox(fields.nichtGes, kind.bisherigArt === 'nicht_gesetzlich');
+    
+    // "war familienversichert bei" - Name des Hauptmitglieds, wenn familienversichert
+    if (kind.bisherigArt === 'familienversicherung') {
+      const hauptmitgliedName = `${formData.mitgliedName}, ${formData.mitgliedVorname}`;
+      setTextField(familienversichertBeiFields[index], hauptmitgliedName);
+    } else {
+      setTextField(familienversichertBeiFields[index], "");
+    }
   });
 
   // === DATUM UND UNTERSCHRIFT (Seite 2) ===
