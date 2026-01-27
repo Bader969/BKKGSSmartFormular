@@ -229,9 +229,11 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   setTextField("E-Mail", formData.email || "");
 
   // === FAMILIENSTAND ===
+  // Nur 3 Checkboxen im PDF: ledig, verheiratet, Lebenspartnerschaft
+  // Lebenspartnerschaft wird nicht angekreuzt, da kein entsprechender Wert im Formular existiert
   setCheckbox("ledig", formData.familienstand === "ledig");
   setCheckbox("verheiratet", formData.familienstand === "verheiratet");
-  setCheckbox("Lebenspartnerschaft", formData.familienstand === "verheiratet"); // Fallback
+  setCheckbox("Lebenspartnerschaft", false);
 
   // === BESCHÄFTIGUNGSSTATUS ===
   setCheckbox("Ich bin beschäftigt", formData.viactivBeschaeftigung === "beschaeftigt");
