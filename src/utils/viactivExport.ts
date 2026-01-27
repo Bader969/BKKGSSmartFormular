@@ -192,7 +192,7 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   
   // Immer angekreuzt
   setCheckbox("Mein Versicherungsstatus ist unverändert", true);
-  setCheckbox("Datenschutzrechtliche und werberechtliche Einwilligungserklärung", true);
+  setCheckbox("Datenschutz- und werberechliche Einwilligungserklärung", true);
 
   // === PERSÖNLICHE DATEN ===
   setTextField("Name", formData.mitgliedName);
