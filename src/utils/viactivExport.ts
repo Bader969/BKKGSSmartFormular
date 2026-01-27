@@ -20,8 +20,16 @@ const formatDateGerman = (date: Date): string => {
   const day = date.getDate().toString().padStart(2, '0');
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const year = date.getFullYear();
-  // Format: TTMMJJJJ (ohne Punkte für VIACTIV PDF)
+  // Format: TTMMJJJJ (ohne Punkte für Mitgliedschaft/Geburtsdatum/versichert bis)
   return `${day}${month}${year}`;
+};
+
+const formatDateGermanWithDots = (date: Date): string => {
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  // Format: TT.MM.JJJJ (mit Punkten für Unterschriftsdatum)
+  return `${day}.${month}.${year}`;
 };
 
 /**
@@ -261,7 +269,8 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
 
   // === DATUM UND UNTERSCHRIFT ===
   const today = new Date();
-  const datumHeute = formatDateGerman(today);
+  // Unterschriftsdatum mit Punkten: TT.MM.JJJJ
+  const datumHeute = formatDateGermanWithDots(today);
   setTextField("Datum und Unterschrift", datumHeute);
 
   // Unterschrift einbetten (Position basierend auf PDF-Analyse)
