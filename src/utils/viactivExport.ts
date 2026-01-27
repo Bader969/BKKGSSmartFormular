@@ -1,5 +1,6 @@
 import { PDFDocument } from "pdf-lib";
 import { FormData } from "@/types/form";
+import { getNationalityName } from "@/utils/countries";
 
 /**
  * VIACTIV Beitrittserklärung PDF Export
@@ -210,8 +211,9 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   // Geburtsname - falls vorhanden im Formular, sonst Nachname
   setTextField("Geburtsname", formData.mitgliedName);
   
-  // Staatsangehörigkeit
-  setTextField("Staatsangehörigkeit", formData.viactivStaatsangehoerigkeit || "deutsch");
+  // Staatsangehörigkeit vollständig ausschreiben (nicht Ländercode)
+  const staatsangehoerigkeitVoll = getNationalityName(formData.viactivStaatsangehoerigkeit) || formData.viactivStaatsangehoerigkeit || "deutsch";
+  setTextField("Staatsangehörigkeit", staatsangehoerigkeitVoll);
 
   // === GESCHLECHT ===
   setCheckbox("weiblich", formData.viactivGeschlecht === "weiblich");
