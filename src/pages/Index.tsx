@@ -11,6 +11,7 @@ import { FileDown, FileText, AlertCircle, Users, User, Building2 } from 'lucide-
 import { exportFilledPDF, exportRundumSicherPaketOnly } from '@/utils/pdfExport';
 import { exportViactivBeitrittserklaerung } from '@/utils/viactivExport';
 import { exportViactivFamilienversicherung } from '@/utils/viactivFamilyExport';
+import { exportViactivBonusPDFs } from '@/utils/viactivBonusExport';
 import { toast } from 'sonner';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -47,6 +48,17 @@ const Index = () => {
       // Automatische Synchronisierung der KV-Nummer zur Mitglied-Versichertennummer
       if ('mitgliedKvNummer' in updates) {
         newData.mitgliedVersichertennummer = updates.mitgliedKvNummer as string;
+      }
+      
+      // Automatische Synchronisierung des Bonus-Kontoinhabers mit Hauptmitglied-Name
+      if ('mitgliedVorname' in updates || 'mitgliedName' in updates) {
+        const oldFullName = `${prev.mitgliedVorname} ${prev.mitgliedName}`.trim();
+        const newFullName = `${newData.mitgliedVorname} ${newData.mitgliedName}`.trim();
+        
+        // Nur synchronisieren wenn Feld leer ist oder noch dem alten Wert entspricht
+        if (!newData.viactivBonusKontoinhaber || newData.viactivBonusKontoinhaber === oldFullName) {
+          newData.viactivBonusKontoinhaber = newFullName;
+        }
       }
       
       return newData;
@@ -90,6 +102,19 @@ const Index = () => {
       }
       if (!formData.viactivVersicherungsart) {
         toast.error('Bitte wählen Sie die bisherige Versicherungsart aus.');
+        return;
+      }
+      // Bonus-Programm Validierung
+      if (!formData.viactivBonusVertragsnummer) {
+        toast.error('Bitte geben Sie die Antrags-/Vertragsnummer für das Bonus-Programm ein.');
+        return;
+      }
+      if (!formData.viactivBonusIBAN) {
+        toast.error('Bitte geben Sie die IBAN für das Bonus-Programm ein.');
+        return;
+      }
+      if (!formData.viactivBonusKontoinhaber) {
+        toast.error('Bitte geben Sie den Kontoinhaber für das Bonus-Programm ein.');
         return;
       }
     }
@@ -154,12 +179,15 @@ const Index = () => {
           const numberOfFamilyPDFs = Math.max(1, Math.ceil(formData.kinder.length / 3));
           const hasSpouseWithOwnMembership = formData.ehegatte.name && formData.ehegatte.bisherigArt === 'mitgliedschaft';
           const numberOfBEs = hasSpouseWithOwnMembership ? 2 : 1;
-          toast.info(`Es werden ${numberOfBEs} Beitrittserklärung(en) und ${numberOfFamilyPDFs} Familienversicherungs-PDF(s) erstellt...`);
+          const numberOfBonusPDFs = 1 + (formData.ehegatte.name ? 1 : 0) + formData.kinder.length;
+          toast.info(`Es werden ${numberOfBEs} Beitrittserklärung(en), ${numberOfFamilyPDFs} Familienversicherungs-PDF(s) und ${numberOfBonusPDFs} Bonus-PDF(s) erstellt...`);
           await exportViactivBeitrittserklaerung(formData);
           await exportViactivFamilienversicherung(formData);
+          await exportViactivBonusPDFs(formData);
         } else {
-          toast.info('VIACTIV Beitrittserklärung wird erstellt...');
+          toast.info('VIACTIV Beitrittserklärung und Bonus-PDF werden erstellt...');
           await exportViactivBeitrittserklaerung(formData);
+          await exportViactivBonusPDFs(formData);
         }
         toast.success('VIACTIV PDF(s) erfolgreich exportiert!');
       }
