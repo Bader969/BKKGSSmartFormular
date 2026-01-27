@@ -2,7 +2,7 @@ import React from 'react';
 import { FormField } from './FormField';
 import { FamilyMember } from '@/types/form';
 import { calculateDates } from '@/utils/dateUtils';
-import { COUNTRY_OPTIONS } from '@/utils/countries';
+import { NATIONALITY_OPTIONS } from '@/utils/countries';
 import { 
   validateName, 
   validateGeburtsdatum, 
@@ -124,7 +124,7 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
             id={`${prefix}-staatsangehoerigkeit`}
             value={member.staatsangehoerigkeit}
             onChange={(value) => updateMember({ staatsangehoerigkeit: value })}
-            options={COUNTRY_OPTIONS.map(c => ({ value: c.code, label: c.name }))}
+            options={NATIONALITY_OPTIONS.map(c => ({ value: c.code, label: c.name }))}
             placeholder="Land auswählen"
             required
             validate={validateSelect}
