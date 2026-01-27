@@ -8,19 +8,15 @@ import { FormData, FamilyMember } from "@/types/form";
  * Bei mehr als 3 Kindern werden mehrere PDFs erstellt (max. 3 Kinder pro PDF)
  */
 
+/**
+ * Formatiert Eingabe-Datum zu TT.MM.JJJJ (mit Punkten für Familienversicherung)
+ */
 const formatInputDate = (dateStr: string): string => {
   if (!dateStr) return "";
   const parts = dateStr.split("-");
   if (parts.length !== 3) return dateStr;
-  // Format: TTMMJJJJ (ohne Punkte für VIACTIV PDF)
-  return `${parts[2]}${parts[1]}${parts[0]}`;
-};
-
-const formatDateGerman = (date: Date): string => {
-  const day = date.getDate().toString().padStart(2, '0');
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}${month}${year}`;
+  // Format: TT.MM.JJJJ (mit Punkten für Familienversicherung PDF)
+  return `${parts[2]}.${parts[1]}.${parts[0]}`;
 };
 
 const formatDateGermanWithDots = (date: Date): string => {
