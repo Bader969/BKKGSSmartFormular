@@ -286,9 +286,9 @@ export const exportViactivBeitrittserklaerung = async (formData: FormData): Prom
   try {
     const pdfBytes = await createViactivBeitrittserklaerungPDF(formData);
     
-    // Dateiname: Viactiv_Nachname, Vorname_BE_Datum.pdf
+    // Dateiname: Viactiv_Nachname, Vorname_BE_Datum.pdf (Datum mit Punkten: TT.MM.JJJJ)
     const today = new Date();
-    const datumForFilename = formatDateGerman(today).replace(/\./g, '-');
+    const datumForFilename = formatDateGermanWithDots(today);
     const nachname = formData.mitgliedName || 'Nachname';
     const vorname = formData.mitgliedVorname || 'Vorname';
     const filename = `Viactiv_${nachname}, ${vorname}_BE_${datumForFilename}.pdf`;
