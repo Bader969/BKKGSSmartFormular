@@ -8,7 +8,7 @@ import { validateName, validateStrasse, validateHausnummer, validatePlz, validat
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { COUNTRY_OPTIONS } from '@/utils/countries';
+import { NATIONALITY_OPTIONS } from '@/utils/countries';
 import { calculateDates } from '@/utils/dateUtils';
 
 interface ViactivSectionProps {
@@ -77,7 +77,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
     { value: 'pflege', label: 'Pflegekind' },
   ];
 
-  const countryOptions = COUNTRY_OPTIONS.map(c => ({ value: c.code, label: c.name }));
+  const nationalityOptions = NATIONALITY_OPTIONS.map(c => ({ value: c.code, label: c.name }));
 
   return (
     <>
@@ -101,7 +101,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
             id="viactivStaatsangehoerigkeit"
             value={formData.viactivStaatsangehoerigkeit}
             onChange={(value) => updateFormData({ viactivStaatsangehoerigkeit: value })}
-            options={countryOptions}
+            options={nationalityOptions}
             placeholder="Land auswählen"
             required
             validate={validateSelect}
@@ -304,7 +304,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                 id="viactiv-ehegatte-staatsangehoerigkeit"
                 value={formData.ehegatte.staatsangehoerigkeit}
                 onChange={(value) => updateEhegatte({ staatsangehoerigkeit: value })}
-                options={countryOptions}
+                options={nationalityOptions}
                 placeholder="Land auswählen"
               />
               <FormField
@@ -457,7 +457,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                         id={`viactiv-kind${index}-staatsangehoerigkeit`}
                         value={kind.staatsangehoerigkeit}
                         onChange={(value) => updateKind(index, { staatsangehoerigkeit: value })}
-                        options={countryOptions}
+                        options={nationalityOptions}
                         placeholder="Land auswählen"
                       />
                       <FormField
