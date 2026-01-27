@@ -4,11 +4,12 @@ import { FormField } from './FormField';
 import { FormData, VIACTIV_GESCHLECHT_OPTIONS, VIACTIV_BESCHAEFTIGUNG_OPTIONS, VIACTIV_VERSICHERUNGSART_OPTIONS, ArbeitgeberDaten, FamilyMember, createEmptyFamilyMember } from '@/types/form';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
-import { validateName, validateStrasse, validateHausnummer, validatePlz, validateOrt, validateSelect, validateStaatsangehoerigkeit, validateKrankenkasse } from '@/utils/validation';
+import { validateName, validateStrasse, validateHausnummer, validatePlz, validateOrt, validateSelect } from '@/utils/validation';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { COUNTRY_OPTIONS } from '@/utils/countries';
+import { calculateDates } from '@/utils/dateUtils';
 
 interface ViactivSectionProps {
   formData: FormData;
@@ -16,6 +17,8 @@ interface ViactivSectionProps {
 }
 
 export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, updateFormData }) => {
+  const { endDate } = calculateDates();
+  
   const updateArbeitgeber = (updates: Partial<ArbeitgeberDaten>) => {
     updateFormData({
       viactivArbeitgeber: { ...formData.viactivArbeitgeber, ...updates }
@@ -93,14 +96,15 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
             validate={validateSelect}
           />
           <FormField
-            type="text"
+            type="select"
             label="Staatsangehörigkeit"
             id="viactivStaatsangehoerigkeit"
             value={formData.viactivStaatsangehoerigkeit}
             onChange={(value) => updateFormData({ viactivStaatsangehoerigkeit: value })}
-            placeholder="z.B. deutsch"
+            options={countryOptions}
+            placeholder="Land auswählen"
             required
-            validate={validateName}
+            validate={validateSelect}
           />
           <FormField
             type="select"
@@ -176,13 +180,6 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
             onChange={(value) => updateArbeitgeber({ ort: value })}
             placeholder="z.B. Berlin"
             validate={validateOrt}
-          />
-          <FormField
-            type="date"
-            label="Beschäftigt seit"
-            id="arbeitgeberBeschaeftigtSeit"
-            value={formData.viactivArbeitgeber.beschaeftigtSeit}
-            onChange={(value) => updateArbeitgeber({ beschaeftigtSeit: value })}
           />
         </div>
       </FormSection>
@@ -302,13 +299,13 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                 validate={validateOrt}
               />
               <FormField
-                type="text"
+                type="select"
                 label="Staatsangehörigkeit"
                 id="viactiv-ehegatte-staatsangehoerigkeit"
                 value={formData.ehegatte.staatsangehoerigkeit}
                 onChange={(value) => updateEhegatte({ staatsangehoerigkeit: value })}
-                placeholder="z.B. deutsch"
-                validate={validateStaatsangehoerigkeit}
+                options={countryOptions}
+                placeholder="Land auswählen"
               />
               <FormField
                 type="text"
@@ -328,7 +325,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                   type="text"
                   label="Versicherung endete am (TTMMJJJJ)"
                   id="viactiv-ehegatte-endete-am"
-                  value={formData.ehegatte.bisherigEndeteAm}
+                  value={formData.ehegatte.bisherigEndeteAm || endDate.replace(/\./g, '')}
                   onChange={(value) => updateEhegatte({ bisherigEndeteAm: value })}
                   placeholder="z.B. 31032026"
                 />
@@ -455,13 +452,13 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                         validate={validateOrt}
                       />
                       <FormField
-                        type="text"
+                        type="select"
                         label="Staatsangehörigkeit"
                         id={`viactiv-kind${index}-staatsangehoerigkeit`}
                         value={kind.staatsangehoerigkeit}
                         onChange={(value) => updateKind(index, { staatsangehoerigkeit: value })}
-                        placeholder="z.B. deutsch"
-                        validate={validateStaatsangehoerigkeit}
+                        options={countryOptions}
+                        placeholder="Land auswählen"
                       />
                       <FormField
                         type="text"
@@ -494,7 +491,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                           type="text"
                           label="Versicherung endete am (TTMMJJJJ)"
                           id={`viactiv-kind${index}-endete-am`}
-                          value={kind.bisherigEndeteAm}
+                          value={kind.bisherigEndeteAm || endDate.replace(/\./g, '')}
                           onChange={(value) => updateKind(index, { bisherigEndeteAm: value })}
                           placeholder="z.B. 31032026"
                         />

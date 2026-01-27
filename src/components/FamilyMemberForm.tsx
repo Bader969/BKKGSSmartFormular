@@ -2,12 +2,12 @@ import React from 'react';
 import { FormField } from './FormField';
 import { FamilyMember } from '@/types/form';
 import { calculateDates } from '@/utils/dateUtils';
+import { COUNTRY_OPTIONS } from '@/utils/countries';
 import { 
   validateName, 
   validateGeburtsdatum, 
   validateSelect, 
-  validateOrt, 
-  validateStaatsangehoerigkeit,
+  validateOrt,
   validateVersichertennummer
 } from '@/utils/validation';
 
@@ -119,14 +119,15 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
             validate={validateOrt}
           />
           <FormField
-            type="text"
+            type="select"
             label="Staatsangehörigkeit"
             id={`${prefix}-staatsangehoerigkeit`}
             value={member.staatsangehoerigkeit}
             onChange={(value) => updateMember({ staatsangehoerigkeit: value })}
-            placeholder="z.B. Deutsch"
+            options={COUNTRY_OPTIONS.map(c => ({ value: c.code, label: c.name }))}
+            placeholder="Land auswählen"
             required
-            validate={validateStaatsangehoerigkeit}
+            validate={validateSelect}
           />
         </div>
       )}
