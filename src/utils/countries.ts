@@ -148,3 +148,14 @@ export const getCountryName = (code: string): string => {
   const country = countries.find(c => c.code.toLowerCase() === code.toLowerCase());
   return country?.name || code;
 };
+
+/**
+ * Findet die Staatsangehörigkeit (Adjektiv) anhand des Codes
+ * @param code - ISO-Code (z.B. "DE")
+ * @returns Staatsangehörigkeit als Adjektiv (z.B. "Deutsch")
+ */
+export const getNationalityName = (code: string): string => {
+  if (!code) return "";
+  const country = countries.find(c => c.code.toLowerCase() === code.toLowerCase());
+  return country?.nationality || code;
+};
