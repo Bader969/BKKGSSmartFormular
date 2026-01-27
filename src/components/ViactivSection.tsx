@@ -206,6 +206,44 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
         </p>
       </FormSection>
 
+      {/* VIACTIV Bonus-Programm */}
+      <FormSection title="VIACTIV Bonus-Programm" variant="member">
+        <div className="p-4 bg-muted/30 rounded-lg border mb-4">
+          <p className="text-sm text-muted-foreground">
+            Diese Daten werden auf allen Bonus-PDFs (Erwachsene 170€ und Kinder 110€) eingetragen.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <FormField
+            type="text"
+            label="Antrags-/Vertragsnummer"
+            id="viactivBonusVertragsnummer"
+            value={formData.viactivBonusVertragsnummer}
+            onChange={(value) => updateFormData({ viactivBonusVertragsnummer: value })}
+            placeholder="Vertragsnummer eingeben"
+            required
+          />
+          <FormField
+            type="text"
+            label="Kontoinhaber"
+            id="viactivBonusKontoinhaber"
+            value={formData.viactivBonusKontoinhaber}
+            onChange={(value) => updateFormData({ viactivBonusKontoinhaber: value })}
+            placeholder="Name des Kontoinhabers"
+            required
+          />
+          <FormField
+            type="text"
+            label="IBAN"
+            id="viactivBonusIBAN"
+            value={formData.viactivBonusIBAN}
+            onChange={(value) => updateFormData({ viactivBonusIBAN: value })}
+            placeholder="DE..."
+            required
+          />
+        </div>
+      </FormSection>
+
       {/* Ehepartner-Sektion - nur anzeigen wenn Familienversicherung aktiviert */}
       {formData.viactivFamilienangehoerigeMitversichern && (
         <>
@@ -314,6 +352,18 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                 value={formData.ehegatte.abweichendeAnschrift}
                 onChange={(value) => updateEhegatte({ abweichendeAnschrift: value })}
                 placeholder="Falls abweichend"
+              />
+            </div>
+
+            {/* Versichertennummer Ehegatte */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <FormField
+                type="text"
+                label="Versichertennummer"
+                id="viactiv-ehegatte-versichertennummer"
+                value={formData.ehegatte.versichertennummer}
+                onChange={(value) => updateEhegatte({ versichertennummer: value })}
+                placeholder="Versichertennummer"
               />
             </div>
 
@@ -467,6 +517,18 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                         value={kind.abweichendeAnschrift}
                         onChange={(value) => updateKind(index, { abweichendeAnschrift: value })}
                         placeholder="Falls abweichend"
+                      />
+                    </div>
+
+                    {/* Versichertennummer Kind */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                      <FormField
+                        type="text"
+                        label="Versichertennummer"
+                        id={`viactiv-kind${index}-versichertennummer`}
+                        value={kind.versichertennummer}
+                        onChange={(value) => updateKind(index, { versichertennummer: value })}
+                        placeholder="Versichertennummer"
                       />
                     </div>
 

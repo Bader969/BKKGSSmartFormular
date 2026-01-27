@@ -206,6 +206,11 @@ export interface FormData {
   viactivArbeitgeber: ArbeitgeberDaten;
   viactivFamilienangehoerigeMitversichern: boolean;
   viactivStaatsangehoerigkeit: string;
+  
+  // VIACTIV Bonus-Programm Felder
+  viactivBonusVertragsnummer: string;
+  viactivBonusIBAN: string;
+  viactivBonusKontoinhaber: string;
 }
 
 export const createEmptyArztDaten = (): ArztDaten => ({
@@ -304,5 +309,10 @@ export const createInitialFormData = (): FormData => {
     viactivArbeitgeber: createEmptyArbeitgeberDaten(),
     viactivFamilienangehoerigeMitversichern: false,
     viactivStaatsangehoerigkeit: 'deutsch',
+    
+    // VIACTIV Bonus-Programm Felder
+    viactivBonusVertragsnummer: '',
+    viactivBonusIBAN: '',
+    viactivBonusKontoinhaber: '',
   };
 };
