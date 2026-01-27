@@ -170,20 +170,22 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
         />
         <FormField
           type="tel"
-          label="Telefon (optional)"
+          label="Telefon"
           id="telefon"
           value={formData.telefon}
           onChange={(value) => updateFormData({ telefon: value })}
           placeholder="Telefonnummer"
+          required
           validate={validateTelefon}
         />
         <FormField
           type="email"
-          label="E-Mail (optional)"
+          label="E-Mail"
           id="email"
           value={formData.email}
           onChange={(value) => updateFormData({ email: value })}
           placeholder="E-Mail-Adresse"
+          required
           validate={validateEmail}
         />
       </div>
