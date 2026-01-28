@@ -240,9 +240,9 @@ const createBonusErwachsenePDF = async (
   const today = new Date();
   setTextField("Datum Unterschrift", formatDateGerman(today));
 
-  // Unterschrift einbetten (Position rechts neben Datum)
+  // Unterschrift einbetten (Position rechts neben Datum - korrigiert)
   if (signatureData) {
-    await embedSignature(pdfDoc, signatureData, 310, 718, 0);
+    await embedSignature(pdfDoc, signatureData, 310, 760, 0);
   }
 
   return await pdfDoc.save();
@@ -299,9 +299,9 @@ const createBonusKinderPDF = async (
   const today = new Date();
   setTextField("Datum Unterschrift", formatDateGerman(today));
 
-  // Unterschrift einbetten (Hauptmitglied unterschreibt für Kind)
+  // Unterschrift einbetten (Hauptmitglied unterschreibt für Kind - korrigiert)
   if (signatureData) {
-    await embedSignature(pdfDoc, signatureData, 310, 675, 0);
+    await embedSignature(pdfDoc, signatureData, 310, 720, 0);
   }
 
   return await pdfDoc.save();

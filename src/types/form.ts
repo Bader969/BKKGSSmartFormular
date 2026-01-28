@@ -22,6 +22,8 @@ export interface FamilyMember {
   versichertennummer: string;
   // Bearbeitbare Felder
   familienversichert: boolean;
+  // VIACTIV Ehegatte-BE Felder
+  beschaeftigung: '' | 'beschaeftigt' | 'ausbildung' | 'rente' | 'freiwillig_versichert' | 'studiere' | 'al_geld_1' | 'al_geld_2' | 'minijob' | 'selbststaendig' | 'einkommen_ueber_grenze';
 }
 
 // Arzt-Daten für Rundum-Sicher-Paket
@@ -255,6 +257,7 @@ export const createEmptyFamilyMember = (): FamilyMember => ({
   staatsangehoerigkeit: '',
   versichertennummer: '',
   familienversichert: true,
+  beschaeftigung: '',
 });
 
 export const createInitialFormData = (): FormData => {

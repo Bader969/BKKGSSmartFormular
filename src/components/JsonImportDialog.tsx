@@ -83,6 +83,7 @@ const createFamilyExampleJson = (): Partial<FormData> => ({
     staatsangehoerigkeit: 'deutsch',
     versichertennummer: 'B987654321',
     familienversichert: true,
+    beschaeftigung: '',
   },
   ehegatteKrankenkasse: 'AOK',
   kinder: [
@@ -107,6 +108,7 @@ const createFamilyExampleJson = (): Partial<FormData> => ({
       staatsangehoerigkeit: 'deutsch',
       versichertennummer: 'C111222333',
       familienversichert: true,
+      beschaeftigung: '',
     },
   ],
   rundumSicherPaket: {
