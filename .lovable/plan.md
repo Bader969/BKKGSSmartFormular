@@ -1,236 +1,247 @@
 
 
-# VIACTIV Bonus-PDFs: Vollständige Implementierung
+# Korrekturen für VIACTIV: Ehegatte-BE Felder + Bonus-PDF Unterschriften
 
-## Zusammenfassung
+## Zusammenfassung der drei Probleme
 
-Diese Implementierung fügt VIACTIV Bonus-PDF-Exporte für Erwachsene (170€) und Kinder (110€) hinzu. Das Kontoinhaber-Feld wird automatisch mit dem Namen des Hauptmitglieds synchronisiert, kann aber manuell überschrieben werden.
-
----
-
-## Geplante Änderungen
-
-### 1. PDF-Templates in public-Ordner kopieren
-
-Die beiden hochgeladenen PDF-Vorlagen werden kopiert:
-- `public/viactiv-bonus-erwachsene.pdf`
-- `public/viactiv-bonus-kinder.pdf`
+1. **Ehegatte-Beitrittserklärung**: Fehlende Felder für Geburtsland und Beschäftigungsstatus
+2. **Bonus-PDF Unterschrift-Position**: Unterschrift ist zu hoch positioniert (siehe Bilder)
+3. **Ehegatte-BE Unterschrift**: Ehegatte soll mit eigener Unterschrift (`unterschriftFamilie`) unterschreiben
 
 ---
 
-### 2. Datenmodell erweitern
+## Technische Änderungen
+
+### 1. Datenmodell erweitern
 
 **Datei: `src/types/form.ts`**
 
-Drei neue Felder im FormData-Interface hinzufügen:
+Das `FamilyMember`-Interface benötigt ein neues Feld für den Beschäftigungsstatus des Ehegatten:
 
 | Neues Feld | Typ | Beschreibung |
 |------------|-----|--------------|
-| `viactivBonusVertragsnummer` | string | Antrags-/Vertragsnummer (wird überall eingetragen) |
-| `viactivBonusIBAN` | string | Eigenes IBAN-Feld für Bonus-PDFs |
-| `viactivBonusKontoinhaber` | string | Kontoinhaber (synchronisiert mit Hauptmitglied) |
+| `beschaeftigung` | `ViactivBeschaeftigung` | Beschäftigungsstatus des Ehegatten |
 
-In `createInitialFormData()` werden diese mit leeren Werten initialisiert.
+In `createEmptyFamilyMember()` wird dieses Feld mit leerem String initialisiert.
 
 ---
 
-### 3. UI-Komponente erweitern
+### 2. UI-Komponente erweitern
 
 **Datei: `src/components/ViactivSection.tsx`**
 
-#### A) Neue "VIACTIV Bonus-Programm" Sektion
+In der Ehegatte-Sektion werden zwei neue Felder hinzugefügt:
 
-Position: Nach der "Familienversicherung" Checkbox, vor den Familienangaben
+#### A) Geburtsland-Feld (separates Feld neben Geburtsort)
 
-Drei Felder in einem Grid:
-- **Antrags-/Vertragsnummer** (Pflichtfeld)
-- **Kontoinhaber** (synchronisiert mit `mitgliedVorname mitgliedName`, kann überschrieben werden)
-- **IBAN** (Pflichtfeld)
+Aktuell ist "Geburtsort / Geburtsland" ein kombiniertes Feld. Es wird aufgeteilt in:
+- **Geburtsort** (Text-Feld)
+- **Geburtsland** (Dropdown mit Länderauswahl)
 
-Die Synchronisationslogik für den Kontoinhaber:
-1. Initial: Leer
-2. Wenn `mitgliedVorname` oder `mitgliedName` sich ändert UND das Feld noch leer ist oder dem alten Wert entspricht → automatisch aktualisieren
-3. Wenn manuell geändert → Synchronisation unterbrechen (wie bei Arzt-Ort)
+Dies ermöglicht eine saubere Trennung für den PDF-Export.
 
-#### B) Versichertennummer-Felder hinzufügen
+#### B) Beschäftigungsstatus-Feld (Dropdown)
 
-In der **Ehegatte-Sektion** (nach "Abweichende Anschrift"):
-- Neues Feld: "Versichertennummer" für `formData.ehegatte.versichertennummer`
+Neues Dropdown-Feld mit den gleichen Optionen wie beim Hauptmitglied:
+- Ich bin beschäftigt
+- Ich bin in Ausbildung
+- Ich beziehe Rente
+- Ich bin freiwillig versichert
+- Ich studiere
+- Ich beziehe AL-Geld I
+- Ich beziehe AL-Geld II
+- Ich habe einen Minijob
+- Ich bin selbstständig
+- Einkommen über Grenze
 
-In der **Kinder-Sektion** (nach "Abweichende Anschrift" pro Kind):
-- Neues Feld: "Versichertennummer" für `kind.versichertennummer`
-
----
-
-### 4. Automatische Kontoinhaber-Synchronisation
-
-**Datei: `src/pages/Index.tsx`**
-
-In der `updateFormData`-Funktion wird folgende Logik hinzugefügt:
-
-```
-Wenn mitgliedVorname oder mitgliedName sich ändert:
-  Wenn viactivBonusKontoinhaber leer ist 
-     ODER viactivBonusKontoinhaber === alter Hauptmitglied-Name:
-    → Setze viactivBonusKontoinhaber = neuer Hauptmitglied-Name
-```
-
-Dies ermöglicht:
-- Automatische Befüllung beim ersten Eingeben des Namens
-- Manuelle Überschreibung, die erhalten bleibt
+**Position:** Nach "Staatsangehörigkeit" in einer neuen Zeile mit:
+- Geburtsland (Dropdown)
+- Beschäftigungsstatus (Dropdown)
 
 ---
 
-### 5. Neue Export-Datei erstellen
+### 3. Ehegatte-Beitrittserklärung Export korrigieren
 
-**Neue Datei: `src/utils/viactivBonusExport.ts`**
+**Datei: `src/utils/viactivExport.ts`**
 
-#### Hauptfunktionen
+Änderungen in der Funktion `createViactivBeitrittserklaerungForSpouse`:
 
-| Funktion | Beschreibung |
-|----------|-------------|
-| `calculateAge(geburtsdatum)` | Berechnet Alter aus Geburtsdatum (ISO oder TT.MM.JJJJ) |
-| `isChild(geburtsdatum)` | Prüft ob Person unter 15 Jahre alt ist |
-| `formatDateGerman(isoDate)` | Konvertiert ISO zu TT.MM.JJJJ |
-| `formatStartDate(date)` | Formatiert Startdatum als JJJJ-MM-TT für Dateinamen |
-| `embedSignature(pdfDoc, signatureBase64, x, y, width, height)` | Bettet Unterschrift-Bild ein |
-| `createBonusErwachsenePDF(...)` | Erstellt Bonus-Erwachsene PDF |
-| `createBonusKinderPDF(...)` | Erstellt Bonus-Kinder PDF |
-| `exportViactivBonusPDFs(formData)` | Hauptexport-Funktion, gibt Anzahl zurück |
-
-#### PDF-Feldmapping Bonus-Erwachsene
-
-| PDF-Feld | Quelle |
-|----------|--------|
-| Verzicht 1 | `true` (immer angekreuzt) |
-| Verzicht 2 | `true` (immer angekreuzt) |
-| Antragsnummer | `viactivBonusVertragsnummer` |
-| Antragsnummer 2 | `viactivBonusVertragsnummer` |
-| Versicherungsnummer | Person-Versichertennummer |
-| Vorname | Person-Vorname |
-| Nachname | Person-Nachname |
-| Geburtsdatum | TT.MM.JJJJ |
-| Kontoinhaberin | `viactivBonusKontoinhaber` |
-| IBAN | `viactivBonusIBAN` |
-| Datum Unterschrift | Heutiges Datum (TT.MM.JJJJ) |
-
-#### PDF-Feldmapping Bonus-Kinder
-
-| PDF-Feld | Quelle |
-|----------|--------|
-| Verzicht 1 | `true` (immer angekreuzt) |
-| Verzicht 2 | `true` (immer angekreuzt) |
-| Antragsnummer | `viactivBonusVertragsnummer` |
-| Antragsnummer 2 | `viactivBonusVertragsnummer` |
-| Versicherungsnummer | `mitgliedVersichertennummer` (Hauptmitglied) |
-| Vorname | `mitgliedVorname` (Hauptmitglied) |
-| Nachname | `mitgliedName` (Hauptmitglied) |
-| Versicherungsnummer_2 | `kind.versichertennummer` |
-| Vorname_2 | `kind.vorname` |
-| Nachname_2 | `kind.name` |
-| Geburtsdatum Kind | Kind-Geburtsdatum TT.MM.JJJJ |
-| Kontoinhaberin | `viactivBonusKontoinhaber` |
-| IBAN | `viactivBonusIBAN` |
-| Datum Unterschrift | Heutiges Datum (TT.MM.JJJJ) |
-
-#### Unterschriften-Logik
-
-| PDF für | Unterschrift von |
-|---------|-----------------|
-| Hauptmitglied | `formData.unterschrift` |
-| Ehegatte | `formData.unterschriftFamilie` |
-| Alle Kinder | `formData.unterschrift` (Hauptmitglied) |
-
-Unterschrift wird als Bild neben dem "Datum Unterschrift"-Feld platziert:
-- Bonus-Erwachsene: X=310, Y=718 (basierend auf Datum-Position 245.8, 730.8)
-- Bonus-Kinder: X=310, Y=675 (basierend auf Datum-Position 246.9, 687.5)
-
-#### Alterslogik
+#### A) Geburtsland separat setzen
 
 ```
-Alter = (Heute - Geburtsdatum) in Jahren
-Wenn Alter >= 15: Bonus-Erwachsene (170€)
-Wenn Alter < 15: Bonus-Kinder (110€)
+Aktuell:
+- Parst "Geburtsort, Geburtsland" aus einem kombinierten Feld
+
+Neu:
+- Geburtsort: ehegatte.geburtsort
+- Geburtsland: ehegatte.geburtsland (ISO-Code)
 ```
 
-#### Dateibenennungs-Konvention
+#### B) Beschäftigungsstatus-Checkboxen setzen
 
-Format: `Startdatum_Nachname, Vorname_geb. Datum.pdf`
+```
+Aktuell (Zeilen 368-379):
+- Alle Checkboxen werden auf false gesetzt
 
-Beispiele:
-- `2026-04-01_Mustermann, Max_01.01.1990.pdf`
-- `2026-04-01_Mustermann, Lisa_15.05.2015.pdf`
+Neu:
+- Die Checkboxen werden basierend auf ehegatte.beschaeftigung gesetzt
+```
 
-Das Startdatum ist das berechnete Mitgliedschafts-Startdatum (+3 Monate, 1. des Folgemonats).
+#### C) Unterschrift vom Ehegatten verwenden
+
+```
+Aktuell (Zeile 410-411):
+- Verwendet formData.unterschrift (Hauptmitglied)
+
+Neu:
+- Verwendet formData.unterschriftFamilie (Ehegatte-Unterschrift)
+```
 
 ---
 
-### 6. Export-Integration
+### 4. Bonus-PDF Unterschrift-Position korrigieren
 
-**Datei: `src/pages/Index.tsx`**
+**Datei: `src/utils/viactivBonusExport.ts`**
 
-#### Validierung hinzufügen (vor VIACTIV-Export)
+Basierend auf den hochgeladenen Bildern ist die Unterschrift ca. 40-50 Pixel zu hoch. Die Unterschrift muss tiefer positioniert werden, um neben dem Datum-Feld zu erscheinen.
 
-Neue Validierungen für VIACTIV:
-- `viactivBonusVertragsnummer` muss ausgefüllt sein
-- `viactivBonusIBAN` muss ausgefüllt sein
-- `viactivBonusKontoinhaber` muss ausgefüllt sein
+#### Aktuelle Positionen:
 
-#### Export-Aufruf
+| PDF-Typ | X | Y | Problem |
+|---------|---|---|---------|
+| Bonus-Erwachsene | 310 | 718 | Zu hoch |
+| Bonus-Kinder | 310 | 675 | Zu hoch |
 
-Nach dem bestehenden VIACTIV BE und Familienversicherung Export:
+#### Korrigierte Positionen:
+
+| PDF-Typ | X | Y (neu) | Anpassung |
+|---------|---|---------|-----------|
+| Bonus-Erwachsene | 310 | 760 | +42 Pixel nach unten |
+| Bonus-Kinder | 310 | 720 | +45 Pixel nach unten |
+
+Die Y-Koordinate wird erhöht, weil PDF-lib die Y-Achse von unten nach oben misst. Um die Unterschrift visuell tiefer zu positionieren, muss der Wert in `height - y` größer sein, also `y` größer werden.
+
+---
+
+## Dateien-Übersicht
+
+| Datei | Änderung |
+|-------|----------|
+| `src/types/form.ts` | +1 Feld in `FamilyMember` Interface (`beschaeftigung`) |
+| `src/components/ViactivSection.tsx` | +2 Felder (Geburtsland-Dropdown, Beschäftigung-Dropdown) |
+| `src/utils/viactivExport.ts` | Geburtsland separat, Beschäftigung-Checkboxen, Ehegatte-Unterschrift |
+| `src/utils/viactivBonusExport.ts` | Unterschrift-Positionen korrigieren |
+
+---
+
+## Detaillierte Änderungen
+
+### 1. FamilyMember Interface (`src/types/form.ts`)
 
 ```typescript
-import { exportViactivBonusPDFs } from '@/utils/viactivBonusExport';
-
-// Bonus-PDFs exportieren
-const bonusCount = await exportViactivBonusPDFs(formData);
+export interface FamilyMember {
+  // ... bestehende Felder ...
+  
+  // Neues Feld für VIACTIV Ehegatte-BE
+  beschaeftigung: ViactivBeschaeftigung;
+}
 ```
 
-#### Toast-Nachricht aktualisieren
-
-Die Toast-Nachricht wird erweitert, um die Anzahl der Bonus-PDFs anzuzeigen:
-- "Es werden X Beitrittserklärung(en), Y Familienversicherungs-PDF(s) und Z Bonus-PDF(s) erstellt..."
-
----
-
-## Export-Szenarien
-
-### Szenario 1: Nur Mitglied (ohne Familienversicherung)
-- 1x Beitrittserklärung
-- 1x Bonus-Erwachsene (Mitglied)
-
-### Szenario 2: Mit Ehegatte
-- 1-2x Beitrittserklärung (je nach Ehegatte-Status)
-- 1x Familienversicherung
-- 1x Bonus-Erwachsene (Mitglied)
-- 1x Bonus je nach Alter (Ehegatte)
-
-### Szenario 3: Mit Ehegatten und Kindern
-- 1-2x Beitrittserklärung
-- 1+ Familienversicherung
-- 1x Bonus-Erwachsene (Mitglied)
-- 1x Bonus je nach Alter (Ehegatte)
-- Pro Kind: 1x Bonus je nach Alter
+In `createEmptyFamilyMember()`:
+```typescript
+beschaeftigung: '',
+```
 
 ---
 
-## Technische Details
+### 2. ViactivSection UI (`src/components/ViactivSection.tsx`)
 
-### Dateien-Übersicht
+Die Ehegatte-Sektion wird erweitert. Nach "Geburtsname" und "Geburtsort" kommt eine neue Zeile:
 
-| Datei | Aktion |
-|-------|--------|
-| `public/viactiv-bonus-erwachsene.pdf` | Neu (Template kopieren) |
-| `public/viactiv-bonus-kinder.pdf` | Neu (Template kopieren) |
-| `src/types/form.ts` | +3 Felder, createInitialFormData erweitern |
-| `src/components/ViactivSection.tsx` | +Bonus-Sektion, +Versichertennummer-Felder |
-| `src/utils/viactivBonusExport.ts` | Neue Datei |
-| `src/pages/Index.tsx` | +Kontoinhaber-Sync, +Validierung, +Export-Integration |
+```text
++------------------------------------------+
+| Ehegatte-Sektion (erweitert)             |
++------------------------------------------+
+| Name* | Vorname* | Geburtsdatum | Geschlecht |
+| [___] | [______] | [__________] | [________] |
+|                                          |
+| Geburtsname | Geburtsort | Staatsang.    |
+| [_________] | [________] | [__________]  |
+|                                          |
+| Geburtsland* | Beschäftigungsstatus*     | <-- NEU
+| [Dropdown]   | [Dropdown]                |
++------------------------------------------+
+```
 
-### Abhängigkeiten
+---
 
-Die neue Export-Datei verwendet:
-- `pdf-lib` (bereits installiert)
-- Bestehende Patterns aus `viactivExport.ts` und `viactivFamilyExport.ts`
+### 3. Ehegatte-BE Export (`src/utils/viactivExport.ts`)
+
+#### Zeile 325-330 (Geburtsort/Geburtsland):
+```typescript
+// Aktuell:
+const geburtsortParts = (spouse.geburtsort || "").split(",");
+const geburtsort = geburtsortParts[0]?.trim() || "";
+const geburtsland = geburtsortParts[1]?.trim() || spouse.geburtsland || "";
+
+// Neu:
+setTextField("Geburtsort", spouse.geburtsort || "");
+setTextField("Geburtsland", spouse.geburtsland || "");
+```
+
+#### Zeile 368-379 (Beschäftigungsstatus):
+```typescript
+// Neu: Checkboxen basierend auf ehegatte.beschaeftigung
+setCheckbox("Ich bin beschäftigt", spouse.beschaeftigung === "beschaeftigt");
+setCheckbox("Ich bin in Ausbildung", spouse.beschaeftigung === "ausbildung");
+setCheckbox("Ich beziehe Rente", spouse.beschaeftigung === "rente");
+// ... etc.
+```
+
+#### Zeile 410-411 (Unterschrift):
+```typescript
+// Aktuell:
+if (formData.unterschrift) {
+  await embedSignature(pdfDoc, formData.unterschrift, 180, 735, 0);
+}
+
+// Neu:
+if (formData.unterschriftFamilie) {
+  await embedSignature(pdfDoc, formData.unterschriftFamilie, 180, 735, 0);
+}
+```
+
+---
+
+### 4. Bonus-PDF Unterschrift-Position (`src/utils/viactivBonusExport.ts`)
+
+#### Zeile 244-246 (Bonus-Erwachsene):
+```typescript
+// Aktuell:
+await embedSignature(pdfDoc, signatureData, 310, 718, 0);
+
+// Neu:
+await embedSignature(pdfDoc, signatureData, 310, 760, 0);
+```
+
+#### Zeile 302-304 (Bonus-Kinder):
+```typescript
+// Aktuell:
+await embedSignature(pdfDoc, signatureData, 310, 675, 0);
+
+// Neu:
+await embedSignature(pdfDoc, signatureData, 310, 720, 0);
+```
+
+---
+
+## Zusammenfassung der Unterschriften-Logik
+
+| PDF-Typ | Unterschrift von |
+|---------|-----------------|
+| **Hauptmitglied BE** | `formData.unterschrift` |
+| **Ehegatte BE** | `formData.unterschriftFamilie` |
+| **Hauptmitglied Bonus** | `formData.unterschrift` |
+| **Ehegatte Bonus** | `formData.unterschriftFamilie` |
+| **Kinder Bonus** | `formData.unterschrift` (Hauptmitglied unterschreibt) |
 
