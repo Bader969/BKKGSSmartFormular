@@ -8,8 +8,9 @@ import { validateName, validateStrasse, validateHausnummer, validatePlz, validat
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { NATIONALITY_OPTIONS } from '@/utils/countries';
+import { NATIONALITY_OPTIONS, COUNTRY_OPTIONS } from '@/utils/countries';
 import { calculateDates } from '@/utils/dateUtils';
+import { ViactivBeschaeftigung } from '@/types/form';
 
 interface ViactivSectionProps {
   formData: FormData;
@@ -317,7 +318,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
               <FormField
                 type="text"
                 label="Geburtsname"
@@ -329,11 +330,11 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
               />
               <FormField
                 type="text"
-                label="Geburtsort / Geburtsland"
+                label="Geburtsort"
                 id="viactiv-ehegatte-geburtsort"
                 value={formData.ehegatte.geburtsort}
                 onChange={(value) => updateEhegatte({ geburtsort: value })}
-                placeholder="z.B. Berlin, DE"
+                placeholder="z.B. Berlin"
                 validate={validateOrt}
               />
               <FormField
@@ -344,6 +345,30 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                 onChange={(value) => updateEhegatte({ staatsangehoerigkeit: value })}
                 options={nationalityOptions}
                 placeholder="Land auswählen"
+              />
+            </div>
+
+            {/* Neue Zeile: Geburtsland und Beschäftigungsstatus */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <FormField
+                type="select"
+                label="Geburtsland"
+                id="viactiv-ehegatte-geburtsland"
+                value={formData.ehegatte.geburtsland}
+                onChange={(value) => updateEhegatte({ geburtsland: value })}
+                options={COUNTRY_OPTIONS.map(c => ({ value: c.code, label: c.name }))}
+                placeholder="Land auswählen"
+                required
+              />
+              <FormField
+                type="select"
+                label="Beschäftigungsstatus"
+                id="viactiv-ehegatte-beschaeftigung"
+                value={formData.ehegatte.beschaeftigung}
+                onChange={(value) => updateEhegatte({ beschaeftigung: value as ViactivBeschaeftigung })}
+                options={beschaeftigungOptions}
+                placeholder="Auswählen..."
+                required
               />
               <FormField
                 type="text"

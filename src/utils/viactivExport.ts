@@ -322,12 +322,9 @@ export const createViactivBeitrittserklaerungForSpouse = async (formData: FormDa
   const geburtsdatumFormatted = formatInputDate(spouse.geburtsdatum);
   setTextField("Geburtsdatum", geburtsdatumFormatted);
   
-  // Geburtsort/-land (Format: "Ort, Land")
-  const geburtsortParts = (spouse.geburtsort || "").split(",");
-  const geburtsort = geburtsortParts[0]?.trim() || "";
-  const geburtsland = geburtsortParts[1]?.trim() || spouse.geburtsland || "";
-  setTextField("Geburtsort", geburtsort);
-  setTextField("Geburtsland", geburtsland);
+  // Geburtsort und Geburtsland separat (ISO-Code für Geburtsland)
+  setTextField("Geburtsort", spouse.geburtsort || "");
+  setTextField("Geburtsland", spouse.geburtsland || "");
   
   // Geburtsname
   setTextField("Geburtsname", spouse.geburtsname || spouse.name);
@@ -365,18 +362,17 @@ export const createViactivBeitrittserklaerungForSpouse = async (formData: FormDa
   setCheckbox("verheiratet", true);
   setCheckbox("Lebenspartnerschaft", false);
 
-  // === BESCHÄFTIGUNGSSTATUS ===
-  // Standard: keine Checkbox angekreuzt, da wir keine spezifischen Daten haben
-  setCheckbox("Ich bin beschäftigt", false);
-  setCheckbox("Ich bin in Ausbildung", false);
-  setCheckbox("Ich beziehe Rente", false);
-  setCheckbox("Ich bin freiwillig versichert", false);
-  setCheckbox("ich studiere", false);
-  setCheckbox("ich beziehe AL-Geld I", false);
-  setCheckbox("ich beziehe AL-Geld II", false);
-  setCheckbox("ich habe einen Minijob (bis zu 450 Euro)", false);
-  setCheckbox("ich bin selbstständig", false);
-  setCheckbox("Einkommen über 64.350 Euro-Stand 2022", false);
+  // === BESCHÄFTIGUNGSSTATUS (basierend auf ehegatte.beschaeftigung) ===
+  setCheckbox("Ich bin beschäftigt", spouse.beschaeftigung === "beschaeftigt");
+  setCheckbox("Ich bin in Ausbildung", spouse.beschaeftigung === "ausbildung");
+  setCheckbox("Ich beziehe Rente", spouse.beschaeftigung === "rente");
+  setCheckbox("Ich bin freiwillig versichert", spouse.beschaeftigung === "freiwillig_versichert");
+  setCheckbox("ich studiere", spouse.beschaeftigung === "studiere");
+  setCheckbox("ich beziehe AL-Geld I", spouse.beschaeftigung === "al_geld_1");
+  setCheckbox("ich beziehe AL-Geld II", spouse.beschaeftigung === "al_geld_2");
+  setCheckbox("ich habe einen Minijob (bis zu 450 Euro)", spouse.beschaeftigung === "minijob");
+  setCheckbox("ich bin selbstständig", spouse.beschaeftigung === "selbststaendig");
+  setCheckbox("Einkommen über 64.350 Euro-Stand 2022", spouse.beschaeftigung === "einkommen_ueber_grenze");
 
   // === ARBEITGEBER (leer lassen) ===
   setTextField("Name des Arbeitgebers", "");
@@ -406,9 +402,9 @@ export const createViactivBeitrittserklaerungForSpouse = async (formData: FormDa
   const datumHeute = formatDateGermanWithDots(today);
   setTextField("Datum und Unterschrift", datumHeute);
 
-  // Unterschrift einbetten
-  if (formData.unterschrift) {
-    await embedSignature(pdfDoc, formData.unterschrift, 180, 735, 0);
+  // Unterschrift einbetten (Ehegatte unterschreibt mit eigener Unterschrift)
+  if (formData.unterschriftFamilie) {
+    await embedSignature(pdfDoc, formData.unterschriftFamilie, 180, 735, 0);
   }
 
   return await pdfDoc.save();
