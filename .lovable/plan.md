@@ -1,153 +1,101 @@
 
 
-# Novitas BKK: KVNR Fix und Versichertennummer entfernen
+# Novitas BKK: "Bisherige Versicherung besteht weiter bei" Fix
 
-## Problem 1: KV-Nummer wird nicht ins PDF geschrieben
+## Problem
 
-Die aktuelle `setAllTextFields` Funktion verwendet `form.getFields()` und versucht Felder mit demselben Namen zu finden. In pdf-lib haben Felder mit demselben Namen jedoch oft ein internes Suffix (z.B. `KVNR.#0`, `KVNR.#1`). Die Iteration findet daher nicht alle Instanzen.
+Wenn "Bisherige Versicherung besteht weiter" aktiviert ist und z.B. "Novitas BKK" im Feld darunter steht, wird auf dem PDF **nicht** dieser Wert geschrieben, sondern die Krankenkasse des Hauptmitglieds (`formData.mitgliedKrankenkasse`).
 
-### Lösung: Direktes Iterieren über alle Felder und Substring-Match
+## Analyse des aktuellen Codes
 
+### Ehepartner (Zeilen 191-194):
 ```typescript
-// In createPDFHelpers
-const setAllTextFields = (fieldNamePattern: string, value: string) => {
-  if (!value) return;
-  try {
-    const allFields = form.getFields();
-    allFields.forEach((field: any) => {
-      const name = field.getName();
-      // Match exakt oder mit Suffix (z.B. KVNR. oder KVNR.#0)
-      if (name === fieldNamePattern || name.startsWith(fieldNamePattern)) {
-        try {
-          const textField = form.getTextField(name);
-          textField.setText(value);
-        } catch {}
-      }
-    });
-  } catch (e) {
-    // Fallback
-    setTextField(fieldNamePattern, value);
-  }
-};
+// Current Kasse if continues
+if (ehegatte.bisherigBestehtWeiter) {
+  setTextField("fna_PartnerAktuelleKasse", ehegatte.bisherigBestehtWeiterBei);
+}
 ```
+**Hier ist es korrekt!** - Es verwendet `ehegatte.bisherigBestehtWeiterBei`.
 
----
-
-## Problem 2: Versichertennummer für Kinder/Ehegatte sind nicht notwendig
-
-Im Novitas PDF gibt es keine EditBox für die Versichertennummer der Kinder oder des Ehegatten. Diese Felder müssen:
-
-1. **In der UI für Novitas ausgeblendet werden** (FamilyMemberForm.tsx)
-2. **Im Export nicht mehr geschrieben werden** (novitasExport.ts - bereits korrekt, da kein Feld dafür existiert)
-3. **Keine Validierung beim Export blockieren** (Index.tsx prüft Versichertennummer nicht für Novitas)
-
----
-
-## Änderungen
-
-### 1. novitasExport.ts - KVNR Fix
-
-**Zeilen 48-65: setAllTextFields verbessern**
-
+### Kinder (Zeilen 252-254):
 ```typescript
-const setAllTextFields = (fieldNamePattern: string, value: string) => {
-  if (!value) return;
-  try {
-    const allFields = form.getFields();
-    allFields.forEach((field: any) => {
-      const name = field.getName();
-      // Match exakt oder mit Suffix (z.B. KVNR. oder KVNR.#0)
-      if (name === fieldNamePattern || name.startsWith(fieldNamePattern)) {
-        try {
-          const textField = form.getTextField(name);
-          textField.setText(value);
-        } catch {}
-      }
-    });
-  } catch (e) {
-    setTextField(fieldNamePattern, value);
-  }
-};
+// Page 3 - Previous insurance - AUTO-SYNC
+setTextField(`famv_bisher_kind_${i}`, dates.endDate);
+setTextField(`famv_kv_kind_${i}`, formData.mitgliedKrankenkasse);  // ← FALSCH!
 ```
+**Hier liegt der Fehler!** - Es verwendet `formData.mitgliedKrankenkasse` statt `kind.bisherigBestehtWeiterBei`.
 
-**Zusätzlich: Explizit beide KVNR-Feldnamen versuchen**
-
+### Zusätzlich Ehepartner (Zeile 173):
 ```typescript
-// In fillBasicFields
-setAllTextFields("KVNR.", formData.mitgliedKvNummer);
-setAllTextFields("KVNR", formData.mitgliedKvNummer);  // Fallback ohne Punkt
+setTextField("fna_PartnerNameAltkasse", ehegatte.bisherigBestandBei || formData.mitgliedKrankenkasse);
 ```
+**Auch falsch!** - Bei `bisherigBestehtWeiter=true` sollte `bisherigBestehtWeiterBei` verwendet werden, nicht `bisherigBestandBei`.
 
-**Zeile 154-155: Versichertennummer des Ehepartners ENTFERNEN**
+---
 
+## Lösung
+
+### 1. fillSpouseFields korrigieren (Zeilen 171-173)
+
+**Vorher:**
 ```typescript
-// ENTFERNEN - kein PDF-Feld dafür:
-// setTextField("bw_strasse_partner", ehegatte.versichertennummer);
+// Previous insurance - AUTO-SYNC with member's Krankenkasse
+setTextField("fna_PartnerVersBis", dates.endDate);
+setTextField("fna_PartnerNameAltkasse", ehegatte.bisherigBestandBei || formData.mitgliedKrankenkasse);
+```
+
+**Nachher:**
+```typescript
+// Previous insurance
+setTextField("fna_PartnerVersBis", dates.endDate);
+
+// Wenn "besteht weiter" aktiviert: Wert aus bisherigBestehtWeiterBei nehmen
+// Ansonsten: Fallback auf bisherigBestandBei oder mitgliedKrankenkasse
+if (ehegatte.bisherigBestehtWeiter && ehegatte.bisherigBestehtWeiterBei) {
+  setTextField("fna_PartnerNameAltkasse", ehegatte.bisherigBestehtWeiterBei);
+} else {
+  setTextField("fna_PartnerNameAltkasse", ehegatte.bisherigBestandBei || formData.mitgliedKrankenkasse);
+}
+```
+
+### 2. fillChildFields korrigieren (Zeilen 252-254)
+
+**Vorher:**
+```typescript
+// Page 3 - Previous insurance - AUTO-SYNC
+setTextField(`famv_bisher_kind_${i}`, dates.endDate);
+setTextField(`famv_kv_kind_${i}`, formData.mitgliedKrankenkasse);
+```
+
+**Nachher:**
+```typescript
+// Page 3 - Previous insurance
+setTextField(`famv_bisher_kind_${i}`, dates.endDate);
+
+// Wenn "besteht weiter" aktiviert: Wert aus bisherigBestehtWeiterBei nehmen
+// Ansonsten: Fallback auf bisherigBestandBei oder mitgliedKrankenkasse
+if (kind.bisherigBestehtWeiter && kind.bisherigBestehtWeiterBei) {
+  setTextField(`famv_kv_kind_${i}`, kind.bisherigBestehtWeiterBei);
+} else {
+  setTextField(`famv_kv_kind_${i}`, kind.bisherigBestandBei || formData.mitgliedKrankenkasse);
+}
 ```
 
 ---
 
-### 2. FamilyMemberForm.tsx - Versichertennummer bei Novitas ausblenden
+## Zusammenfassung der Änderungen
 
-**Zeilen 148-158: Conditional Rendering**
-
-```tsx
-{/* Versichertennummer - bei Novitas nicht anzeigen (kein PDF-Feld) */}
-{selectedKrankenkasse !== 'novitas' && (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <FormField
-      type="text"
-      label="Versichertennummer"
-      id={`${prefix}-versichertennummer`}
-      value={member.versichertennummer}
-      onChange={(value) => updateMember({ versichertennummer: value })}
-      placeholder="Versichertennummer"
-      required
-      validate={validateVersichertennummer}
-    />
-    {type === 'child' && (
-      <FormField
-        type="select"
-        label="Verwandtschaftsverhältnis"
-        ...
-      />
-    )}
-  </div>
-)}
-
-{/* Bei Novitas nur das Verwandtschaftsverhältnis anzeigen */}
-{selectedKrankenkasse === 'novitas' && type === 'child' && (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <FormField
-      type="select"
-      label="Verwandtschaftsverhältnis"
-      id={`${prefix}-verwandtschaft`}
-      value={member.verwandtschaft}
-      onChange={(value) => updateMember({ verwandtschaft: value as FamilyMember['verwandtschaft'] })}
-      options={verwandtschaftOptions}
-      required
-      validate={validateSelect}
-    />
-  </div>
-)}
-```
+| Datei | Zeilen | Änderung |
+|-------|--------|----------|
+| `src/utils/novitasExport.ts` | 171-173 | Ehepartner: `bisherigBestehtWeiterBei` priorisieren wenn "besteht weiter" aktiviert |
+| `src/utils/novitasExport.ts` | 252-254 | Kinder: `bisherigBestehtWeiterBei` priorisieren wenn "besteht weiter" aktiviert |
 
 ---
 
-## Dateien-Übersicht
+## Ergebnis
 
-| Datei | Änderung |
-|-------|----------|
-| `src/utils/novitasExport.ts` | KVNR-Fix mit verbesserter Feldsuche, Versichertennummer-Export entfernen |
-| `src/components/FamilyMemberForm.tsx` | Versichertennummer bei Novitas ausblenden |
-
----
-
-## Zusammenfassung
-
-| Problem | Ursache | Lösung |
-|---------|---------|--------|
-| KVNR nicht geschrieben | pdf-lib findet nur ein Feld bei doppelten Namen | Substring-Match für alle Felder |
-| Versichertennummer Kind/Ehegatte | Kein PDF-Feld vorhanden | UI-Feld bei Novitas ausblenden |
-| Export-Hemmung | Pflichtfeld ohne PDF-Entsprechung | Validierung nicht mehr blockiert |
+| Situation | Vorher | Nachher |
+|-----------|--------|---------|
+| "Besteht weiter" aktiviert mit "Novitas BKK" | Name der Mitglied-Krankenkasse | "Novitas BKK" (aus dem UI-Feld) |
+| "Besteht weiter" nicht aktiviert | Name der Mitglied-Krankenkasse | Fallback auf bisherigBestandBei oder mitgliedKrankenkasse |
 
