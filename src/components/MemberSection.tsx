@@ -34,7 +34,8 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
 
   return (
     <FormSection title="Allgemeine Angaben des Mitglieds" variant="member">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Vorname und Name - immer anzeigen */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField
           type="text"
           label="Vorname"
@@ -55,77 +56,86 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           required
           validate={validateName}
         />
-        <FormField
-          type="date"
-          label="Geburtsdatum"
-          id="mitgliedGeburtsdatum"
-          value={formData.mitgliedGeburtsdatum}
-          onChange={(value) => updateFormData({ mitgliedGeburtsdatum: value })}
-          required
-          validate={validateGeburtsdatum}
-        />
-        <FormField
-          type="text"
-          label="Geburtsort"
-          id="mitgliedGeburtsort"
-          value={formData.mitgliedGeburtsort}
-          onChange={(value) => updateFormData({ mitgliedGeburtsort: value })}
-          placeholder="z.B. Berlin"
-          validate={validateOrt}
-        />
-        <FormField
-          type="select"
-          label="Geburtsland"
-          id="mitgliedGeburtsland"
-          value={formData.mitgliedGeburtsland}
-          onChange={(value) => updateFormData({ mitgliedGeburtsland: value })}
-          options={countries.map(c => ({ value: c.code, label: c.name }))}
-          placeholder="Land auswählen"
-        />
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-        <FormField
-          type="text"
-          label="Straße"
-          id="mitgliedStrasse"
-          value={formData.mitgliedStrasse}
-          onChange={(value) => updateFormData({ mitgliedStrasse: value })}
-          placeholder="z.B. Musterstraße"
-          required
-          validate={validateStrasse}
-        />
-        <FormField
-          type="text"
-          label="Hausnummer"
-          id="mitgliedHausnummer"
-          value={formData.mitgliedHausnummer}
-          onChange={(value) => updateFormData({ mitgliedHausnummer: value })}
-          placeholder="z.B. 12a"
-          required
-          validate={validateHausnummer}
-        />
-        <FormField
-          type="text"
-          label="PLZ"
-          id="mitgliedPlz"
-          value={formData.mitgliedPlz}
-          onChange={(value) => updateFormData({ mitgliedPlz: value })}
-          placeholder="z.B. 12345"
-          required
-          validate={validatePlz}
-        />
-        <FormField
-          type="text"
-          label="Ort"
-          id="ort"
-          value={formData.ort}
-          onChange={(value) => updateFormData({ ort: value })}
-          placeholder="z.B. Berlin"
-          required
-          validate={validateOrt}
-        />
-      </div>
+      {/* Geburtsdatum, Geburtsort, Geburtsland - NICHT für Novitas */}
+      {formData.selectedKrankenkasse !== 'novitas' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          <FormField
+            type="date"
+            label="Geburtsdatum"
+            id="mitgliedGeburtsdatum"
+            value={formData.mitgliedGeburtsdatum}
+            onChange={(value) => updateFormData({ mitgliedGeburtsdatum: value })}
+            required
+            validate={validateGeburtsdatum}
+          />
+          <FormField
+            type="text"
+            label="Geburtsort"
+            id="mitgliedGeburtsort"
+            value={formData.mitgliedGeburtsort}
+            onChange={(value) => updateFormData({ mitgliedGeburtsort: value })}
+            placeholder="z.B. Berlin"
+            validate={validateOrt}
+          />
+          <FormField
+            type="select"
+            label="Geburtsland"
+            id="mitgliedGeburtsland"
+            value={formData.mitgliedGeburtsland}
+            onChange={(value) => updateFormData({ mitgliedGeburtsland: value })}
+            options={countries.map(c => ({ value: c.code, label: c.name }))}
+            placeholder="Land auswählen"
+          />
+        </div>
+      )}
+      
+      {/* Adresse - NICHT für Novitas */}
+      {formData.selectedKrankenkasse !== 'novitas' && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+          <FormField
+            type="text"
+            label="Straße"
+            id="mitgliedStrasse"
+            value={formData.mitgliedStrasse}
+            onChange={(value) => updateFormData({ mitgliedStrasse: value })}
+            placeholder="z.B. Musterstraße"
+            required
+            validate={validateStrasse}
+          />
+          <FormField
+            type="text"
+            label="Hausnummer"
+            id="mitgliedHausnummer"
+            value={formData.mitgliedHausnummer}
+            onChange={(value) => updateFormData({ mitgliedHausnummer: value })}
+            placeholder="z.B. 12a"
+            required
+            validate={validateHausnummer}
+          />
+          <FormField
+            type="text"
+            label="PLZ"
+            id="mitgliedPlz"
+            value={formData.mitgliedPlz}
+            onChange={(value) => updateFormData({ mitgliedPlz: value })}
+            placeholder="z.B. 12345"
+            required
+            validate={validatePlz}
+          />
+          <FormField
+            type="text"
+            label="Ort"
+            id="ort"
+            value={formData.ort}
+            onChange={(value) => updateFormData({ ort: value })}
+            placeholder="z.B. Berlin"
+            required
+            validate={validateOrt}
+          />
+        </div>
+      )}
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <FormField

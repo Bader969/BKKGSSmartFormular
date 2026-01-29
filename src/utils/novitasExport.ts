@@ -45,6 +45,25 @@ const createPDFHelpers = (form: any) => {
     }
   };
 
+  // Set all text fields with the same name (for duplicate fields like KVNR on multiple pages)
+  const setAllTextFields = (fieldName: string, value: string) => {
+    if (!value) return;
+    try {
+      const allFields = form.getFields();
+      allFields.forEach((field: any) => {
+        if (field.getName() === fieldName) {
+          try {
+            const textField = form.getTextField(field.getName());
+            textField.setText(value);
+          } catch {}
+        }
+      });
+    } catch (e) {
+      // Fallback to single field
+      setTextField(fieldName, value);
+    }
+  };
+
   const setCheckbox = (fieldName: string, checked: boolean) => {
     try {
       const field = form.getCheckBox(fieldName);
@@ -56,7 +75,23 @@ const createPDFHelpers = (form: any) => {
     }
   };
 
-  return { setTextField, setCheckbox };
+  // NEW: RadioButton helper - PDF RadioButtons use getRadioGroup().select()
+  const setRadioButton = (groupName: string, option: string) => {
+    if (!option) return;
+    try {
+      const radioGroup = form.getRadioGroup(groupName);
+      if (radioGroup) {
+        radioGroup.select(option);
+      }
+    } catch (e) {
+      // Fallback: try as checkbox (some PDFs mix these)
+      try {
+        setCheckbox(`${groupName}.${option}`, true);
+      } catch {}
+    }
+  };
+
+  return { setTextField, setAllTextFields, setCheckbox, setRadioButton };
 };
 
 // Fill basic member fields
@@ -65,25 +100,33 @@ const fillBasicFields = (
   helpers: ReturnType<typeof createPDFHelpers>,
   dates: ReturnType<typeof calculateNovitasDates>
 ) => {
-  const { setTextField, setCheckbox } = helpers;
+  const { setTextField, setAllTextFields, setRadioButton } = helpers;
   
   // Member data
   setTextField("NameGesamt", `${formData.mitgliedVorname} ${formData.mitgliedName}`);
-  setTextField("KVNR.", formData.mitgliedKvNummer);
+  
+  // KVNR exists on multiple pages - set ALL instances
+  setAllTextFields("KVNR.", formData.mitgliedKvNummer);
+  
   setTextField("fna_BeginnFamiVers", dates.beginDate);
   setTextField("fna_Telefon", formData.telefon);
   setTextField("fna_Email", formData.email);
   setTextField("datum", dates.today);
   
-  // Familienstand RadioButtons
-  setCheckbox("fna_Famstand.L", formData.familienstand === "ledig");
-  setCheckbox("fna_Famstand.V", formData.familienstand === "verheiratet");
-  setCheckbox("fna_Famstand.GL", formData.familienstand === "getrennt");
-  setCheckbox("fna_Famstand.G", formData.familienstand === "geschieden");
-  setCheckbox("fna_Famstand.W", formData.familienstand === "verwitwet");
+  // Familienstand - use RadioButton (not Checkbox!)
+  const familienstandMap: Record<string, string> = {
+    ledig: 'L',
+    verheiratet: 'V',
+    getrennt: 'GL',
+    geschieden: 'G',
+    verwitwet: 'W'
+  };
+  if (formData.familienstand && familienstandMap[formData.familienstand]) {
+    setRadioButton("fna_Famstand", familienstandMap[formData.familienstand]);
+  }
   
-  // Abgabegrund: ALWAYS "Beginn Beschäftigung" = true
-  setCheckbox("abgabegrund.B", true);
+  // Abgabegrund: ALWAYS "Beginn meiner Mitgliedschaft" - RadioButton!
+  setRadioButton("abgabegrund", "B");
 };
 
 // Fill spouse fields
@@ -92,7 +135,7 @@ const fillSpouseFields = (
   helpers: ReturnType<typeof createPDFHelpers>,
   dates: ReturnType<typeof calculateNovitasDates>
 ) => {
-  const { setTextField, setCheckbox } = helpers;
+  const { setTextField, setRadioButton } = helpers;
   const ehegatte = formData.ehegatte;
   
   if (!ehegatte.name && !ehegatte.vorname) return;
@@ -101,17 +144,18 @@ const fillSpouseFields = (
   setTextField("fna_PartnerName", ehegatte.name);
   setTextField("fna_PartnerVorname", ehegatte.vorname);
   
-  // Gender
+  // Gender - RadioButton!
   if (ehegatte.geschlecht) {
-    setCheckbox(`fna_PartnerGeschlecht.${ehegatte.geschlecht}`, true);
+    setRadioButton("fna_PartnerGeschlecht", ehegatte.geschlecht);
   }
   
   setTextField("fna_PartnerGebdat", formatInputDate(ehegatte.geburtsdatum));
+  
+  // Versichertennummer in bw_strasse_partner (confirmed correct field)
   setTextField("bw_strasse_partner", ehegatte.versichertennummer);
   
   // Address fields if deviating address exists
   if (ehegatte.abweichendeAnschrift) {
-    // Parse address - format: "Straße Hausnummer, PLZ Ort"
     const addressParts = ehegatte.abweichendeAnschrift.split(',');
     if (addressParts.length >= 2) {
       const plzOrt = addressParts[1].trim().split(' ');
@@ -126,10 +170,15 @@ const fillSpouseFields = (
   setTextField("fna_PartnerVersBis", dates.endDate);
   setTextField("fna_PartnerNameAltkasse", ehegatte.bisherigBestandBei || formData.mitgliedKrankenkasse);
   
-  // Insurance type
-  setCheckbox("fna_PartnerVersArt.GesetzlichMitglied", ehegatte.bisherigArt === 'mitgliedschaft');
-  setCheckbox("fna_PartnerVersArt.GesetzlichFAMI", ehegatte.bisherigArt === 'familienversicherung');
-  setCheckbox("fna_PartnerVersArt.NichtGesetzlich", ehegatte.bisherigArt === 'nicht_gesetzlich');
+  // Insurance type - RadioButton!
+  const versArtMap: Record<string, string> = {
+    mitgliedschaft: 'GesetzlichMitglied',
+    familienversicherung: 'GesetzlichFAMI',
+    nicht_gesetzlich: 'NichtGesetzlich'
+  };
+  if (ehegatte.bisherigArt && versArtMap[ehegatte.bisherigArt]) {
+    setRadioButton("fna_PartnerVersArt", versArtMap[ehegatte.bisherigArt]);
+  }
   
   // If family insurance: sync first/last name from main member
   if (ehegatte.bisherigArt === 'familienversicherung') {
@@ -157,7 +206,7 @@ const fillChildFields = (
   helpers: ReturnType<typeof createPDFHelpers>,
   dates: ReturnType<typeof calculateNovitasDates>
 ) => {
-  const { setTextField, setCheckbox } = helpers;
+  const { setTextField, setRadioButton } = helpers;
   const i = index + 1; // 1-based index
   
   if (!kind.name && !kind.vorname) return;
@@ -166,16 +215,17 @@ const fillChildFields = (
   setTextField(`name_kind_${i}`, kind.name);
   setTextField(`vorname_kind_${i}`, kind.vorname);
   
-  // Gender
+  // Gender - RadioButton!
   if (kind.geschlecht) {
-    setCheckbox(`geschlecht_kind_${i}.${kind.geschlecht}`, true);
+    setRadioButton(`geschlecht_kind_${i}`, kind.geschlecht);
   }
   
   setTextField(`gebdat_kind_${i}`, formatInputDate(kind.geburtsdatum));
-  setTextField(`bw_strasse_kind_${i}`, kind.versichertennummer);
   
-  // Address fields if deviating address exists
+  // bw_strasse_kind is for DEVIATING ADDRESS, NOT Versichertennummer!
+  // Only fill if child has a different address than member
   if (kind.abweichendeAnschrift) {
+    setTextField(`bw_strasse_kind_${i}`, kind.abweichendeAnschrift);
     const addressParts = kind.abweichendeAnschrift.split(',');
     if (addressParts.length >= 2) {
       const plzOrt = addressParts[1].trim().split(' ');
@@ -186,7 +236,7 @@ const fillChildFields = (
     }
   }
   
-  // Relationship
+  // Relationship - RadioButton!
   const verwandtschaftMap: Record<string, string> = { 
     leiblich: 'L', 
     stief: 'S', 
@@ -194,15 +244,15 @@ const fillChildFields = (
     pflege: 'P' 
   };
   if (kind.verwandtschaft && verwandtschaftMap[kind.verwandtschaft]) {
-    setCheckbox(`fna_KindVerwandt_${i}.${verwandtschaftMap[kind.verwandtschaft]}`, true);
+    setRadioButton(`fna_KindVerwandt_${i}`, verwandtschaftMap[kind.verwandtschaft]);
   }
   
   // Page 3 - Previous insurance - AUTO-SYNC
   setTextField(`famv_bisher_kind_${i}`, dates.endDate);
   setTextField(`famv_kv_kind_${i}`, formData.mitgliedKrankenkasse);
   
-  // Children are ALWAYS family insured
-  setCheckbox(`angabe_eigene_kv_kind_${i}.GesetzlichFAMI`, true);
+  // Children are ALWAYS family insured - RadioButton!
+  setRadioButton(`angabe_eigene_kv_kind_${i}`, "GesetzlichFAMI");
   
   // AUTO-SYNC: Vorname/Nachname des Hauptmitglieds
   setTextField(`famv_vorname_bisher_kv_kind_${i}`, formData.mitgliedVorname);
@@ -279,8 +329,8 @@ const createNovitasFamilyPDF = async (
     await addSignature(pdfDoc, formData.unterschriftFamilie, 2, 380, 690, 100, 30);
   }
   
-  // Flatten form to make fields non-editable
-  form.flatten();
+  // DO NOT flatten - keep PDF editable!
+  // form.flatten(); // REMOVED
   
   return await pdfDoc.save();
 };
