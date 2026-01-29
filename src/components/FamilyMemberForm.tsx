@@ -1,8 +1,8 @@
 import React from 'react';
 import { FormField } from './FormField';
-import { FamilyMember } from '@/types/form';
+import { FamilyMember, Krankenkasse } from '@/types/form';
 import { calculateDates } from '@/utils/dateUtils';
-import { NATIONALITY_OPTIONS } from '@/utils/countries';
+import { COUNTRY_OPTIONS, NATIONALITY_OPTIONS } from '@/utils/countries';
 import { 
   validateName, 
   validateGeburtsdatum, 
@@ -16,13 +16,25 @@ interface FamilyMemberFormProps {
   updateMember: (updates: Partial<FamilyMember>) => void;
   type: 'spouse' | 'child';
   childIndex?: number;
+  selectedKrankenkasse?: Krankenkasse;
 }
+
+// Helper function to get the default Krankenkasse name
+const getDefaultKrankenkasseName = (kasse?: Krankenkasse): string => {
+  switch (kasse) {
+    case 'novitas': return 'NOVITAS BKK';
+    case 'viactiv': return 'VIACTIV';
+    case 'bkk_gs': 
+    default: return 'BKK GS';
+  }
+};
 
 export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({ 
   member, 
   updateMember, 
   type,
-  childIndex 
+  childIndex,
+  selectedKrankenkasse
 }) => {
   const { endDate } = calculateDates();
   
@@ -109,14 +121,15 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
             validate={validateOrt}
           />
           <FormField
-            type="text"
+            type="select"
             label="Geburtsland"
             id={`${prefix}-geburtsland`}
             value={member.geburtsland}
             onChange={(value) => updateMember({ geburtsland: value })}
-            placeholder="z.B. Deutschland"
+            options={COUNTRY_OPTIONS.map(c => ({ value: c.code, label: c.name }))}
+            placeholder="Land auswählen"
             required
-            validate={validateOrt}
+            validate={validateSelect}
           />
           <FormField
             type="select"
@@ -178,25 +191,16 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
               checked={member.bisherigBestehtWeiter}
               onChange={(checked) => updateMember({ bisherigBestehtWeiter: checked })}
             />
-            <FormField
-              type="text"
-              label="Bei"
-              id={`${prefix}-bestehtWeiterBei`}
-              value={member.bisherigBestehtWeiterBei}
-              onChange={(value) => updateMember({ bisherigBestehtWeiterBei: value })}
-              placeholder="Name der Krankenkasse"
-              required
-            />
-          </div>
-        </div>
-        <div className="mt-3">
           <FormField
-            type="checkbox"
-            label="Familienversichert"
-            id={`${prefix}-familienversichert`}
-            checked={member.familienversichert !== false}
-            onChange={(checked) => updateMember({ familienversichert: checked })}
+            type="text"
+            label="Bei"
+            id={`${prefix}-bestehtWeiterBei`}
+            value={member.bisherigBestehtWeiterBei || getDefaultKrankenkasseName(selectedKrankenkasse)}
+            onChange={(value) => updateMember({ bisherigBestehtWeiterBei: value })}
+            placeholder={getDefaultKrankenkasseName(selectedKrankenkasse)}
+            required
           />
+          </div>
         </div>
       </div>
     </div>

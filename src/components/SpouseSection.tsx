@@ -4,9 +4,10 @@ import { FamilyMemberForm } from './FamilyMemberForm';
 import { FormField } from './FormField';
 import { FormData, FamilyMember } from '@/types/form';
 import { CopyBlockButton } from './CopyBlockButton';
-import { validateName, validateOrt, validateStaatsangehoerigkeit, validateKrankenkasse } from '@/utils/validation';
+import { validateName, validateOrt, validateSelect, validateKrankenkasse } from '@/utils/validation';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { COUNTRY_OPTIONS, NATIONALITY_OPTIONS } from '@/utils/countries';
 
 interface SpouseSectionProps {
   formData: FormData;
@@ -52,6 +53,7 @@ export const SpouseSection: React.FC<SpouseSectionProps> = ({ formData, updateFo
             member={formData.ehegatte}
             updateMember={updateEhegatte}
             type="spouse"
+            selectedKrankenkasse={formData.selectedKrankenkasse}
           />
           
           {/* Neue Felder für Ehegatte */}
@@ -77,24 +79,26 @@ export const SpouseSection: React.FC<SpouseSectionProps> = ({ formData, updateFo
               validate={validateOrt}
             />
             <FormField
-              type="text"
+              type="select"
               label="Geburtsland"
               id="ehegatte-geburtsland"
               value={formData.ehegatte.geburtsland}
               onChange={(value) => updateEhegatte({ geburtsland: value })}
-              placeholder="z.B. Deutschland"
+              options={COUNTRY_OPTIONS.map(c => ({ value: c.code, label: c.name }))}
+              placeholder="Land auswählen"
               required
-              validate={validateOrt}
+              validate={validateSelect}
             />
             <FormField
-              type="text"
+              type="select"
               label="Staatsangehörigkeit"
               id="ehegatte-staatsangehoerigkeit"
               value={formData.ehegatte.staatsangehoerigkeit}
               onChange={(value) => updateEhegatte({ staatsangehoerigkeit: value })}
-              placeholder="z.B. Deutsch"
+              options={NATIONALITY_OPTIONS.map(c => ({ value: c.code, label: c.name }))}
+              placeholder="Staatsangehörigkeit auswählen"
               required
-              validate={validateStaatsangehoerigkeit}
+              validate={validateSelect}
             />
           </div>
           
