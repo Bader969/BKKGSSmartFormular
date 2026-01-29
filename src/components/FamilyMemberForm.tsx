@@ -145,18 +145,37 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
         </div>
       )}
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FormField
-          type="text"
-          label="Versichertennummer"
-          id={`${prefix}-versichertennummer`}
-          value={member.versichertennummer}
-          onChange={(value) => updateMember({ versichertennummer: value })}
-          placeholder="Versichertennummer"
-          required
-          validate={validateVersichertennummer}
-        />
-        {type === 'child' && (
+      {/* Versichertennummer - bei Novitas nicht anzeigen (kein PDF-Feld) */}
+      {selectedKrankenkasse !== 'novitas' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            type="text"
+            label="Versichertennummer"
+            id={`${prefix}-versichertennummer`}
+            value={member.versichertennummer}
+            onChange={(value) => updateMember({ versichertennummer: value })}
+            placeholder="Versichertennummer"
+            required
+            validate={validateVersichertennummer}
+          />
+          {type === 'child' && (
+            <FormField
+              type="select"
+              label="Verwandtschaftsverhältnis"
+              id={`${prefix}-verwandtschaft`}
+              value={member.verwandtschaft}
+              onChange={(value) => updateMember({ verwandtschaft: value as FamilyMember['verwandtschaft'] })}
+              options={verwandtschaftOptions}
+              required
+              validate={validateSelect}
+            />
+          )}
+        </div>
+      )}
+      
+      {/* Bei Novitas nur das Verwandtschaftsverhältnis anzeigen (für Kinder) */}
+      {selectedKrankenkasse === 'novitas' && type === 'child' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             type="select"
             label="Verwandtschaftsverhältnis"
@@ -167,8 +186,8 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
             required
             validate={validateSelect}
           />
-        )}
-      </div>
+        </div>
+      )}
       
       {/* Bisherige Versicherung - automatisch ausgefüllt */}
       <div className="p-4 bg-card/50 rounded-lg border mt-4">

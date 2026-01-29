@@ -45,22 +45,24 @@ const createPDFHelpers = (form: any) => {
     }
   };
 
-  // Set all text fields with the same name (for duplicate fields like KVNR on multiple pages)
-  const setAllTextFields = (fieldName: string, value: string) => {
+  // Set all text fields matching pattern (for duplicate fields like KVNR. / KVNR.#0 / KVNR.#1)
+  const setAllTextFields = (fieldNamePattern: string, value: string) => {
     if (!value) return;
     try {
       const allFields = form.getFields();
       allFields.forEach((field: any) => {
-        if (field.getName() === fieldName) {
+        const name = field.getName();
+        // Match exact name OR names starting with pattern (e.g., KVNR. matches KVNR.#0, KVNR.#1)
+        if (name === fieldNamePattern || name.startsWith(fieldNamePattern)) {
           try {
-            const textField = form.getTextField(field.getName());
+            const textField = form.getTextField(name);
             textField.setText(value);
           } catch {}
         }
       });
     } catch (e) {
       // Fallback to single field
-      setTextField(fieldName, value);
+      setTextField(fieldNamePattern, value);
     }
   };
 
@@ -105,8 +107,9 @@ const fillBasicFields = (
   // Member data
   setTextField("NameGesamt", `${formData.mitgliedVorname} ${formData.mitgliedName}`);
   
-  // KVNR exists on multiple pages - set ALL instances
+  // KVNR exists on multiple pages - set ALL instances (try both patterns)
   setAllTextFields("KVNR.", formData.mitgliedKvNummer);
+  setAllTextFields("KVNR", formData.mitgliedKvNummer); // Fallback without dot
   
   setTextField("fna_BeginnFamiVers", dates.beginDate);
   setTextField("fna_Telefon", formData.telefon);
@@ -151,8 +154,7 @@ const fillSpouseFields = (
   
   setTextField("fna_PartnerGebdat", formatInputDate(ehegatte.geburtsdatum));
   
-  // Versichertennummer in bw_strasse_partner (confirmed correct field)
-  setTextField("bw_strasse_partner", ehegatte.versichertennummer);
+  // NOTE: No Versichertennummer field exists in Novitas PDF for spouse - removed
   
   // Address fields if deviating address exists
   if (ehegatte.abweichendeAnschrift) {
