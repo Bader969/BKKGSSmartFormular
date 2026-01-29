@@ -168,9 +168,16 @@ const fillSpouseFields = (
     }
   }
   
-  // Previous insurance - AUTO-SYNC with member's Krankenkasse
+  // Previous insurance
   setTextField("fna_PartnerVersBis", dates.endDate);
-  setTextField("fna_PartnerNameAltkasse", ehegatte.bisherigBestandBei || formData.mitgliedKrankenkasse);
+  
+  // Wenn "besteht weiter" aktiviert: Wert aus bisherigBestehtWeiterBei nehmen
+  // Ansonsten: Fallback auf bisherigBestandBei oder mitgliedKrankenkasse
+  if (ehegatte.bisherigBestehtWeiter && ehegatte.bisherigBestehtWeiterBei) {
+    setTextField("fna_PartnerNameAltkasse", ehegatte.bisherigBestehtWeiterBei);
+  } else {
+    setTextField("fna_PartnerNameAltkasse", ehegatte.bisherigBestandBei || formData.mitgliedKrankenkasse);
+  }
   
   // Insurance type - RadioButton!
   const versArtMap: Record<string, string> = {
@@ -249,9 +256,16 @@ const fillChildFields = (
     setRadioButton(`fna_KindVerwandt_${i}`, verwandtschaftMap[kind.verwandtschaft]);
   }
   
-  // Page 3 - Previous insurance - AUTO-SYNC
+  // Page 3 - Previous insurance
   setTextField(`famv_bisher_kind_${i}`, dates.endDate);
-  setTextField(`famv_kv_kind_${i}`, formData.mitgliedKrankenkasse);
+  
+  // Wenn "besteht weiter" aktiviert: Wert aus bisherigBestehtWeiterBei nehmen
+  // Ansonsten: Fallback auf bisherigBestandBei oder mitgliedKrankenkasse
+  if (kind.bisherigBestehtWeiter && kind.bisherigBestehtWeiterBei) {
+    setTextField(`famv_kv_kind_${i}`, kind.bisherigBestehtWeiterBei);
+  } else {
+    setTextField(`famv_kv_kind_${i}`, kind.bisherigBestandBei || formData.mitgliedKrankenkasse);
+  }
   
   // Children are ALWAYS family insured - RadioButton!
   setRadioButton(`angabe_eigene_kv_kind_${i}`, "GesetzlichFAMI");
