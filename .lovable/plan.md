@@ -1,301 +1,231 @@
 
-# Novitas BKK Familienversicherung - Implementierungsplan
+# Novitas BKK UI-Anpassungen - Korrigierter Implementierungsplan
 
-## Zusammenfassung
+## Zusammenfassung der Klarstellungen
 
-Eine neue Krankenkassen-Option "Novitas BKK" wird hinzugefügt, die **nur Familienversicherung** (ohne Mitgliedschaft oder Bonus) ermöglicht. Die Logik folgt 1:1 dem BKK GS Familienversicherungs-Pattern.
+Der Benutzer hat präzisiert:
+
+1. **"Familienversichert" Checkbox (Zeilen 192-200 in FamilyMemberForm.tsx):**
+   - **Für Kinder:** Checkbox entfernen, da Kinder **IMMER** familienversichert sind (statisch, hardcoded im Export)
+   - **Für Ehegatte:** Checkbox entfernen, da die Versicherungsart bereits über RadioButtons in SpouseSection.tsx (Zeilen 144-179) ausgewählt wird
+
+2. **"Bisherige Versicherung besteht weiter bei" Feld:**
+   - Dynamisch vorausfüllen basierend auf ausgewählter Krankenkasse:
+     - `'novitas'` → "NOVITAS BKK"
+     - `'bkk_gs'` → "BKK GS"
+     - `'viactiv'` → "VIACTIV"
+
+3. **Geburtsland und Staatsangehörigkeit:**
+   - Als Dropdown-Listen (nicht Textfelder)
+   - Vollständige Namen ins PDF schreiben (nicht Codes)
 
 ---
 
-## PDF-Template
+## Dateien-Änderungen
 
-Das neu hochgeladene PDF wird verwendet:
-```
-user-uploads://nov_antrag-auf-familienversicherung-2.pdf
-→ Kopieren nach: public/novitas-familienversicherung.pdf
-```
+### 1. FamilyMemberForm.tsx
 
----
-
-## Änderungen im Überblick
-
-### 1. Datenmodell erweitern (`src/types/form.ts`)
-
+**Änderung 1: Props erweitern**
 ```typescript
-// Erweitere Krankenkasse-Typ
-export type Krankenkasse = 'bkk_gs' | 'viactiv' | 'novitas';
-
-// Erweitere KRANKENKASSEN_OPTIONS
-export const KRANKENKASSEN_OPTIONS = [
-  { value: 'bkk_gs' as Krankenkasse, label: 'BKK GILDEMEISTER SEIDENSTICK' },
-  { value: 'viactiv' as Krankenkasse, label: 'VIACTIV Krankenkasse' },
-  { value: 'novitas' as Krankenkasse, label: 'Novitas BKK' },
-] as const;
-```
-
-### 2. Neue Export-Datei (`src/utils/novitasExport.ts`)
-
-Eine neue Export-Datei folgt der Struktur von `pdfExport.ts` (BKK GS).
-
-### 3. UI-Anpassung (`src/pages/Index.tsx`)
-
-Novitas-spezifische Sektionen und Export-Logik hinzufügen.
-
----
-
-## Automatische Felder und Synchronisationen
-
-### Automatische Berechnungen
-
-| Feld | Berechnung | Beispiel (Januar 2026) |
-|------|------------|------------------------|
-| **Beginn Familienversicherung** | 1. Tag des 3. Kalendermonats | 01.04.2026 |
-| **Bisherige Versicherung endet am** | Letzter Tag vor Beginn | 31.03.2026 |
-| **Heutiges Datum** | Aktuelles Datum | 29.01.2026 |
-
-### Automatisch angekreuzte Felder
-
-| Feld | Wert | Begründung |
-|------|------|------------|
-| "Ich war bisher" | Im Rahmen einer eigenen Mitgliedschaft | Standard |
-| "Anlass für Aufnahme" | Beginn meiner Mitgliedschaft (`abgabegrund.B`) | Standard |
-| Versicherungsart Kinder | Familienversicherung | Kinder werden immer familienversichert |
-
-### Feld-Synchronisationen
-
-| Feld | Sync-Quelle |
-|------|-------------|
-| KVNR (Seite 2 + 3) | `mitgliedKvNummer` (immer vom Hauptmitglied) |
-| Ehegatte "Versicherung bestand bei" | `mitgliedKrankenkasse` (Fallback) |
-| Kinder "Versicherung bestand bei" | `mitgliedKrankenkasse` |
-| Ehegatte "war familienversichert bei" | `mitgliedVorname, mitgliedName` |
-| Kinder "war familienversichert bei" | `mitgliedVorname, mitgliedName` |
-| Geburtsname | Nachname (Fallback wenn leer) |
-
----
-
-## PDF-Feld-Mapping
-
-### Seite 2 - Mitglied
-
-| Feld | PDF-Feldname | Quelle |
-|------|--------------|--------|
-| Vorname Name | `NameGesamt` | `${mitgliedVorname} ${mitgliedName}` |
-| KV-Nummer | `KVNR.` | `mitgliedKvNummer` (beide Seiten) |
-| Beginn Familienvers. | `fna_BeginnFamiVers` | Automatisch berechnet |
-| Telefon | `fna_Telefon` | `telefon` |
-| E-Mail | `fna_Email` | `email` |
-| Datum | `datum` | Aktuelles Datum (Seite 3) |
-
-### Familienstand (RadioButtons)
-
-| Wert | Feldname |
-|------|----------|
-| Ledig | `fna_Famstand.L` |
-| Verheiratet | `fna_Famstand.V` |
-| Getrennt lebend | `fna_Famstand.GL` |
-| Geschieden | `fna_Famstand.G` |
-| Verwitwet | `fna_Famstand.W` |
-| Lebenspartnerschaft | `fna_Famstand.E` |
-
-### Abgabegrund (RadioButtons)
-
-| Grund | Feldname | Wert |
-|-------|----------|------|
-| Beginn Beschäftigung | `abgabegrund.B` | **true** (Standard) |
-
-### Seite 2 - Ehegatte (Partner)
-
-| Feld | PDF-Feldname |
-|------|--------------|
-| Name | `fna_PartnerName` |
-| Vorname | `fna_PartnerVorname` |
-| Geschlecht m | `fna_PartnerGeschlecht.m` |
-| Geschlecht w | `fna_PartnerGeschlecht.w` |
-| Geschlecht x | `fna_PartnerGeschlecht.x` |
-| Geschlecht d | `fna_PartnerGeschlecht.d` |
-| Geburtsdatum | `fna_PartnerGebdat` |
-| Straße (Versichertennummer) | `bw_strasse_partner` |
-| PLZ | `fna_PartnerPlz` |
-| Ort | `fna_PartnerOrt` |
-
-### Seite 2 - Kinder (1-3)
-
-| Feld | Kind 1 | Kind 2 | Kind 3 |
-|------|--------|--------|--------|
-| Name | `name_kind_1` | `name_kind_2` | `name_kind_3` |
-| Vorname | `vorname_kind_1` | `vorname_kind_2` | `vorname_kind_3` |
-| Geschlecht m | `geschlecht_kind_1.m` | `geschlecht_kind_2.m` | `geschlecht_kind_3.m` |
-| Geschlecht w | `geschlecht_kind_1.w` | `geschlecht_kind_2.w` | `geschlecht_kind_3.w` |
-| Geschlecht x | `geschlecht_kind_1.x` | `geschlecht_kind_2.x` | `geschlecht_kind_3.x` |
-| Geschlecht d | `geschlecht_kind_1.d` | `geschlecht_kind_2.d` | `geschlecht_kind_3.d` |
-| Geburtsdatum | `gebdat_kind_1` | `gebdat_kind_2` | `gebdat_kind_3` |
-| Straße | `bw_strasse_kind_1` | `bw_strasse_kind_2` | `bw_strasse_kind_3` |
-| PLZ | `fna_KindPlz_1` | `fna_KindPlz_2` | `fna_KindPlz_3` |
-| Ort | `fna_KindOrt_1` | `fna_KindOrt_2` | `fna_KindOrt_3` |
-
-### Verwandtschaft (RadioButtons)
-
-| Verwandtschaft | Kind 1 | Kind 2 | Kind 3 |
-|---------------|--------|--------|--------|
-| Leiblich | `fna_KindVerwandt_1.L` | `fna_KindVerwandt_2.L` | `fna_KindVerwandt_3.L` |
-| Stief | `fna_KindVerwandt_1.S` | `fna_KindVerwandt_2.S` | `fna_KindVerwandt_3.S` |
-| Enkel | `fna_KindVerwandt_1.E` | `fna_KindVerwandt_2.E` | `fna_KindVerwandt_3.E` |
-| Pflege | `fna_KindVerwandt_1.P` | `fna_KindVerwandt_2.P` | `fna_KindVerwandt_3.P` |
-
-### Seite 3 - Bisherige Versicherung (Ehegatte)
-
-| Feld | PDF-Feldname | Quelle |
-|------|--------------|--------|
-| KV-Nr. Mitglied | `KVNR.` | `mitgliedKvNummer` |
-| Endete am | `fna_PartnerVersBis` | Automatisch berechnet |
-| Bestand bei | `fna_PartnerNameAltkasse` | `mitgliedKrankenkasse` (Sync) |
-| Mitgliedschaft | `fna_PartnerVersArt.GesetzlichMitglied` | RadioButton |
-| Familienvers. | `fna_PartnerVersArt.GesetzlichFAMI` | RadioButton |
-| Nicht gesetzl. | `fna_PartnerVersArt.NichtGesetzlich` | RadioButton |
-| Vorname | `famv_vorname_bisher_kv_partner` | `mitgliedVorname` (Sync) |
-| Nachname | `famv_name_bisher_kv_partner` | `mitgliedName` (Sync) |
-| Aktuelle Kasse | `fna_PartnerAktuelleKasse` | `bisherigBestehtWeiterBei` |
-
-### Seite 3 - Personendaten (Ehegatte) - OHNE RV-Nummer
-
-| Feld | PDF-Feldname |
-|------|--------------|
-| Geburtsname | `fna_PartnerGeburtsname` |
-| Geburtsort | `fna_PartnerGeburtsort` |
-| Geburtsland | `fna_PartnerGeburtsland` |
-| Staatsangehörigkeit | `fna_PartnerStaatsangehoerigkeit` |
-
-### Seite 3 - Bisherige Versicherung (Kinder)
-
-| Feld | Kind 1 | Kind 2 | Kind 3 |
-|------|--------|--------|--------|
-| Endete am | `famv_bisher_kind_1` | `famv_bisher_kind_2` | `famv_bisher_kind_3` |
-| Bestand bei | `famv_kv_kind_1` | `famv_kv_kind_2` | `famv_kv_kind_3` |
-| Familienvers. | `angabe_eigene_kv_kind_*.GesetzlichFAMI` | **true** | |
-| Vorname | `famv_vorname_bisher_kv_kind_*` | `mitgliedVorname` | |
-| Nachname | `famv_name_bisher_kv_kind_*` | `mitgliedName` | |
-
-### Seite 3 - Personendaten (Kinder) - OHNE RV-Nummer
-
-| Feld | Kind 1 | Kind 2 | Kind 3 |
-|------|--------|--------|--------|
-| Geburtsname | `geburtsname_kind_1` | `geburtsname_kind_2` | `geburtsname_kind_3` |
-| Geburtsort | `geburtsort_kind_1` | `geburtsort_kind_2` | `geburtsort_kind_3` |
-| Geburtsland | `geburtsland_kind_1` | `geburtsland_kind_2` | `geburtsland_kind_3` |
-| Staatsangehörigkeit | `staatsangehoerigkeit_kind_1` | `staatsangehoerigkeit_kind_2` | `staatsangehoerigkeit_kind_3` |
-
-### Datum + Unterschrift (Seite 3)
-
-| Feld | PDF-Feldname | Position |
-|------|--------------|----------|
-| Datum | `datum` | Left=75, Top=708 |
-
-Unterschriften werden neben dem Datum-Feld positioniert (wie bei BKK GS).
-
----
-
-## Felder die NICHT ausgefüllt werden
-
-| Kategorie | Felder |
-|-----------|--------|
-| **RV-Nummer** | `fna_PartnerRvnr`, `rvnr_kind_1/2/3` |
-| **Einkommen** | `fna_PartnerEinkommenSelbst`, `gewinn_kind_*`, `brutto_kind_*` |
-| **Selbstständigkeit** | `selbststaendig_partner`, `selbststaendig_kind_*` |
-| **Minijob** | `minijob_partner`, `minijob_kind_*` |
-| **Renten** | `renten_kind_*` |
-| **Wehrdienst/Schule** | `fna_wehrdienst_*`, `fna_schule_*` |
-
----
-
-## UI-Anpassung (`src/pages/Index.tsx`)
-
-### Novitas zeigt dieselben Sektionen wie BKK GS (ohne Rundum-Sicher-Paket)
-
-```typescript
-{formData.selectedKrankenkasse === 'novitas' && (
-  <>
-    <SpouseSection formData={formData} updateFormData={updateFormData} />
-    <ChildrenSection formData={formData} updateFormData={updateFormData} />
-  </>
-)}
-```
-
-### Beschreibungstext
-
-```typescript
-{formData.selectedKrankenkasse === 'novitas' 
-  ? 'Es wird die Novitas BKK Familienversicherung erstellt.'
-  : formData.selectedKrankenkasse === 'viactiv' 
-    ? 'Es wird die VIACTIV Beitrittserklärung erstellt.'
-    : 'Es werden BKK GS Familienversicherung und Rundum-Sicher-Paket erstellt.'}
-```
-
-### Validierung (Novitas)
-
-```typescript
-if (formData.selectedKrankenkasse === 'novitas') {
-  if (!formData.mitgliedKvNummer) {
-    toast.error('Bitte geben Sie die KV-Nummer ein.');
-    return;
-  }
-  if (!formData.mitgliedKrankenkasse) {
-    toast.error('Bitte geben Sie den Namen der Krankenkasse ein.');
-    return;
-  }
-  if (!formData.familienstand) {
-    toast.error('Bitte wählen Sie den Familienstand aus.');
-    return;
-  }
-  if (!formData.ort) {
-    toast.error('Bitte geben Sie den Ort ein.');
-    return;
-  }
+interface FamilyMemberFormProps {
+  member: FamilyMember;
+  updateMember: (updates: Partial<FamilyMember>) => void;
+  type: 'spouse' | 'child';
+  childIndex?: number;
+  selectedKrankenkasse?: Krankenkasse; // NEU
 }
 ```
 
-### Export-Logik
+**Änderung 2: "Familienversichert" Checkbox entfernen (Zeilen 192-200)**
 
+Diese Checkbox wird komplett entfernt:
+```tsx
+// ENTFERNEN:
+<div className="mt-3">
+  <FormField
+    type="checkbox"
+    label="Familienversichert"
+    id={`${prefix}-familienversichert`}
+    checked={member.familienversichert !== false}
+    onChange={(checked) => updateMember({ familienversichert: checked })}
+  />
+</div>
+```
+
+**Änderung 3: Dynamischer Platzhalter für "Bei" Feld**
 ```typescript
-else if (formData.selectedKrankenkasse === 'novitas') {
-  const numberOfPDFs = Math.max(1, Math.ceil(formData.kinder.length / 3));
-  toast.info(`Es werden ${numberOfPDFs} Novitas Familienversicherungs-PDF(s) erstellt.`);
-  await exportNovitasFamilienversicherung(formData);
-  toast.success('Novitas BKK Familienversicherung erfolgreich exportiert!');
+// Hilfsfunktion
+const getDefaultKrankenkasseName = (kasse?: Krankenkasse): string => {
+  switch (kasse) {
+    case 'novitas': return 'NOVITAS BKK';
+    case 'viactiv': return 'VIACTIV';
+    case 'bkk_gs': 
+    default: return 'BKK GS';
+  }
+};
+
+// Im Feld "Bei"
+<FormField
+  type="text"
+  label="Bei"
+  id={`${prefix}-bestehtWeiterBei`}
+  value={member.bisherigBestehtWeiterBei || getDefaultKrankenkasseName(selectedKrankenkasse)}
+  onChange={(value) => updateMember({ bisherigBestehtWeiterBei: value })}
+  placeholder={getDefaultKrankenkasseName(selectedKrankenkasse)}
+  required
+/>
+```
+
+**Änderung 4: Geburtsland als Dropdown (für Kinder, Zeilen 111-120)**
+```tsx
+// Import hinzufügen
+import { COUNTRY_OPTIONS, NATIONALITY_OPTIONS } from '@/utils/countries';
+
+// Geburtsland von text zu select ändern
+<FormField
+  type="select"
+  label="Geburtsland"
+  id={`${prefix}-geburtsland`}
+  value={member.geburtsland}
+  onChange={(value) => updateMember({ geburtsland: value })}
+  options={COUNTRY_OPTIONS.map(c => ({ value: c.code, label: c.name }))}
+  placeholder="Land auswählen"
+  required
+  validate={validateSelect}
+/>
+```
+
+---
+
+### 2. SpouseSection.tsx
+
+**Änderung 1: Props erweitern**
+```typescript
+interface SpouseSectionProps {
+  formData: FormData;
+  updateFormData: (updates: Partial<FormData>) => void;
+  selectedKrankenkasse?: Krankenkasse; // NEU für Prop-Durchreichung
 }
 ```
 
----
-
-## Multi-PDF-Logik
-
-Bei mehr als 3 Kindern werden mehrere PDFs erstellt (wie bei BKK GS):
-
+**Änderung 2: selectedKrankenkasse an FamilyMemberForm durchreichen**
+```tsx
+<FamilyMemberForm
+  member={formData.ehegatte}
+  updateMember={updateEhegatte}
+  type="spouse"
+  selectedKrankenkasse={formData.selectedKrankenkasse}
+/>
 ```
-Novitas_Familienversicherung_{Vorname}_{Nachname}.pdf
-Novitas_Familienversicherung_{Vorname}_{Nachname}_Teil2.pdf (bei >3 Kindern)
+
+**Änderung 3: Geburtsland als Dropdown (Zeilen 79-88)**
+```tsx
+// Import hinzufügen
+import { COUNTRY_OPTIONS, NATIONALITY_OPTIONS } from '@/utils/countries';
+
+// Geburtsland von text zu select ändern
+<FormField
+  type="select"
+  label="Geburtsland"
+  id="ehegatte-geburtsland"
+  value={formData.ehegatte.geburtsland}
+  onChange={(value) => updateEhegatte({ geburtsland: value })}
+  options={COUNTRY_OPTIONS.map(c => ({ value: c.code, label: c.name }))}
+  placeholder="Land auswählen"
+  required
+  validate={validateSelect}
+/>
+```
+
+**Änderung 4: Staatsangehörigkeit als Dropdown (Zeilen 89-98)**
+```tsx
+<FormField
+  type="select"
+  label="Staatsangehörigkeit"
+  id="ehegatte-staatsangehoerigkeit"
+  value={formData.ehegatte.staatsangehoerigkeit}
+  onChange={(value) => updateEhegatte({ staatsangehoerigkeit: value })}
+  options={NATIONALITY_OPTIONS.map(c => ({ value: c.code, label: c.name }))}
+  placeholder="Staatsangehörigkeit auswählen"
+  required
+  validate={validateSelect}
+/>
 ```
 
 ---
 
-## Dateien-Übersicht
+### 3. ChildrenSection.tsx
 
-| Datei | Aktion |
-|-------|--------|
-| `public/novitas-familienversicherung.pdf` | Neu (von user-uploads kopieren) |
-| `src/types/form.ts` | Krankenkasse-Typ erweitern |
-| `src/utils/novitasExport.ts` | Neue Datei erstellen |
-| `src/pages/Index.tsx` | Novitas-Logik hinzufügen |
+**Änderung: selectedKrankenkasse an FamilyMemberForm durchreichen**
+
+```tsx
+<FamilyMemberForm
+  member={kind}
+  updateMember={(updates) => updateKind(index, updates)}
+  type="child"
+  childIndex={index}
+  selectedKrankenkasse={formData.selectedKrankenkasse}
+/>
+```
 
 ---
 
-## Unterschiede zu anderen Krankenkassen
+### 4. novitasExport.ts
 
-| Aspekt | BKK GS | VIACTIV | Novitas BKK |
-|--------|--------|---------|-------------|
-| Familienversicherung | Ja | Ja | Ja |
-| Mitgliedschaft (BE) | Nein | Ja | Nein |
-| Rundum-Sicher-Paket | Ja | Nein | Nein |
-| Bonus-Programm | Nein | Ja | Nein |
-| Modus-Auswahl | Ja | Nein | Nein |
-| Max. Kinder pro PDF | 3 | 3 | 3 |
+**Änderung: Vollständige Ländernamen ins PDF schreiben**
+
+```typescript
+// Import hinzufügen
+import { getCountryName, getNationalityName } from './countries';
+
+// Beim Füllen der Ehegatte-Felder:
+setTextField("fna_PartnerGeburtsland", getCountryName(ehegatte.geburtsland));
+setTextField("fna_PartnerStaatsangehoerigkeit", getNationalityName(ehegatte.staatsangehoerigkeit));
+
+// Beim Füllen der Kinder-Felder:
+setTextField(`geburtsland_kind_${i}`, getCountryName(kind.geburtsland));
+setTextField(`staatsangehoerigkeit_kind_${i}`, getNationalityName(kind.staatsangehoerigkeit));
+```
+
+---
+
+## Export-Logik Klarstellung
+
+### Kinder: IMMER Familienversicherung (statisch)
+```typescript
+// Im Export bleibt hardcoded:
+setCheckbox(`angabe_eigene_kv_kind_${i}.GesetzlichFAMI`, true);
+```
+
+### Ehegatte: Basierend auf RadioButton-Auswahl
+```typescript
+// Übernimmt den Wert von ehegatte.bisherigArt (RadioButtons in SpouseSection)
+setCheckbox("fna_PartnerVersArt.GesetzlichMitglied", ehegatte.bisherigArt === 'mitgliedschaft');
+setCheckbox("fna_PartnerVersArt.GesetzlichFAMI", ehegatte.bisherigArt === 'familienversicherung');
+setCheckbox("fna_PartnerVersArt.NichtGesetzlich", ehegatte.bisherigArt === 'nicht_gesetzlich');
+```
+
+---
+
+## Übersicht der Änderungen
+
+| Datei | Änderung |
+|-------|----------|
+| `src/components/FamilyMemberForm.tsx` | Props erweitern, Checkbox entfernen, dynamischer Default, Geburtsland-Dropdown |
+| `src/components/SpouseSection.tsx` | Props durchreichen, Dropdowns für Geburtsland/Staatsangehörigkeit |
+| `src/components/ChildrenSection.tsx` | Props durchreichen |
+| `src/utils/novitasExport.ts` | Ländernamen-Konvertierung beim PDF-Export |
+
+---
+
+## Zusammenfassung der Logik
+
+| Element | Kinder | Ehegatte |
+|---------|--------|----------|
+| Familienversichert Checkbox | Entfernt (immer true im Export) | Entfernt (RadioButtons in SpouseSection) |
+| Versicherungsart | Hardcoded: Familienversicherung | RadioButtons: Mitgliedschaft/Familienvers./Nicht gesetzlich |
+| "Besteht weiter bei" | Dynamisch vorausgefüllt | Dynamisch vorausgefüllt |
+| Geburtsland | Dropdown mit Ländernamen | Dropdown mit Ländernamen |
+| Staatsangehörigkeit | Dropdown mit Nationalitäten | Dropdown mit Nationalitäten |
+| PDF-Export Geburtsland | Vollständiger Name (z.B. "Deutschland") | Vollständiger Name |
+| PDF-Export Staatsangehörigkeit | Vollständiger Name (z.B. "Deutsch") | Vollständiger Name |
