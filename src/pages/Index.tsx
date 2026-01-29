@@ -12,6 +12,7 @@ import { exportFilledPDF, exportRundumSicherPaketOnly } from '@/utils/pdfExport'
 import { exportViactivBeitrittserklaerung } from '@/utils/viactivExport';
 import { exportViactivFamilienversicherung } from '@/utils/viactivFamilyExport';
 import { exportViactivBonusPDFs } from '@/utils/viactivBonusExport';
+import { exportNovitasFamilienversicherung } from '@/utils/novitasExport';
 import { toast } from 'sonner';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -118,6 +119,25 @@ const Index = () => {
         return;
       }
     }
+    // Novitas-spezifische Validierung
+    else if (formData.selectedKrankenkasse === 'novitas') {
+      if (!formData.mitgliedKvNummer) {
+        toast.error('Bitte geben Sie die KV-Nummer ein.');
+        return;
+      }
+      if (!formData.mitgliedKrankenkasse) {
+        toast.error('Bitte geben Sie den Namen der Krankenkasse ein.');
+        return;
+      }
+      if (!formData.familienstand) {
+        toast.error('Bitte wählen Sie den Familienstand aus.');
+        return;
+      }
+      if (!formData.ort) {
+        toast.error('Bitte geben Sie den Ort ein.');
+        return;
+      }
+    }
     // BKK GS-spezifische Validierung
     else {
       if (!formData.mitgliedKvNummer) {
@@ -190,6 +210,13 @@ const Index = () => {
           await exportViactivBonusPDFs(formData);
         }
         toast.success('VIACTIV PDF(s) erfolgreich exportiert!');
+      }
+      // Novitas BKK Export
+      else if (formData.selectedKrankenkasse === 'novitas') {
+        const numberOfPDFs = Math.max(1, Math.ceil(formData.kinder.length / 3));
+        toast.info(`Es werden ${numberOfPDFs} Novitas Familienversicherungs-PDF(s) erstellt...`);
+        await exportNovitasFamilienversicherung(formData);
+        toast.success('Novitas BKK Familienversicherung erfolgreich exportiert!');
       }
       // BKK GS Export
       else {
@@ -273,9 +300,11 @@ const Index = () => {
               </SelectContent>
             </Select>
             <p className="text-sm text-muted-foreground mt-2">
-              {formData.selectedKrankenkasse === 'viactiv' 
-                ? 'Es wird die VIACTIV Beitrittserklärung erstellt.'
-                : 'Es werden BKK GS Familienversicherung und Rundum-Sicher-Paket erstellt.'}
+              {formData.selectedKrankenkasse === 'novitas' 
+                ? 'Es wird die Novitas BKK Familienversicherung erstellt.'
+                : formData.selectedKrankenkasse === 'viactiv' 
+                  ? 'Es wird die VIACTIV Beitrittserklärung erstellt.'
+                  : 'Es werden BKK GS Familienversicherung und Rundum-Sicher-Paket erstellt.'}
             </p>
           </div>
           
@@ -351,6 +380,14 @@ const Index = () => {
           {/* VIACTIV-spezifische Sektionen */}
           {formData.selectedKrankenkasse === 'viactiv' && (
             <ViactivSection formData={formData} updateFormData={updateFormData} />
+          )}
+          
+          {/* Novitas BKK spezifische Sektionen */}
+          {formData.selectedKrankenkasse === 'novitas' && (
+            <>
+              <SpouseSection formData={formData} updateFormData={updateFormData} />
+              <ChildrenSection formData={formData} updateFormData={updateFormData} />
+            </>
           )}
           
           <SignatureSection formData={formData} updateFormData={updateFormData} />
