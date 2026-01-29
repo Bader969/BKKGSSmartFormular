@@ -68,6 +68,7 @@ export const ChildrenSection: React.FC<ChildrenSectionProps> = ({ formData, upda
                 updateMember={(updates) => updateKind(index, updates)}
                 type="child"
                 childIndex={index + 1}
+                selectedKrankenkasse={formData.selectedKrankenkasse}
               />
               
               {/* Pre-filled Felder anzeigen (vom Antragsteller - bearbeitbar) */}

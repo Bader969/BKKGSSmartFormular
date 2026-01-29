@@ -1,5 +1,6 @@
 import { PDFDocument, rgb } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
+import { getCountryName, getNationalityName } from "./countries";
 
 // Helper function to format date from YYYY-MM-DD to DD.MM.YYYY
 const formatInputDate = (dateStr: string): string => {
@@ -144,8 +145,8 @@ const fillSpouseFields = (
   // Personal data (WITHOUT RV-Nummer!)
   setTextField("fna_PartnerGeburtsname", ehegatte.geburtsname || ehegatte.name);
   setTextField("fna_PartnerGeburtsort", ehegatte.geburtsort);
-  setTextField("fna_PartnerGeburtsland", ehegatte.geburtsland);
-  setTextField("fna_PartnerStaatsangehoerigkeit", ehegatte.staatsangehoerigkeit);
+  setTextField("fna_PartnerGeburtsland", getCountryName(ehegatte.geburtsland));
+  setTextField("fna_PartnerStaatsangehoerigkeit", getNationalityName(ehegatte.staatsangehoerigkeit));
 };
 
 // Fill child fields for a single child
@@ -210,8 +211,8 @@ const fillChildFields = (
   // Personal data (WITHOUT RV-Nummer!)
   setTextField(`geburtsname_kind_${i}`, kind.geburtsname || kind.name);
   setTextField(`geburtsort_kind_${i}`, kind.geburtsort);
-  setTextField(`geburtsland_kind_${i}`, kind.geburtsland);
-  setTextField(`staatsangehoerigkeit_kind_${i}`, kind.staatsangehoerigkeit);
+  setTextField(`geburtsland_kind_${i}`, getCountryName(kind.geburtsland));
+  setTextField(`staatsangehoerigkeit_kind_${i}`, getNationalityName(kind.staatsangehoerigkeit));
 };
 
 // Add signature to PDF
