@@ -77,7 +77,8 @@ const Index = () => {
       return;
     }
     
-    if (!formData.mitgliedGeburtsdatum) {
+    // Geburtsdatum nur prüfen wenn NICHT Novitas (bei Novitas ausgeblendet)
+    if (formData.selectedKrankenkasse !== 'novitas' && !formData.mitgliedGeburtsdatum) {
       toast.error('Bitte geben Sie das Geburtsdatum des Mitglieds ein.');
       return;
     }
@@ -133,10 +134,7 @@ const Index = () => {
         toast.error('Bitte wählen Sie den Familienstand aus.');
         return;
       }
-      if (!formData.ort) {
-        toast.error('Bitte geben Sie den Ort ein.');
-        return;
-      }
+      // Ort-Validierung entfernt - Feld ist für Novitas ausgeblendet
     }
     // BKK GS-spezifische Validierung
     else {
