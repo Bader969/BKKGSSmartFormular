@@ -1,231 +1,226 @@
 
-# Novitas BKK UI-Anpassungen - Korrigierter Implementierungsplan
 
-## Zusammenfassung der Klarstellungen
+# Novitas BKK Export & UI Korrekturen - Implementierungsplan
 
-Der Benutzer hat präzisiert:
+## Zusammenfassung der gefundenen Probleme
 
-1. **"Familienversichert" Checkbox (Zeilen 192-200 in FamilyMemberForm.tsx):**
-   - **Für Kinder:** Checkbox entfernen, da Kinder **IMMER** familienversichert sind (statisch, hardcoded im Export)
-   - **Für Ehegatte:** Checkbox entfernen, da die Versicherungsart bereits über RadioButtons in SpouseSection.tsx (Zeilen 144-179) ausgewählt wird
-
-2. **"Bisherige Versicherung besteht weiter bei" Feld:**
-   - Dynamisch vorausfüllen basierend auf ausgewählter Krankenkasse:
-     - `'novitas'` → "NOVITAS BKK"
-     - `'bkk_gs'` → "BKK GS"
-     - `'viactiv'` → "VIACTIV"
-
-3. **Geburtsland und Staatsangehörigkeit:**
-   - Als Dropdown-Listen (nicht Textfelder)
-   - Vollständige Namen ins PDF schreiben (nicht Codes)
+Nach Analyse der CSV-Datei und des Export-Codes wurden folgende Probleme identifiziert:
 
 ---
 
-## Dateien-Änderungen
+## 1. UI-Änderung: Nicht benötigte Felder für Mitglied entfernen
 
-### 1. FamilyMemberForm.tsx
+**Problem:** Die Felder Adresse (Straße, Hausnummer, PLZ, Ort), Geburtsdatum, Geburtsort und Geburtsland sind für Novitas Mitglied nicht erforderlich.
 
-**Änderung 1: Props erweitern**
-```typescript
-interface FamilyMemberFormProps {
-  member: FamilyMember;
-  updateMember: (updates: Partial<FamilyMember>) => void;
-  type: 'spouse' | 'child';
-  childIndex?: number;
-  selectedKrankenkasse?: Krankenkasse; // NEU
-}
+**Lösung:** In `MemberSection.tsx` diese Felder bei Novitas ausblenden (conditional rendering basierend auf `selectedKrankenkasse`).
+
+---
+
+## 2. KV-Nummer des Mitglieds nicht eingetragen
+
+**Problem im Code:** Der `setTextField("KVNR.", ...)` funktioniert, aber es gibt **zwei** `KVNR.`-Felder im PDF (Seite 2 + Seite 3). pdf-lib erkennt nur eines.
+
+**Aus der CSV:**
+- Zeile 3: `KVNR.` auf Seite 2 (Position 380, 62)
+- Zeile 80: `KVNR.` auf Seite 3 (Position 82, 103)
+
+**Lösung:** Das Feld existiert zweimal mit dem gleichen Namen. pdf-lib muss beide Instanzen befüllen. Wir müssen die Felder direkt mit `form.getFields()` iterieren und alle `KVNR.`-Felder setzen.
+
+---
+
+## 3. Familienstand nicht angekreuzt
+
+**Problem:** Die `setCheckbox()`-Funktion verwendet `form.getCheckBox()`, aber die Familienstand-Felder sind **RadioButtons**, keine Checkboxen!
+
+**Aus der CSV:**
+```
+"fna_Famstand.L","fna_Famstand.L","RadioButton"
+"fna_Famstand.V","fna_Famstand.V","RadioButton"
 ```
 
-**Änderung 2: "Familienversichert" Checkbox entfernen (Zeilen 192-200)**
+**Lösung:** Eine `setRadioButton()`-Funktion hinzufügen, die RadioButtons korrekt setzt.
 
-Diese Checkbox wird komplett entfernt:
-```tsx
-// ENTFERNEN:
-<div className="mt-3">
-  <FormField
-    type="checkbox"
-    label="Familienversichert"
-    id={`${prefix}-familienversichert`}
-    checked={member.familienversichert !== false}
-    onChange={(checked) => updateMember({ familienversichert: checked })}
-  />
-</div>
+---
+
+## 4. "Anlass für die Aufnahme" (abgabegrund.B) nicht angekreuzt
+
+**Gleiche Problem wie #3:** `abgabegrund.B` ist ein **RadioButton**, nicht eine Checkbox.
+
+```csv
+"abgabegrund.B","abgabegrund.B","RadioButton"
 ```
 
-**Änderung 3: Dynamischer Platzhalter für "Bei" Feld**
+---
+
+## 5. Geschlecht der Kinder nicht angekreuzt
+
+**Gleiche Problem:** Die Geschlechtsfelder sind **RadioButtons**:
+```csv
+"geschlecht_kind_1.m","geschlecht_kind_1.m","RadioButton"
+"geschlecht_kind_1.w","geschlecht_kind_1.w","RadioButton"
+```
+
+---
+
+## 6. Verwandtschaftsverhältnis nicht angekreuzt
+
+**Gleiche Problem:** Auch RadioButtons:
+```csv
+"fna_KindVerwandt_1.L","fna_KindVerwandt_1.L","RadioButton"
+```
+
+---
+
+## 7. "bw_strasse_kind" sollte NICHT Versichertennummer enthalten
+
+**Problem im Code (Zeile 175):**
 ```typescript
-// Hilfsfunktion
-const getDefaultKrankenkasseName = (kasse?: Krankenkasse): string => {
-  switch (kasse) {
-    case 'novitas': return 'NOVITAS BKK';
-    case 'viactiv': return 'VIACTIV';
-    case 'bkk_gs': 
-    default: return 'BKK GS';
+setTextField(`bw_strasse_kind_${i}`, kind.versichertennummer);
+```
+
+**Korrektur:** Das Feld `bw_strasse_kind_*` ist für **"ggf. vom Mitglied abweichende Anschrift"** - Straße, nicht Versichertennummer! Dieses Feld sollte leer bleiben oder die tatsächliche abweichende Adresse enthalten.
+
+---
+
+## 8. PDF Flattening (PDF wird "starr")
+
+**Problem:** Zeile 283 in novitasExport.ts:
+```typescript
+form.flatten();
+```
+
+**Lösung:** `form.flatten()` entfernen, damit das PDF bearbeitbar bleibt.
+
+---
+
+## Technische Korrektur: RadioButton vs Checkbox
+
+pdf-lib behandelt RadioButtons anders als Checkboxen:
+- **Checkbox:** `form.getCheckBox(name).check()`
+- **RadioButton:** `form.getRadioGroup(name).select(option)`
+
+Für RadioButtons mit dem Format `feldname.option` (z.B. `fna_Famstand.L`):
+- Die RadioGroup heißt `fna_Famstand`
+- Die Option heißt `L`
+
+---
+
+## Änderungen in novitasExport.ts
+
+### Neue Hilfsfunktion für RadioButtons
+
+```typescript
+const setRadioButton = (groupName: string, option: string) => {
+  try {
+    const radioGroup = form.getRadioGroup(groupName);
+    if (radioGroup && option) {
+      radioGroup.select(option);
+    }
+  } catch (e) {
+    // Fallback: try as individual button
+    try {
+      const buttonName = `${groupName}.${option}`;
+      const button = form.getButton(buttonName);
+      // ...
+    } catch {}
   }
 };
-
-// Im Feld "Bei"
-<FormField
-  type="text"
-  label="Bei"
-  id={`${prefix}-bestehtWeiterBei`}
-  value={member.bisherigBestehtWeiterBei || getDefaultKrankenkasseName(selectedKrankenkasse)}
-  onChange={(value) => updateMember({ bisherigBestehtWeiterBei: value })}
-  placeholder={getDefaultKrankenkasseName(selectedKrankenkasse)}
-  required
-/>
 ```
 
-**Änderung 4: Geburtsland als Dropdown (für Kinder, Zeilen 111-120)**
-```tsx
-// Import hinzufügen
-import { COUNTRY_OPTIONS, NATIONALITY_OPTIONS } from '@/utils/countries';
+### Korrekte Feld-Aufrufe
 
-// Geburtsland von text zu select ändern
-<FormField
-  type="select"
-  label="Geburtsland"
-  id={`${prefix}-geburtsland`}
-  value={member.geburtsland}
-  onChange={(value) => updateMember({ geburtsland: value })}
-  options={COUNTRY_OPTIONS.map(c => ({ value: c.code, label: c.name }))}
-  placeholder="Land auswählen"
-  required
-  validate={validateSelect}
-/>
-```
+| Feld | Falsch (aktuell) | Richtig |
+|------|------------------|---------|
+| Familienstand | `setCheckbox("fna_Famstand.L", true)` | `setRadioButton("fna_Famstand", "L")` |
+| Abgabegrund | `setCheckbox("abgabegrund.B", true)` | `setRadioButton("abgabegrund", "B")` |
+| Geschlecht Partner | `setCheckbox("fna_PartnerGeschlecht.m", true)` | `setRadioButton("fna_PartnerGeschlecht", "m")` |
+| Geschlecht Kind | `setCheckbox("geschlecht_kind_1.m", true)` | `setRadioButton("geschlecht_kind_1", "m")` |
+| Verwandtschaft | `setCheckbox("fna_KindVerwandt_1.L", true)` | `setRadioButton("fna_KindVerwandt_1", "L")` |
+| Versicherungsart | `setCheckbox("fna_PartnerVersArt.GesetzlichMitglied", true)` | `setRadioButton("fna_PartnerVersArt", "GesetzlichMitglied")` |
+| Kind Vers.Art | `setCheckbox("angabe_eigene_kv_kind_1.GesetzlichFAMI", true)` | `setRadioButton("angabe_eigene_kv_kind_1", "GesetzlichFAMI")` |
 
----
+### KVNR auf beiden Seiten setzen
 
-### 2. SpouseSection.tsx
-
-**Änderung 1: Props erweitern**
 ```typescript
-interface SpouseSectionProps {
-  formData: FormData;
-  updateFormData: (updates: Partial<FormData>) => void;
-  selectedKrankenkasse?: Krankenkasse; // NEU für Prop-Durchreichung
+// Setze KVNR auf allen Seiten (PDF hat 2 Felder mit gleichem Namen)
+const allFields = form.getFields();
+allFields.forEach(field => {
+  if (field.getName() === 'KVNR.' || field.getName() === 'KVNR') {
+    try {
+      const textField = form.getTextField(field.getName());
+      textField.setText(formData.mitgliedKvNummer);
+    } catch {}
+  }
+});
+```
+
+### bw_strasse_kind korrigieren
+
+```typescript
+// NICHT die Versichertennummer, sondern leer lassen oder abweichende Adresse
+// setTextField(`bw_strasse_kind_${i}`, kind.versichertennummer); // ENTFERNEN
+
+// Falls abweichende Anschrift vorhanden, diese eintragen
+if (kind.abweichendeAnschrift) {
+  setTextField(`bw_strasse_kind_${i}`, kind.abweichendeAnschrift);
 }
 ```
 
-**Änderung 2: selectedKrankenkasse an FamilyMemberForm durchreichen**
-```tsx
-<FamilyMemberForm
-  member={formData.ehegatte}
-  updateMember={updateEhegatte}
-  type="spouse"
-  selectedKrankenkasse={formData.selectedKrankenkasse}
-/>
-```
-
-**Änderung 3: Geburtsland als Dropdown (Zeilen 79-88)**
-```tsx
-// Import hinzufügen
-import { COUNTRY_OPTIONS, NATIONALITY_OPTIONS } from '@/utils/countries';
-
-// Geburtsland von text zu select ändern
-<FormField
-  type="select"
-  label="Geburtsland"
-  id="ehegatte-geburtsland"
-  value={formData.ehegatte.geburtsland}
-  onChange={(value) => updateEhegatte({ geburtsland: value })}
-  options={COUNTRY_OPTIONS.map(c => ({ value: c.code, label: c.name }))}
-  placeholder="Land auswählen"
-  required
-  validate={validateSelect}
-/>
-```
-
-**Änderung 4: Staatsangehörigkeit als Dropdown (Zeilen 89-98)**
-```tsx
-<FormField
-  type="select"
-  label="Staatsangehörigkeit"
-  id="ehegatte-staatsangehoerigkeit"
-  value={formData.ehegatte.staatsangehoerigkeit}
-  onChange={(value) => updateEhegatte({ staatsangehoerigkeit: value })}
-  options={NATIONALITY_OPTIONS.map(c => ({ value: c.code, label: c.name }))}
-  placeholder="Staatsangehörigkeit auswählen"
-  required
-  validate={validateSelect}
-/>
-```
-
----
-
-### 3. ChildrenSection.tsx
-
-**Änderung: selectedKrankenkasse an FamilyMemberForm durchreichen**
-
-```tsx
-<FamilyMemberForm
-  member={kind}
-  updateMember={(updates) => updateKind(index, updates)}
-  type="child"
-  childIndex={index}
-  selectedKrankenkasse={formData.selectedKrankenkasse}
-/>
-```
-
----
-
-### 4. novitasExport.ts
-
-**Änderung: Vollständige Ländernamen ins PDF schreiben**
+### form.flatten() entfernen
 
 ```typescript
-// Import hinzufügen
-import { getCountryName, getNationalityName } from './countries';
-
-// Beim Füllen der Ehegatte-Felder:
-setTextField("fna_PartnerGeburtsland", getCountryName(ehegatte.geburtsland));
-setTextField("fna_PartnerStaatsangehoerigkeit", getNationalityName(ehegatte.staatsangehoerigkeit));
-
-// Beim Füllen der Kinder-Felder:
-setTextField(`geburtsland_kind_${i}`, getCountryName(kind.geburtsland));
-setTextField(`staatsangehoerigkeit_kind_${i}`, getNationalityName(kind.staatsangehoerigkeit));
+// ENTFERNEN:
+// form.flatten();
 ```
 
 ---
 
-## Export-Logik Klarstellung
+## UI-Änderung in MemberSection.tsx
 
-### Kinder: IMMER Familienversicherung (statisch)
-```typescript
-// Im Export bleibt hardcoded:
-setCheckbox(`angabe_eigene_kv_kind_${i}.GesetzlichFAMI`, true);
-```
+Für Novitas sind Adresse und Geburtsort/land nicht notwendig. Lösung: Props erweitern und conditional rendering.
 
-### Ehegatte: Basierend auf RadioButton-Auswahl
-```typescript
-// Übernimmt den Wert von ehegatte.bisherigArt (RadioButtons in SpouseSection)
-setCheckbox("fna_PartnerVersArt.GesetzlichMitglied", ehegatte.bisherigArt === 'mitgliedschaft');
-setCheckbox("fna_PartnerVersArt.GesetzlichFAMI", ehegatte.bisherigArt === 'familienversicherung');
-setCheckbox("fna_PartnerVersArt.NichtGesetzlich", ehegatte.bisherigArt === 'nicht_gesetzlich');
+```tsx
+interface MemberSectionProps {
+  formData: FormData;
+  updateFormData: (updates: Partial<FormData>) => void;
+  selectedKrankenkasse?: Krankenkasse;
+}
+
+// Conditional rendering:
+{formData.selectedKrankenkasse !== 'novitas' && (
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {/* Geburtsdatum, Geburtsort, Geburtsland Felder */}
+  </div>
+)}
+
+{formData.selectedKrankenkasse !== 'novitas' && (
+  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+    {/* Straße, Hausnummer, PLZ, Ort Felder */}
+  </div>
+)}
 ```
 
 ---
 
-## Übersicht der Änderungen
+## Dateien-Übersicht
 
 | Datei | Änderung |
 |-------|----------|
-| `src/components/FamilyMemberForm.tsx` | Props erweitern, Checkbox entfernen, dynamischer Default, Geburtsland-Dropdown |
-| `src/components/SpouseSection.tsx` | Props durchreichen, Dropdowns für Geburtsland/Staatsangehörigkeit |
-| `src/components/ChildrenSection.tsx` | Props durchreichen |
-| `src/utils/novitasExport.ts` | Ländernamen-Konvertierung beim PDF-Export |
+| `src/utils/novitasExport.ts` | RadioButton-Funktion, KVNR-Fix, bw_strasse-Fix, flatten entfernen |
+| `src/components/MemberSection.tsx` | Nicht benötigte Felder bei Novitas ausblenden |
 
 ---
 
-## Zusammenfassung der Logik
+## Zusammenfassung der Fixes
 
-| Element | Kinder | Ehegatte |
-|---------|--------|----------|
-| Familienversichert Checkbox | Entfernt (immer true im Export) | Entfernt (RadioButtons in SpouseSection) |
-| Versicherungsart | Hardcoded: Familienversicherung | RadioButtons: Mitgliedschaft/Familienvers./Nicht gesetzlich |
-| "Besteht weiter bei" | Dynamisch vorausgefüllt | Dynamisch vorausgefüllt |
-| Geburtsland | Dropdown mit Ländernamen | Dropdown mit Ländernamen |
-| Staatsangehörigkeit | Dropdown mit Nationalitäten | Dropdown mit Nationalitäten |
-| PDF-Export Geburtsland | Vollständiger Name (z.B. "Deutschland") | Vollständiger Name |
-| PDF-Export Staatsangehörigkeit | Vollständiger Name (z.B. "Deutsch") | Vollständiger Name |
+| Problem | Ursache | Lösung |
+|---------|---------|--------|
+| KV-Nummer nicht eingetragen | PDF hat 2 KVNR-Felder | Alle KVNR-Felder iterieren und setzen |
+| Familienstand nicht angekreuzt | RadioButton mit Checkbox-Methode gesetzt | `setRadioButton()` verwenden |
+| Anlass nicht angekreuzt | RadioButton mit Checkbox-Methode gesetzt | `setRadioButton()` verwenden |
+| Geschlecht Kinder nicht angekreuzt | RadioButton mit Checkbox-Methode gesetzt | `setRadioButton()` verwenden |
+| Verwandtschaft nicht angekreuzt | RadioButton mit Checkbox-Methode gesetzt | `setRadioButton()` verwenden |
+| bw_strasse_kind falsch befüllt | Versichertennummer statt Adresse | Feld leer lassen / abweichende Adresse |
+| PDF starr/flattened | `form.flatten()` aufgerufen | Zeile entfernen |
+| UI: Unnötige Felder | Alle Felder angezeigt | Bei Novitas Adress-/Geburtsfelder ausblenden |
+
