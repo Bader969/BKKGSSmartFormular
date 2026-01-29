@@ -1,132 +1,153 @@
 
-# Novitas BKK: Export-Validierung anpassen
 
-## Problem
+# Novitas BKK: KVNR Fix und Versichertennummer entfernen
 
-Beim Exportieren erscheint der Fehler "Bitte geben Sie das Geburtsdatum des Mitglieds ein", obwohl dieses Feld in der UI für Novitas BKK nicht mehr angezeigt wird.
+## Problem 1: KV-Nummer wird nicht ins PDF geschrieben
 
-## Ursache
+Die aktuelle `setAllTextFields` Funktion verwendet `form.getFields()` und versucht Felder mit demselben Namen zu finden. In pdf-lib haben Felder mit demselben Namen jedoch oft ein internes Suffix (z.B. `KVNR.#0`, `KVNR.#1`). Die Iteration findet daher nicht alle Instanzen.
 
-In `src/pages/Index.tsx` gibt es eine **allgemeine Basis-Validierung** (Zeilen 74-88) die für ALLE Krankenkassen gilt:
-
-```typescript
-// Basis-Validierung für alle Krankenkassen
-if (!formData.mitgliedName || !formData.mitgliedVorname) {
-  toast.error('Bitte geben Sie Name und Vorname des Mitglieds ein.');
-  return;
-}
-
-if (!formData.mitgliedGeburtsdatum) {  // <-- Dieses Feld ist für Novitas versteckt!
-  toast.error('Bitte geben Sie das Geburtsdatum des Mitglieds ein.');
-  return;
-}
-```
-
-Zusätzlich prüft die Novitas-spezifische Validierung (Zeilen 122-140) auch auf `ort`, das ebenfalls ausgeblendet ist.
-
-## Lösung
-
-Die Export-Validierung anpassen, sodass nur die tatsächlich benötigten Felder für Novitas BKK geprüft werden.
-
----
-
-## Änderungen in Index.tsx
-
-### Vorher (Zeilen 73-140):
+### Lösung: Direktes Iterieren über alle Felder und Substring-Match
 
 ```typescript
-const handleExport = async () => {
-  // Basis-Validierung für alle Krankenkassen
-  if (!formData.mitgliedName || !formData.mitgliedVorname) {
-    toast.error('...');
-    return;
-  }
-  
-  if (!formData.mitgliedGeburtsdatum) {  // ← Blockiert Novitas!
-    toast.error('...');
-    return;
-  }
-  
-  // ...
-  
-  // Novitas-spezifische Validierung
-  else if (formData.selectedKrankenkasse === 'novitas') {
-    // ...
-    if (!formData.ort) {  // ← Feld ist ausgeblendet!
-      toast.error('...');
-      return;
-    }
-  }
-};
-```
-
-### Nachher:
-
-```typescript
-const handleExport = async () => {
-  // Basis-Validierung für alle Krankenkassen
-  if (!formData.mitgliedName || !formData.mitgliedVorname) {
-    toast.error('Bitte geben Sie Name und Vorname des Mitglieds ein.');
-    return;
-  }
-  
-  // Geburtsdatum nur prüfen wenn NICHT Novitas (bei Novitas ausgeblendet)
-  if (formData.selectedKrankenkasse !== 'novitas' && !formData.mitgliedGeburtsdatum) {
-    toast.error('Bitte geben Sie das Geburtsdatum des Mitglieds ein.');
-    return;
-  }
-  
-  if (!formData.unterschrift) {
-    toast.error('Bitte unterschreiben Sie das Formular.');
-    return;
-  }
-  
-  // ... VIACTIV-spezifische Validierung bleibt gleich ...
-  
-  // Novitas-spezifische Validierung (ANGEPASST)
-  else if (formData.selectedKrankenkasse === 'novitas') {
-    if (!formData.mitgliedKvNummer) {
-      toast.error('Bitte geben Sie die KV-Nummer ein.');
-      return;
-    }
-    if (!formData.mitgliedKrankenkasse) {
-      toast.error('Bitte geben Sie den Namen der Krankenkasse ein.');
-      return;
-    }
-    if (!formData.familienstand) {
-      toast.error('Bitte wählen Sie den Familienstand aus.');
-      return;
-    }
-    // ENTFERNT: Ort-Validierung (Feld ist für Novitas ausgeblendet)
-    // if (!formData.ort) { ... }
+// In createPDFHelpers
+const setAllTextFields = (fieldNamePattern: string, value: string) => {
+  if (!value) return;
+  try {
+    const allFields = form.getFields();
+    allFields.forEach((field: any) => {
+      const name = field.getName();
+      // Match exakt oder mit Suffix (z.B. KVNR. oder KVNR.#0)
+      if (name === fieldNamePattern || name.startsWith(fieldNamePattern)) {
+        try {
+          const textField = form.getTextField(name);
+          textField.setText(value);
+        } catch {}
+      }
+    });
+  } catch (e) {
+    // Fallback
+    setTextField(fieldNamePattern, value);
   }
 };
 ```
 
 ---
 
-## Zusammenfassung der Änderungen
+## Problem 2: Versichertennummer für Kinder/Ehegatte sind nicht notwendig
 
-| Validierung | Vorher | Nachher |
-|-------------|--------|---------|
-| `mitgliedGeburtsdatum` | Für alle Krankenkassen | NUR wenn nicht Novitas |
-| `ort` (bei Novitas) | Geprüft | **Entfernt** |
+Im Novitas PDF gibt es keine EditBox für die Versichertennummer der Kinder oder des Ehegatten. Diese Felder müssen:
+
+1. **In der UI für Novitas ausgeblendet werden** (FamilyMemberForm.tsx)
+2. **Im Export nicht mehr geschrieben werden** (novitasExport.ts - bereits korrekt, da kein Feld dafür existiert)
+3. **Keine Validierung beim Export blockieren** (Index.tsx prüft Versichertennummer nicht für Novitas)
 
 ---
 
-## Dateien
+## Änderungen
+
+### 1. novitasExport.ts - KVNR Fix
+
+**Zeilen 48-65: setAllTextFields verbessern**
+
+```typescript
+const setAllTextFields = (fieldNamePattern: string, value: string) => {
+  if (!value) return;
+  try {
+    const allFields = form.getFields();
+    allFields.forEach((field: any) => {
+      const name = field.getName();
+      // Match exakt oder mit Suffix (z.B. KVNR. oder KVNR.#0)
+      if (name === fieldNamePattern || name.startsWith(fieldNamePattern)) {
+        try {
+          const textField = form.getTextField(name);
+          textField.setText(value);
+        } catch {}
+      }
+    });
+  } catch (e) {
+    setTextField(fieldNamePattern, value);
+  }
+};
+```
+
+**Zusätzlich: Explizit beide KVNR-Feldnamen versuchen**
+
+```typescript
+// In fillBasicFields
+setAllTextFields("KVNR.", formData.mitgliedKvNummer);
+setAllTextFields("KVNR", formData.mitgliedKvNummer);  // Fallback ohne Punkt
+```
+
+**Zeile 154-155: Versichertennummer des Ehepartners ENTFERNEN**
+
+```typescript
+// ENTFERNEN - kein PDF-Feld dafür:
+// setTextField("bw_strasse_partner", ehegatte.versichertennummer);
+```
+
+---
+
+### 2. FamilyMemberForm.tsx - Versichertennummer bei Novitas ausblenden
+
+**Zeilen 148-158: Conditional Rendering**
+
+```tsx
+{/* Versichertennummer - bei Novitas nicht anzeigen (kein PDF-Feld) */}
+{selectedKrankenkasse !== 'novitas' && (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <FormField
+      type="text"
+      label="Versichertennummer"
+      id={`${prefix}-versichertennummer`}
+      value={member.versichertennummer}
+      onChange={(value) => updateMember({ versichertennummer: value })}
+      placeholder="Versichertennummer"
+      required
+      validate={validateVersichertennummer}
+    />
+    {type === 'child' && (
+      <FormField
+        type="select"
+        label="Verwandtschaftsverhältnis"
+        ...
+      />
+    )}
+  </div>
+)}
+
+{/* Bei Novitas nur das Verwandtschaftsverhältnis anzeigen */}
+{selectedKrankenkasse === 'novitas' && type === 'child' && (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <FormField
+      type="select"
+      label="Verwandtschaftsverhältnis"
+      id={`${prefix}-verwandtschaft`}
+      value={member.verwandtschaft}
+      onChange={(value) => updateMember({ verwandtschaft: value as FamilyMember['verwandtschaft'] })}
+      options={verwandtschaftOptions}
+      required
+      validate={validateSelect}
+    />
+  </div>
+)}
+```
+
+---
+
+## Dateien-Übersicht
 
 | Datei | Änderung |
 |-------|----------|
-| `src/pages/Index.tsx` | Zeilen 80-83: Geburtsdatum-Check mit Novitas-Ausnahme; Zeilen 136-139: Ort-Check entfernen |
+| `src/utils/novitasExport.ts` | KVNR-Fix mit verbesserter Feldsuche, Versichertennummer-Export entfernen |
+| `src/components/FamilyMemberForm.tsx` | Versichertennummer bei Novitas ausblenden |
 
 ---
 
-## Ergebnis
+## Zusammenfassung
 
-Nach dieser Änderung kann der Novitas BKK Export durchgeführt werden, ohne dass versteckte Felder (Geburtsdatum, Adresse) validiert werden müssen. Nur die sichtbaren Pflichtfelder werden geprüft:
-- Name + Vorname
-- KV-Nummer
-- Name der Krankenkasse
-- Familienstand
-- Unterschrift
+| Problem | Ursache | Lösung |
+|---------|---------|--------|
+| KVNR nicht geschrieben | pdf-lib findet nur ein Feld bei doppelten Namen | Substring-Match für alle Felder |
+| Versichertennummer Kind/Ehegatte | Kein PDF-Feld vorhanden | UI-Feld bei Novitas ausblenden |
+| Export-Hemmung | Pflichtfeld ohne PDF-Entsprechung | Validierung nicht mehr blockiert |
+
