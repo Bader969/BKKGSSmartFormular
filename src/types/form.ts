@@ -251,7 +251,7 @@ export const createEmptyFamilyMember = (): FamilyMember => ({
   bisherigVorname: '',
   bisherigNachname: '',
   bisherigBestehtWeiter: true,
-  bisherigBestehtWeiterBei: 'BKK GS',
+  bisherigBestehtWeiterBei: '', // Dynamic based on selectedKrankenkasse
   geburtsname: '',
   geburtsort: '',
   geburtsland: '',

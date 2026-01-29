@@ -76,7 +76,7 @@ const createFamilyExampleJson = (): Partial<FormData> => ({
     bisherigVorname: 'Max',
     bisherigNachname: 'Mustermann',
     bisherigBestehtWeiter: true,
-    bisherigBestehtWeiterBei: 'BKK GS',
+    bisherigBestehtWeiterBei: '',
     geburtsname: 'Musterfrau',
     geburtsort: 'Berlin',
     geburtsland: 'Deutschland',
@@ -101,7 +101,7 @@ const createFamilyExampleJson = (): Partial<FormData> => ({
       bisherigVorname: 'Maria',
       bisherigNachname: 'Mustermann',
       bisherigBestehtWeiter: true,
-      bisherigBestehtWeiterBei: 'BKK GS',
+      bisherigBestehtWeiterBei: '',
       geburtsname: '',
       geburtsort: 'Musterstadt',
       geburtsland: 'Deutschland',
@@ -339,10 +339,11 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       // Auto-Import: Direkt nach erfolgreicher Extraktion importieren
       const todayForInput = formatDateForInput(new Date());
       
+      // Bei Kindern immer bisherigBestehtWeiter = true, bisherigBestehtWeiterBei bleibt leer (wird dynamisch in UI gesetzt)
       const processedKinder = parsed.kinder?.map(kind => ({
         ...kind,
         bisherigBestehtWeiter: true,
-        bisherigBestehtWeiterBei: 'BKK GS',
+        bisherigBestehtWeiterBei: kind.bisherigBestehtWeiterBei || '',
       })) || formData.kinder;
       
       const mitgliedVersichertennummer = parsed.mitgliedKvNummer || parsed.mitgliedVersichertennummer || formData.mitgliedVersichertennummer;
@@ -387,11 +388,11 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       // Immer heutiges Datum für Unterschrift setzen
       const todayForInput = formatDateForInput(new Date());
       
-      // Bei Kindern immer bisherigBestehtWeiter = true und bisherigBestehtWeiterBei = 'BKK GS' setzen
+      // Bei Kindern immer bisherigBestehtWeiter = true, bisherigBestehtWeiterBei bleibt leer (wird dynamisch in UI gesetzt)
       const processedKinder = parsed.kinder?.map(kind => ({
         ...kind,
         bisherigBestehtWeiter: true,
-        bisherigBestehtWeiterBei: 'BKK GS',
+        bisherigBestehtWeiterBei: kind.bisherigBestehtWeiterBei || '',
       })) || formData.kinder;
       
       // Synchronisierung: mitgliedVersichertennummer = mitgliedKvNummer

@@ -203,11 +203,11 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
         throw new Error('Ungültiges JSON-Format');
       }
       
-      // Bei Kindern immer bisherigBestehtWeiter = true und bisherigBestehtWeiterBei = 'BKK GS' setzen
+      // Bei Kindern immer bisherigBestehtWeiter = true, bisherigBestehtWeiterBei bleibt leer (wird dynamisch in UI gesetzt)
       const processedKinder = parsed.kinder?.map(kind => ({
         ...kind,
         bisherigBestehtWeiter: true,
-        bisherigBestehtWeiterBei: 'BKK GS',
+        bisherigBestehtWeiterBei: kind.bisherigBestehtWeiterBei || '',
       })) || formData.kinder;
       
       // Synchronisierung: mitgliedVersichertennummer = mitgliedKvNummer
