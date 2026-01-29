@@ -1,6 +1,6 @@
 import { PDFDocument } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
-import { getNationalityName } from "@/utils/countries";
+import { getNationalityName, getCountryName } from "@/utils/countries";
 
 /**
  * VIACTIV Familienversicherung PDF Export
@@ -213,7 +213,8 @@ const createViactivFamilyPDF = async (
   setCheckbox("Selbst versichert nein", !ehegatteSelbstVersichert);
   setCheckbox("Selbst versichert ja", ehegatteSelbstVersichert);
   if (ehegatteSelbstVersichert) {
-    setTextField("Ja, versichert bei", formData.ehegatte.bisherigBestehtWeiterBei || "");
+    // Auto-Sync: Fallback auf mitgliedKrankenkasse wenn bisherigBestehtWeiterBei leer
+    setTextField("Ja, versichert bei", formData.ehegatte.bisherigBestehtWeiterBei || formData.mitgliedKrankenkasse || "");
   }
 
   // === EHEPARTNER DATEN ===
@@ -230,7 +231,11 @@ const createViactivFamilyPDF = async (
     setCheckbox("Ehepartner/-in divers", ehegatte.geschlecht === 'd');
     
     setTextField("Ehepartner/-in Geburtsname", ehegatte.geburtsname || ehegatte.name);
-    setTextField("Ehepartner/-in Geburtsort_Geburtsland", ehegatte.geburtsort || "");
+    // Geburtsort und Geburtsland zusammenführen: "Berlin / Deutschland"
+    const ehegatteGeburtsortGeburtsland = ehegatte.geburtsort && ehegatte.geburtsland 
+      ? `${ehegatte.geburtsort} / ${getCountryName(ehegatte.geburtsland)}`
+      : ehegatte.geburtsort || "";
+    setTextField("Ehepartner/-in Geburtsort_Geburtsland", ehegatteGeburtsortGeburtsland);
     // Staatsangehörigkeit vollständig ausschreiben (nicht Ländercode)
     setTextField("Ehepartner/-in Staatsangehörigkeit", getNationalityName(ehegatte.staatsangehoerigkeit) || ehegatte.staatsangehoerigkeit || "");
     setTextField("Ehepartner/-in abweichende Anschrift", ehegatte.abweichendeAnschrift || "");
@@ -305,7 +310,11 @@ const createViactivFamilyPDF = async (
     setCheckbox(fields.divers, kind.geschlecht === 'd');
     
     setTextField(fields.gebName, kind.geburtsname || kind.name);
-    setTextField(fields.gebOrt, kind.geburtsort || "");
+    // Geburtsort und Geburtsland zusammenführen: "Berlin / Deutschland"
+    const kindGeburtsortGeburtsland = kind.geburtsort && kind.geburtsland
+      ? `${kind.geburtsort} / ${getCountryName(kind.geburtsland)}`
+      : kind.geburtsort || "";
+    setTextField(fields.gebOrt, kindGeburtsortGeburtsland);
     // Staatsangehörigkeit vollständig ausschreiben (nicht Ländercode)
     setTextField(fields.staat, getNationalityName(kind.staatsangehoerigkeit) || kind.staatsangehoerigkeit || "");
     setTextField(fields.anschrift, kind.abweichendeAnschrift || "");

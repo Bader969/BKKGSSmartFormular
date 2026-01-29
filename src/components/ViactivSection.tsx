@@ -273,7 +273,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                   type="text"
                   label=""
                   id="ehegatte-selbst-versichert-bei"
-                  value={formData.ehegatte.bisherigBestehtWeiterBei || ''}
+                  value={formData.ehegatte.bisherigBestehtWeiterBei || formData.mitgliedKrankenkasse}
                   onChange={(value) => updateEhegatte({ bisherigBestehtWeiterBei: value })}
                   placeholder="Name der Krankenkasse"
                   className="mt-2"
@@ -519,12 +519,21 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                       />
                       <FormField
                         type="text"
-                        label="Geburtsort / Geburtsland"
+                        label="Geburtsort"
                         id={`viactiv-kind${index}-geburtsort`}
                         value={kind.geburtsort}
                         onChange={(value) => updateKind(index, { geburtsort: value })}
-                        placeholder="z.B. Berlin, DE"
+                        placeholder="z.B. Berlin"
                         validate={validateOrt}
+                      />
+                      <FormField
+                        type="select"
+                        label="Geburtsland"
+                        id={`viactiv-kind${index}-geburtsland`}
+                        value={kind.geburtsland}
+                        onChange={(value) => updateKind(index, { geburtsland: value })}
+                        options={COUNTRY_OPTIONS.map(c => ({ value: c.code, label: c.name }))}
+                        placeholder="Land auswählen"
                       />
                       <FormField
                         type="select"
@@ -535,6 +544,9 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                         options={nationalityOptions}
                         placeholder="Land auswählen"
                       />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                       <FormField
                         type="text"
                         label="Abweichende Anschrift"
