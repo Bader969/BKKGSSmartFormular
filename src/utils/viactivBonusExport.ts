@@ -320,7 +320,7 @@ const generateBonusFilename = (
   const startDateStr = formatStartDate(startDate);
   const geburtsdatumStr = formatISOToGerman(geburtsdatum);
   
-  return `${startDateStr}_${nachname}, ${vorname}_geb. ${geburtsdatumStr}.pdf`;
+  return `${startDateStr}_${nachname}, ${vorname}_${geburtsdatumStr}.pdf`;
 };
 
 /**
