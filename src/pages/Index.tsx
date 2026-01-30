@@ -71,6 +71,26 @@ const Index = () => {
     updateFormData({ mode });
   };
   
+  const getHeaderTitle = () => {
+    switch (formData.selectedKrankenkasse) {
+      case 'viactiv': return 'VIACTIV Formular';
+      case 'novitas': return 'Novitas BKK Formular';
+      case 'dak': return 'DAK Formular';
+      case 'bkk_gs': return 'BKK GS Formular';
+      default: return 'Smart Formular';
+    }
+  };
+
+  const getHeaderSubtitle = () => {
+    switch (formData.selectedKrankenkasse) {
+      case 'viactiv': return 'VIACTIV Krankenkasse - Beitrittserklärung';
+      case 'novitas': return 'Novitas BKK - Familienversicherung';
+      case 'dak': return 'DAK - Familienversicherung';
+      case 'bkk_gs': return 'BKK GILDEMEISTER SEIDENSTICK - Online-Formular';
+      default: return 'Bitte wählen Sie eine Krankenkasse aus';
+    }
+  };
+  
   const handleExport = async () => {
     // Basis-Validierung für alle Krankenkassen
     if (!formData.mitgliedName || !formData.mitgliedVorname) {
@@ -269,7 +289,7 @@ const Index = () => {
             <div className="flex items-center gap-3">
               <FileText className="h-8 w-8" />
               <h1 className="text-2xl md:text-3xl font-bold">
-                BKK GS-Smart Formular
+                {getHeaderTitle()}
               </h1>
             </div>
             <div className="flex items-center gap-2">
@@ -279,7 +299,7 @@ const Index = () => {
             </div>
           </div>
           <p className="text-primary-foreground/80 text-sm md:text-base">
-            BKK GILDEMEISTER SEIDENSTICK - Online-Formular
+            {getHeaderSubtitle()}
           </p>
         </div>
       </header>
@@ -331,119 +351,124 @@ const Index = () => {
             </p>
           </div>
           
-          {/* Modus-Auswahl (nur für BKK GS) */}
-          {formData.selectedKrankenkasse === 'bkk_gs' && (
-            <div className="bg-card rounded-xl shadow-sm border p-6 mb-4">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Formular-Modus auswählen
-              </h2>
-              <RadioGroup
-                value={formData.mode}
-                onValueChange={(value) => handleModeChange(value as FormMode)}
-                className="grid grid-cols-1 md:grid-cols-2 gap-4"
-              >
-                <Label
-                  htmlFor="mode-family"
-                  className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                    formData.mode === 'familienversicherung_und_rundum'
-                      ? 'border-primary bg-primary/5'
-                      : 'border-muted hover:border-primary/50'
-                  }`}
-                >
-                  <RadioGroupItem value="familienversicherung_und_rundum" id="mode-family" className="mt-1" />
-                  <div>
-                    <div className="flex items-center gap-2 font-medium">
-                      <Users className="h-4 w-4 text-primary" />
-                      Familienversicherung + Rundum-Sicher-Paket
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Für Mitglied mit Ehegatte und/oder Kindern. Erstellt beide PDF-Typen.
-                    </p>
-                  </div>
-                </Label>
-                <Label
-                  htmlFor="mode-single"
-                  className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                    formData.mode === 'nur_rundum'
-                      ? 'border-primary bg-primary/5'
-                      : 'border-muted hover:border-primary/50'
-                  }`}
-                >
-                  <RadioGroupItem value="nur_rundum" id="mode-single" className="mt-1" />
-                  <div>
-                    <div className="flex items-center gap-2 font-medium">
-                      <User className="h-4 w-4 text-primary" />
-                      Nur Rundum-Sicher-Paket
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Nur für das Mitglied selbst. Keine Familienangehörigen erforderlich.
-                    </p>
-                  </div>
-                </Label>
-              </RadioGroup>
-            </div>
-          )}
-          
-          <MemberSection formData={formData} updateFormData={updateFormData} />
-          
-          {/* BKK GS spezifische Sektionen */}
-          {formData.selectedKrankenkasse === 'bkk_gs' && (
+          {/* Formular-Sektionen nur anzeigen wenn Krankenkasse gewählt */}
+          {formData.selectedKrankenkasse && (
             <>
-              {formData.mode === 'familienversicherung_und_rundum' && (
+              {/* Modus-Auswahl (nur für BKK GS) */}
+              {formData.selectedKrankenkasse === 'bkk_gs' && (
+                <div className="bg-card rounded-xl shadow-sm border p-6 mb-4">
+                  <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                    Formular-Modus auswählen
+                  </h2>
+                  <RadioGroup
+                    value={formData.mode}
+                    onValueChange={(value) => handleModeChange(value as FormMode)}
+                    className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                  >
+                    <Label
+                      htmlFor="mode-family"
+                      className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                        formData.mode === 'familienversicherung_und_rundum'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-muted hover:border-primary/50'
+                      }`}
+                    >
+                      <RadioGroupItem value="familienversicherung_und_rundum" id="mode-family" className="mt-1" />
+                      <div>
+                        <div className="flex items-center gap-2 font-medium">
+                          <Users className="h-4 w-4 text-primary" />
+                          Familienversicherung + Rundum-Sicher-Paket
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Für Mitglied mit Ehegatte und/oder Kindern. Erstellt beide PDF-Typen.
+                        </p>
+                      </div>
+                    </Label>
+                    <Label
+                      htmlFor="mode-single"
+                      className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                        formData.mode === 'nur_rundum'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-muted hover:border-primary/50'
+                      }`}
+                    >
+                      <RadioGroupItem value="nur_rundum" id="mode-single" className="mt-1" />
+                      <div>
+                        <div className="flex items-center gap-2 font-medium">
+                          <User className="h-4 w-4 text-primary" />
+                          Nur Rundum-Sicher-Paket
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Nur für das Mitglied selbst. Keine Familienangehörigen erforderlich.
+                        </p>
+                      </div>
+                    </Label>
+                  </RadioGroup>
+                </div>
+              )}
+              
+              <MemberSection formData={formData} updateFormData={updateFormData} />
+              
+              {/* BKK GS spezifische Sektionen */}
+              {formData.selectedKrankenkasse === 'bkk_gs' && (
+                <>
+                  {formData.mode === 'familienversicherung_und_rundum' && (
+                    <>
+                      <SpouseSection formData={formData} updateFormData={updateFormData} />
+                      <ChildrenSection formData={formData} updateFormData={updateFormData} />
+                    </>
+                  )}
+                  <RundumSicherPaketSection formData={formData} updateFormData={updateFormData} />
+                </>
+              )}
+              
+              {/* VIACTIV-spezifische Sektionen */}
+              {formData.selectedKrankenkasse === 'viactiv' && (
+                <ViactivSection formData={formData} updateFormData={updateFormData} />
+              )}
+              
+              {/* Novitas BKK spezifische Sektionen */}
+              {formData.selectedKrankenkasse === 'novitas' && (
                 <>
                   <SpouseSection formData={formData} updateFormData={updateFormData} />
                   <ChildrenSection formData={formData} updateFormData={updateFormData} />
                 </>
               )}
-              <RundumSicherPaketSection formData={formData} updateFormData={updateFormData} />
-            </>
-          )}
-          
-          {/* VIACTIV-spezifische Sektionen */}
-          {formData.selectedKrankenkasse === 'viactiv' && (
-            <ViactivSection formData={formData} updateFormData={updateFormData} />
-          )}
-          
-          {/* Novitas BKK spezifische Sektionen */}
-          {formData.selectedKrankenkasse === 'novitas' && (
-            <>
-              <SpouseSection formData={formData} updateFormData={updateFormData} />
-              <ChildrenSection formData={formData} updateFormData={updateFormData} />
-            </>
-          )}
-          
-          {/* DAK spezifische Sektionen */}
-          {formData.selectedKrankenkasse === 'dak' && (
-            <>
-              <SpouseSection formData={formData} updateFormData={updateFormData} />
-              <ChildrenSection formData={formData} updateFormData={updateFormData} />
-            </>
-          )}
-          
-          <SignatureSection formData={formData} updateFormData={updateFormData} />
-          
-          {/* Export Button */}
-          <div className="sticky bottom-4 pt-4">
-            <div className="bg-card rounded-xl shadow-2xl border p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="text-center md:text-left">
-                <p className="font-medium text-foreground">Bereit zum Exportieren?</p>
-                <p className="text-sm text-muted-foreground">
-                  Das ausgefüllte PDF wird heruntergeladen.
-                </p>
+              
+              {/* DAK spezifische Sektionen */}
+              {formData.selectedKrankenkasse === 'dak' && (
+                <>
+                  <SpouseSection formData={formData} updateFormData={updateFormData} />
+                  <ChildrenSection formData={formData} updateFormData={updateFormData} />
+                </>
+              )}
+              
+              <SignatureSection formData={formData} updateFormData={updateFormData} />
+              
+              {/* Export Button */}
+              <div className="sticky bottom-4 pt-4">
+                <div className="bg-card rounded-xl shadow-2xl border p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div className="text-center md:text-left">
+                    <p className="font-medium text-foreground">Bereit zum Exportieren?</p>
+                    <p className="text-sm text-muted-foreground">
+                      Das ausgefüllte PDF wird heruntergeladen.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="lg"
+                    onClick={handleExport}
+                    disabled={isExporting}
+                    className="w-full md:w-auto gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8"
+                  >
+                    <FileDown className="h-5 w-5" />
+                    {isExporting ? 'Exportiere...' : 'PDF Exportieren'}
+                  </Button>
+                </div>
               </div>
-              <Button
-                type="button"
-                size="lg"
-                onClick={handleExport}
-                disabled={isExporting}
-                className="w-full md:w-auto gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8"
-              >
-                <FileDown className="h-5 w-5" />
-                {isExporting ? 'Exportiere...' : 'PDF Exportieren'}
-              </Button>
-            </div>
-          </div>
+            </>
+          )}
         </form>
       </main>
       
