@@ -132,8 +132,15 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
         </div>
       </FormSection>
 
-      {/* Arbeitgeber-Daten */}
+      {/* Arbeitgeber-Daten - PFLICHT wenn beschäftigt */}
       <FormSection title="Angaben zum Arbeitgeber" variant="member">
+        {formData.viactivBeschaeftigung === 'beschaeftigt' && (
+          <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+            <p className="text-sm text-primary font-medium">
+              Bei Beschäftigungsstatus "Ich bin beschäftigt" sind alle Arbeitgeber-Felder Pflicht.
+            </p>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
             <FormField
@@ -143,7 +150,8 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
               value={formData.viactivArbeitgeber.name}
               onChange={(value) => updateArbeitgeber({ name: value })}
               placeholder="z.B. Musterfirma GmbH"
-              validate={validateName}
+              required={formData.viactivBeschaeftigung === 'beschaeftigt'}
+              validate={formData.viactivBeschaeftigung === 'beschaeftigt' ? validateName : undefined}
             />
           </div>
           <FormField
@@ -153,7 +161,8 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
             value={formData.viactivArbeitgeber.strasse}
             onChange={(value) => updateArbeitgeber({ strasse: value })}
             placeholder="z.B. Industriestraße"
-            validate={validateStrasse}
+            required={formData.viactivBeschaeftigung === 'beschaeftigt'}
+            validate={formData.viactivBeschaeftigung === 'beschaeftigt' ? validateStrasse : undefined}
           />
           <FormField
             type="text"
@@ -162,7 +171,8 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
             value={formData.viactivArbeitgeber.hausnummer}
             onChange={(value) => updateArbeitgeber({ hausnummer: value })}
             placeholder="z.B. 5"
-            validate={validateHausnummer}
+            required={formData.viactivBeschaeftigung === 'beschaeftigt'}
+            validate={formData.viactivBeschaeftigung === 'beschaeftigt' ? validateHausnummer : undefined}
           />
           <FormField
             type="text"
@@ -171,7 +181,8 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
             value={formData.viactivArbeitgeber.plz}
             onChange={(value) => updateArbeitgeber({ plz: value })}
             placeholder="z.B. 12345"
-            validate={validatePlz}
+            required={formData.viactivBeschaeftigung === 'beschaeftigt'}
+            validate={formData.viactivBeschaeftigung === 'beschaeftigt' ? validatePlz : undefined}
           />
           <FormField
             type="text"
@@ -180,7 +191,8 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
             value={formData.viactivArbeitgeber.ort}
             onChange={(value) => updateArbeitgeber({ ort: value })}
             placeholder="z.B. Berlin"
-            validate={validateOrt}
+            required={formData.viactivBeschaeftigung === 'beschaeftigt'}
+            validate={formData.viactivBeschaeftigung === 'beschaeftigt' ? validateOrt : undefined}
           />
         </div>
       </FormSection>
@@ -380,7 +392,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
               />
             </div>
 
-            {/* Versichertennummer Ehegatte */}
+            {/* Versichertennummer Ehegatte - PFLICHT für VIACTIV */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <FormField
                 type="text"
@@ -389,6 +401,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                 value={formData.ehegatte.versichertennummer}
                 onChange={(value) => updateEhegatte({ versichertennummer: value })}
                 placeholder="Versichertennummer"
+                required
               />
             </div>
 
@@ -557,7 +570,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                       />
                     </div>
 
-                    {/* Versichertennummer Kind */}
+                    {/* Versichertennummer Kind - PFLICHT für VIACTIV */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                       <FormField
                         type="text"
@@ -566,6 +579,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                         value={kind.versichertennummer}
                         onChange={(value) => updateKind(index, { versichertennummer: value })}
                         placeholder="Versichertennummer"
+                        required
                       />
                     </div>
 

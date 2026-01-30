@@ -3,11 +3,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { FileText, Sparkles, Loader2, Copy, Check, Clipboard } from 'lucide-react';
-import { FormData, FormMode } from '@/types/form';
+import { FileText, Sparkles, Loader2, Copy, Check, Clipboard, AlertTriangle } from 'lucide-react';
+import { FormData, FormMode, Krankenkasse } from '@/types/form';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
+import { applyKrankenkassenMapping } from '@/utils/krankenkassenMapping';
 
 interface CopyBlockData {
   copyBlockMitglied: string;
@@ -18,9 +19,10 @@ interface FreitextImportDialogProps {
   formData: FormData;
   setFormData: (data: FormData) => void;
   currentMode: FormMode;
+  selectedKrankenkasse?: Krankenkasse;
 }
 
-export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ formData, setFormData, currentMode }) => {
+export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ formData, setFormData, currentMode, selectedKrankenkasse = '' }) => {
   const [open, setOpen] = useState(false);
   const [freitextInput, setFreitextInput] = useState('');
   const [jsonInput, setJsonInput] = useState('');
@@ -143,11 +145,13 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
 
     try {
       const formMode = mapFormMode(currentMode);
+      const activeKrankenkasse = selectedKrankenkasse || formData.selectedKrankenkasse || '';
       
       const requestBody = {
         text: freitextInput,
         mode: currentMode,
-        formMode: formMode  // Send mapped mode
+        formMode: formMode,
+        selectedKrankenkasse: activeKrankenkasse
       };
 
       setAnalysisProgress(30);
@@ -197,18 +201,15 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
 
   const handleImport = () => {
     try {
-      const parsed = JSON.parse(jsonInput) as FormData;
+      const parsed = JSON.parse(jsonInput);
       
       if (typeof parsed !== 'object' || parsed === null) {
         throw new Error('Ungültiges JSON-Format');
       }
       
-      // Bei Kindern immer bisherigBestehtWeiter = true, bisherigBestehtWeiterBei bleibt leer (wird dynamisch in UI gesetzt)
-      const processedKinder = parsed.kinder?.map(kind => ({
-        ...kind,
-        bisherigBestehtWeiter: true,
-        bisherigBestehtWeiterBei: kind.bisherigBestehtWeiterBei || '',
-      })) || formData.kinder;
+      // Apply Krankenkassen-specific mapping
+      const activeKrankenkasse = selectedKrankenkasse || formData.selectedKrankenkasse || '';
+      const mappedData = applyKrankenkassenMapping(parsed, activeKrankenkasse as Krankenkasse, formData);
       
       // Synchronisierung: mitgliedVersichertennummer = mitgliedKvNummer
       const mitgliedVersichertennummer = parsed.mitgliedKvNummer || parsed.mitgliedVersichertennummer || formData.mitgliedVersichertennummer;
@@ -218,14 +219,9 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
       
       setFormData({
         ...formData,
-        ...parsed,
+        ...mappedData,
         mitgliedVersichertennummer: mitgliedVersichertennummer,
         ehegatteKrankenkasse: ehegatteKrankenkasse,
-        ehegatte: parsed.ehegatte ? { ...formData.ehegatte, ...parsed.ehegatte } : formData.ehegatte,
-        kinder: processedKinder,
-        rundumSicherPaket: parsed.rundumSicherPaket 
-          ? { ...formData.rundumSicherPaket, ...parsed.rundumSicherPaket }
-          : formData.rundumSicherPaket,
       });
       
       toast.success('JSON erfolgreich importiert!');
@@ -324,6 +320,21 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
         </DialogHeader>
         
         <div className="space-y-4">
+          {/* Warnung wenn keine Krankenkasse ausgewählt */}
+          {!formData.selectedKrankenkasse && (
+            <div className="flex items-start gap-3 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+              <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                  Keine Krankenkasse ausgewählt
+                </p>
+                <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-1">
+                  Bitte wählen Sie zuerst eine Krankenkasse aus, um die optimale Datenextraktion zu gewährleisten.
+                </p>
+              </div>
+            </div>
+          )}
+          
           {/* Freitext-Eingabe */}
           <div className="space-y-2">
             <label className="text-sm font-medium block">Freitext hier einfügen:</label>
