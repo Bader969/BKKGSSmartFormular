@@ -54,6 +54,7 @@ export const SpouseSection: React.FC<SpouseSectionProps> = ({ formData, updateFo
             updateMember={updateEhegatte}
             type="spouse"
             selectedKrankenkasse={formData.selectedKrankenkasse}
+            mitgliedKrankenkasse={formData.mitgliedKrankenkasse}
           />
           
           {/* Neue Felder für Ehegatte */}

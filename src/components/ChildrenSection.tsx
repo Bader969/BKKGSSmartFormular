@@ -69,6 +69,7 @@ export const ChildrenSection: React.FC<ChildrenSectionProps> = ({ formData, upda
                 type="child"
                 childIndex={index + 1}
                 selectedKrankenkasse={formData.selectedKrankenkasse}
+                mitgliedKrankenkasse={formData.mitgliedKrankenkasse}
               />
               
               {/* Pre-filled Felder anzeigen (vom Antragsteller - bearbeitbar) */}

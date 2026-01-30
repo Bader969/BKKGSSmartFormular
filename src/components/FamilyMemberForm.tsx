@@ -17,6 +17,7 @@ interface FamilyMemberFormProps {
   type: 'spouse' | 'child';
   childIndex?: number;
   selectedKrankenkasse?: Krankenkasse;
+  mitgliedKrankenkasse?: string;
 }
 
 // Helper function to get the default Krankenkasse name
@@ -34,8 +35,16 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
   updateMember, 
   type,
   childIndex,
-  selectedKrankenkasse
+  selectedKrankenkasse,
+  mitgliedKrankenkasse
 }) => {
+  // For Novitas: use mitgliedKrankenkasse as default, otherwise use the selected Krankenkasse name
+  const getDefaultBeiValue = (): string => {
+    if (selectedKrankenkasse === 'novitas' && mitgliedKrankenkasse) {
+      return mitgliedKrankenkasse;
+    }
+    return getDefaultKrankenkasseName(selectedKrankenkasse);
+  };
   const { endDate } = calculateDates();
   
   const geschlechtOptions = [
@@ -214,9 +223,9 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
             type="text"
             label="Bei"
             id={`${prefix}-bestehtWeiterBei`}
-            value={member.bisherigBestehtWeiterBei || getDefaultKrankenkasseName(selectedKrankenkasse)}
+            value={member.bisherigBestehtWeiterBei || getDefaultBeiValue()}
             onChange={(value) => updateMember({ bisherigBestehtWeiterBei: value })}
-            placeholder={getDefaultKrankenkasseName(selectedKrankenkasse)}
+            placeholder={getDefaultBeiValue()}
             required
           />
           </div>
