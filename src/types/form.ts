@@ -69,10 +69,10 @@ export interface RundumSicherPaketData {
 export type FormMode = 'familienversicherung_und_rundum' | 'nur_rundum';
 
 // Krankenkassen-Auswahl
-export type Krankenkasse = 'bkk_gs' | 'viactiv' | 'novitas' | 'dak';
+export type Krankenkasse = 'bkk_gs' | 'viactiv' | 'novitas' | 'dak' | '';
 
 export const KRANKENKASSEN_OPTIONS = [
-  { value: 'bkk_gs' as Krankenkasse, label: 'BKK GILDEMEISTER SEIDENSTICK' },
+  // { value: 'bkk_gs' as Krankenkasse, label: 'BKK GILDEMEISTER SEIDENSTICK' }, // Temporär versteckt
   { value: 'viactiv' as Krankenkasse, label: 'VIACTIV Krankenkasse' },
   { value: 'novitas' as Krankenkasse, label: 'Novitas BKK' },
   { value: 'dak' as Krankenkasse, label: 'DAK Familienversicherung' },
@@ -283,7 +283,7 @@ export const createInitialFormData = (): FormData => {
 
   return {
     mode: 'familienversicherung_und_rundum',
-    selectedKrankenkasse: 'bkk_gs',
+    selectedKrankenkasse: '',
     mitgliedName: '',
     mitgliedVorname: '',
     mitgliedGeburtsdatum: '',
