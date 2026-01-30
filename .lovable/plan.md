@@ -1,138 +1,65 @@
 
-# VIACTIV: Vorname und Name Felder tauschen
+
+# Fix: VIACTIV Ehegatte BE - Adressdaten vom Hauptmitglied übernehmen
 
 ## Problem
 
-Aktuell werden in der VIACTIV-Sektion die Felder in dieser Reihenfolge angezeigt:
-- **Name | Vorname** (Nachname zuerst)
+Bei der Ehegatte-Beitrittserklärung (wenn der Ehegatte eine eigene Mitgliedschaft hat) werden die Adressfelder **Straße** und **PLZ** nicht ins PDF geschrieben, wenn das Feld `abweichendeAnschrift` einen Wert enthält.
 
-Gewünscht ist:
-- **Vorname | Name** (Vorname zuerst)
+### Aktuelle Logik (Zeilen 341-353):
 
----
-
-## Betroffene Stellen in `src/components/ViactivSection.tsx`
-
-### 1. Ehegatte (Zeilen 284-319)
-
-**Aktuell:**
-```
-| Name | Vorname | Geburtsdatum | Geschlecht |
-```
-
-**Neu:**
-```
-| Vorname | Name | Geburtsdatum | Geschlecht |
-```
-
-### 2. Kinder (Zeilen 473-508)
-
-**Aktuell:**
-```
-| Name | Vorname | Geburtsdatum | Geschlecht |
-```
-
-**Neu:**
-```
-| Vorname | Name | Geburtsdatum | Geschlecht |
+```typescript
+if (spouse.abweichendeAnschrift) {
+  setTextField("Straße", "");           // ❌ Wird leer gesetzt
+  setTextField("Hausnummer", "");       // ❌ Wird leer gesetzt
+  setTextField("PLZ", "");              // ❌ Wird leer gesetzt
+  setTextField("Ort", spouse.abweichendeAnschrift);
+} else {
+  setTextField("Straße", formData.mitgliedStrasse || "");
+  setTextField("Hausnummer", formData.mitgliedHausnummer || "");
+  setTextField("PLZ", formData.mitgliedPlz || "");
+  setTextField("Ort", formData.ort || "");
+}
 ```
 
 ---
 
-## Änderungen
+## Lösung
 
-### Ehegatte-Sektion (Zeilen 285-302)
+Die Adressdaten (Straße, Hausnummer, PLZ) sollen **immer** vom Hauptmitglied übernommen werden. Nur der Ort kann abweichend sein.
 
-Die Reihenfolge der FormField-Komponenten wird getauscht:
+### Neue Logik:
 
-**Vorher (Zeilen 285-302):**
 ```typescript
-<FormField
-  type="text"
-  label="Name"
-  id="viactiv-ehegatte-name"
-  value={formData.ehegatte.name}
-  ...
-/>
-<FormField
-  type="text"
-  label="Vorname"
-  id="viactiv-ehegatte-vorname"
-  value={formData.ehegatte.vorname}
-  ...
-/>
-```
+// Adresse IMMER vom Hauptmitglied übernehmen
+setTextField("Straße", formData.mitgliedStrasse || "");
+setTextField("Hausnummer", formData.mitgliedHausnummer || "");
+setTextField("PLZ", formData.mitgliedPlz || "");
 
-**Nachher:**
-```typescript
-<FormField
-  type="text"
-  label="Vorname"
-  id="viactiv-ehegatte-vorname"
-  value={formData.ehegatte.vorname}
-  ...
-/>
-<FormField
-  type="text"
-  label="Name"
-  id="viactiv-ehegatte-name"
-  value={formData.ehegatte.name}
-  ...
-/>
-```
-
-### Kinder-Sektion (Zeilen 474-491)
-
-**Vorher:**
-```typescript
-<FormField
-  type="text"
-  label="Name"
-  id={`viactiv-kind${index}-name`}
-  value={kind.name}
-  ...
-/>
-<FormField
-  type="text"
-  label="Vorname"
-  id={`viactiv-kind${index}-vorname`}
-  value={kind.vorname}
-  ...
-/>
-```
-
-**Nachher:**
-```typescript
-<FormField
-  type="text"
-  label="Vorname"
-  id={`viactiv-kind${index}-vorname`}
-  value={kind.vorname}
-  ...
-/>
-<FormField
-  type="text"
-  label="Name"
-  id={`viactiv-kind${index}-name`}
-  value={kind.name}
-  ...
-/>
+// Ort: abweichende Anschrift oder vom Hauptmitglied
+if (spouse.abweichendeAnschrift) {
+  setTextField("Ort", spouse.abweichendeAnschrift);
+} else {
+  setTextField("Ort", formData.ort || "");
+}
 ```
 
 ---
 
-## Zusammenfassung
+## Änderung
 
-| Datei | Zeilen | Änderung |
-|-------|--------|----------|
-| `src/components/ViactivSection.tsx` | 285-302 | Ehegatte: Vorname und Name Felder tauschen |
-| `src/components/ViactivSection.tsx` | 474-491 | Kinder: Vorname und Name Felder tauschen |
+| Datei | Zeilen | Beschreibung |
+|-------|--------|--------------|
+| `src/utils/viactivExport.ts` | 341-353 | Adressfelder immer vom Hauptmitglied übernehmen |
 
 ---
 
 ## Ergebnis
 
-| Sektion | Vorher | Nachher |
-|---------|--------|---------|
-| Ehegatte | Name, Vorname, Geburtsdatum, Geschlecht | **Vorname, Name**, Geburtsdatum, Geschlecht |
-| Kinder | Name, Vorname, Geburtsdatum, Geschlecht | **Vorname, Name**, Geburtsdatum, Geschlecht |
+| Feld | Vorher | Nachher |
+|------|--------|---------|
+| Straße | Leer (wenn abweichende Anschrift) | **Vom Hauptmitglied** |
+| Hausnummer | Leer (wenn abweichende Anschrift) | **Vom Hauptmitglied** |
+| PLZ | Leer (wenn abweichende Anschrift) | **Vom Hauptmitglied** |
+| Ort | Abweichende Anschrift oder Hauptmitglied | Abweichende Anschrift oder Hauptmitglied (unverändert) |
+
