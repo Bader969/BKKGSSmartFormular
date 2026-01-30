@@ -171,10 +171,10 @@ const fillSpouseFields = (
   // Previous insurance
   setTextField("fna_PartnerVersBis", dates.endDate);
   
-  // Wenn "besteht weiter" aktiviert: Wert aus bisherigBestehtWeiterBei nehmen (mit Default "NOVITAS BKK")
+  // Wenn "besteht weiter" aktiviert: Wert aus bisherigBestehtWeiterBei nehmen (mit Fallback auf mitgliedKrankenkasse)
   // Ansonsten: Fallback auf bisherigBestandBei oder mitgliedKrankenkasse
   if (ehegatte.bisherigBestehtWeiter) {
-    setTextField("fna_PartnerNameAltkasse", ehegatte.bisherigBestehtWeiterBei || "NOVITAS BKK");
+    setTextField("fna_PartnerNameAltkasse", ehegatte.bisherigBestehtWeiterBei || formData.mitgliedKrankenkasse);
   } else {
     setTextField("fna_PartnerNameAltkasse", ehegatte.bisherigBestandBei || formData.mitgliedKrankenkasse);
   }
@@ -259,10 +259,10 @@ const fillChildFields = (
   // Page 3 - Previous insurance
   setTextField(`famv_bisher_kind_${i}`, dates.endDate);
   
-  // Wenn "besteht weiter" aktiviert: Wert aus bisherigBestehtWeiterBei nehmen (mit Default "NOVITAS BKK")
+  // Wenn "besteht weiter" aktiviert: Wert aus bisherigBestehtWeiterBei nehmen (mit Fallback auf mitgliedKrankenkasse)
   // Ansonsten: Fallback auf bisherigBestandBei oder mitgliedKrankenkasse
   if (kind.bisherigBestehtWeiter) {
-    setTextField(`famv_kv_kind_${i}`, kind.bisherigBestehtWeiterBei || "NOVITAS BKK");
+    setTextField(`famv_kv_kind_${i}`, kind.bisherigBestehtWeiterBei || formData.mitgliedKrankenkasse);
   } else {
     setTextField(`famv_kv_kind_${i}`, kind.bisherigBestandBei || formData.mitgliedKrankenkasse);
   }
