@@ -13,6 +13,7 @@ import { exportViactivBeitrittserklaerung } from '@/utils/viactivExport';
 import { exportViactivFamilienversicherung } from '@/utils/viactivFamilyExport';
 import { exportViactivBonusPDFs } from '@/utils/viactivBonusExport';
 import { exportNovitasFamilienversicherung } from '@/utils/novitasExport';
+import { exportDAKFamilienversicherung } from '@/utils/dakExport';
 import { toast } from 'sonner';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -136,6 +137,21 @@ const Index = () => {
       }
       // Ort-Validierung entfernt - Feld ist für Novitas ausgeblendet
     }
+    // DAK-spezifische Validierung
+    else if (formData.selectedKrankenkasse === 'dak') {
+      if (!formData.mitgliedKvNummer) {
+        toast.error('Bitte geben Sie die KV-Nummer ein.');
+        return;
+      }
+      if (!formData.mitgliedKrankenkasse) {
+        toast.error('Bitte geben Sie den Namen der Krankenkasse ein.');
+        return;
+      }
+      if (!formData.mitgliedGeburtsdatum) {
+        toast.error('Bitte geben Sie das Geburtsdatum des Mitglieds ein.');
+        return;
+      }
+    }
     // BKK GS-spezifische Validierung
     else {
       if (!formData.mitgliedKvNummer) {
@@ -215,6 +231,13 @@ const Index = () => {
         toast.info(`Es werden ${numberOfPDFs} Novitas Familienversicherungs-PDF(s) erstellt...`);
         await exportNovitasFamilienversicherung(formData);
         toast.success('Novitas BKK Familienversicherung erfolgreich exportiert!');
+      }
+      // DAK Export
+      else if (formData.selectedKrankenkasse === 'dak') {
+        const numberOfPDFs = Math.max(1, Math.ceil(formData.kinder.length / 2)); // Nur 2 Kinder pro PDF!
+        toast.info(`Es werden ${numberOfPDFs} DAK Familienversicherungs-PDF(s) erstellt...`);
+        await exportDAKFamilienversicherung(formData);
+        toast.success('DAK Familienversicherung erfolgreich exportiert!');
       }
       // BKK GS Export
       else {
@@ -298,11 +321,13 @@ const Index = () => {
               </SelectContent>
             </Select>
             <p className="text-sm text-muted-foreground mt-2">
-              {formData.selectedKrankenkasse === 'novitas' 
-                ? 'Es wird die Novitas BKK Familienversicherung erstellt.'
-                : formData.selectedKrankenkasse === 'viactiv' 
-                  ? 'Es wird die VIACTIV Beitrittserklärung erstellt.'
-                  : 'Es werden BKK GS Familienversicherung und Rundum-Sicher-Paket erstellt.'}
+              {formData.selectedKrankenkasse === 'dak' 
+                ? 'Es wird die DAK Familienversicherung erstellt.'
+                : formData.selectedKrankenkasse === 'novitas' 
+                  ? 'Es wird die Novitas BKK Familienversicherung erstellt.'
+                  : formData.selectedKrankenkasse === 'viactiv' 
+                    ? 'Es wird die VIACTIV Beitrittserklärung erstellt.'
+                    : 'Es werden BKK GS Familienversicherung und Rundum-Sicher-Paket erstellt.'}
             </p>
           </div>
           
@@ -382,6 +407,14 @@ const Index = () => {
           
           {/* Novitas BKK spezifische Sektionen */}
           {formData.selectedKrankenkasse === 'novitas' && (
+            <>
+              <SpouseSection formData={formData} updateFormData={updateFormData} />
+              <ChildrenSection formData={formData} updateFormData={updateFormData} />
+            </>
+          )}
+          
+          {/* DAK spezifische Sektionen */}
+          {formData.selectedKrankenkasse === 'dak' && (
             <>
               <SpouseSection formData={formData} updateFormData={updateFormData} />
               <ChildrenSection formData={formData} updateFormData={updateFormData} />
