@@ -115,6 +115,7 @@ const fillBasicFields = (
   setTextField("fna_Telefon", formData.telefon);
   setTextField("fna_Email", formData.email);
   setTextField("datum", dates.today);
+  setTextField("ort", formData.ort);
   
   // Familienstand - use RadioButton (not Checkbox!)
   const familienstandMap: Record<string, string> = {
