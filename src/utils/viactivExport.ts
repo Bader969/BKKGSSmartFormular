@@ -338,17 +338,15 @@ export const createViactivBeitrittserklaerungForSpouse = async (formData: FormDa
   setCheckbox("männlich", spouse.geschlecht === "m");
   setCheckbox("divers", spouse.geschlecht === "d" || spouse.geschlecht === "x");
 
-  // === ADRESSE (gleich wie Hauptmitglied, falls keine abweichende) ===
+  // === ADRESSE (immer vom Hauptmitglied, nur Ort kann abweichen) ===
+  setTextField("Straße", formData.mitgliedStrasse || "");
+  setTextField("Hausnummer", formData.mitgliedHausnummer || "");
+  setTextField("PLZ", formData.mitgliedPlz || "");
+  
+  // Ort: abweichende Anschrift oder vom Hauptmitglied
   if (spouse.abweichendeAnschrift) {
-    // Wenn abweichende Anschrift vorhanden, diese parsen
-    setTextField("Straße", "");
-    setTextField("Hausnummer", "");
-    setTextField("PLZ", "");
     setTextField("Ort", spouse.abweichendeAnschrift);
   } else {
-    setTextField("Straße", formData.mitgliedStrasse || "");
-    setTextField("Hausnummer", formData.mitgliedHausnummer || "");
-    setTextField("PLZ", formData.mitgliedPlz || "");
     setTextField("Ort", formData.ort || "");
   }
   
