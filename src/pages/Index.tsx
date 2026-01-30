@@ -294,8 +294,8 @@ const Index = () => {
             </div>
             <div className="flex items-center gap-2">
               <DocumentMergeDialog />
-              <FreitextImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} />
-              <JsonImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} />
+              <FreitextImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} selectedKrankenkasse={formData.selectedKrankenkasse} />
+              <JsonImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} selectedKrankenkasse={formData.selectedKrankenkasse} />
             </div>
           </div>
           <p className="text-primary-foreground/80 text-sm md:text-base">

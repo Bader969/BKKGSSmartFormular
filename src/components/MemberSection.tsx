@@ -77,6 +77,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
             value={formData.mitgliedGeburtsort}
             onChange={(value) => updateFormData({ mitgliedGeburtsort: value })}
             placeholder="z.B. Berlin"
+            required={formData.selectedKrankenkasse === 'viactiv'}
             validate={validateOrt}
           />
           <FormField
@@ -87,6 +88,8 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
             onChange={(value) => updateFormData({ mitgliedGeburtsland: value })}
             options={countries.map(c => ({ value: c.code, label: c.name }))}
             placeholder="Land auswählen"
+            required={formData.selectedKrankenkasse === 'viactiv'}
+            validate={formData.selectedKrankenkasse === 'viactiv' ? validateSelect : undefined}
           />
         </div>
       )}

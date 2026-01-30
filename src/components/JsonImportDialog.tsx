@@ -3,13 +3,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Upload, Copy, Check, Sparkles, Loader2, X, FileImage, Shield, Image, Download, FileText, Lock } from 'lucide-react';
-import { FormData, FormMode } from '@/types/form';
+import { Upload, Copy, Check, Sparkles, Loader2, X, FileImage, Shield, Image, Download, FileText, Lock, AlertTriangle } from 'lucide-react';
+import { FormData, FormMode, Krankenkasse } from '@/types/form';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
 import { createCombinedPdf, downloadBlob } from '@/utils/pdfUtils';
 import { formatDateForInput } from '@/utils/dateUtils';
+import { applyKrankenkassenMapping } from '@/utils/krankenkassenMapping';
 
 // Passwort für den Zugang zum Import-Dialog
 const IMPORT_PASSWORD = 'Ahmad19Bader96';
@@ -34,6 +35,7 @@ interface JsonImportDialogProps {
   formData: FormData;
   setFormData: (data: FormData) => void;
   currentMode: FormMode;
+  selectedKrankenkasse?: Krankenkasse;
 }
 
 interface UploadedFile {
@@ -165,7 +167,7 @@ const createRundumOnlyExampleJson = (): Partial<FormData> => ({
   mitgliedVersichertennummer: 'A123456789',
 });
 
-export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, setFormData, currentMode }) => {
+export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, setFormData, currentMode, selectedKrankenkasse = '' }) => {
   const [open, setOpen] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
   const [copied, setCopied] = useState(false);
@@ -303,8 +305,10 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
         text?: string; 
         images?: { base64: string; mimeType: string }[];
         mode: FormMode;
+        selectedKrankenkasse: string;
       } = {
         mode: currentMode,
+        selectedKrankenkasse: selectedKrankenkasse || formData.selectedKrankenkasse || '',
         images: uploadedFiles.map(f => ({
           base64: f.base64,
           mimeType: f.mimeType
@@ -334,32 +338,24 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
 
       // Extract the actual form data (exclude improvedImages if present)
       const { improvedImages, ...formDataFromAi } = data;
-      const parsed = formDataFromAi as FormData;
+      
+      // Apply Krankenkassen-specific mapping
+      const activeKrankenkasse = selectedKrankenkasse || formData.selectedKrankenkasse || '';
+      const mappedData = applyKrankenkassenMapping(formDataFromAi, activeKrankenkasse as Krankenkasse, formData);
       
       // Auto-Import: Direkt nach erfolgreicher Extraktion importieren
       const todayForInput = formatDateForInput(new Date());
       
-      // Bei Kindern immer bisherigBestehtWeiter = true, bisherigBestehtWeiterBei bleibt leer (wird dynamisch in UI gesetzt)
-      const processedKinder = parsed.kinder?.map(kind => ({
-        ...kind,
-        bisherigBestehtWeiter: true,
-        bisherigBestehtWeiterBei: kind.bisherigBestehtWeiterBei || '',
-      })) || formData.kinder;
-      
-      const mitgliedVersichertennummer = parsed.mitgliedKvNummer || parsed.mitgliedVersichertennummer || formData.mitgliedVersichertennummer;
-      const ehegatteKrankenkasse = parsed.ehegatteKrankenkasse || parsed.mitgliedKrankenkasse || formData.ehegatteKrankenkasse;
+      // Synchronisierung
+      const mitgliedVersichertennummer = formDataFromAi.mitgliedKvNummer || formDataFromAi.mitgliedVersichertennummer || formData.mitgliedVersichertennummer;
+      const ehegatteKrankenkasse = formDataFromAi.ehegatteKrankenkasse || formDataFromAi.mitgliedKrankenkasse || formData.ehegatteKrankenkasse;
       
       setFormData({
         ...formData,
-        ...parsed,
+        ...mappedData,
         datum: todayForInput,
         mitgliedVersichertennummer: mitgliedVersichertennummer,
         ehegatteKrankenkasse: ehegatteKrankenkasse,
-        ehegatte: parsed.ehegatte ? { ...formData.ehegatte, ...parsed.ehegatte } : formData.ehegatte,
-        kinder: processedKinder,
-        rundumSicherPaket: parsed.rundumSicherPaket
-          ? { ...formData.rundumSicherPaket, ...parsed.rundumSicherPaket }
-          : formData.rundumSicherPaket,
       });
       
       toast.success('Daten erfolgreich extrahiert und importiert!');
@@ -513,6 +509,21 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
             </DialogHeader>
             
             <div className="space-y-4">
+              {/* Warnung wenn keine Krankenkasse ausgewählt */}
+              {!formData.selectedKrankenkasse && (
+                <div className="flex items-start gap-3 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                      Keine Krankenkasse ausgewählt
+                    </p>
+                    <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-1">
+                      Bitte wählen Sie zuerst eine Krankenkasse aus, um die optimale Datenextraktion zu gewährleisten.
+                    </p>
+                  </div>
+                </div>
+              )}
+              
               {/* Dokument-Upload Sektion */}
               <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
                 <div className="flex items-center gap-2">

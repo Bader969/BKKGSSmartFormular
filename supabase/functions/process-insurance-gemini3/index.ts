@@ -5,58 +5,189 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Schema für Familienversicherung + Rundum-Sicher-Paket
-const familyJsonSchema = `{
+// VIACTIV Schema - Beitrittserklärung + Familienversicherung
+const viactivSchema = `{
+  "mitgliedVorname": "", 
+  "mitgliedName": "",
+  "mitgliedGeburtsdatum": "TT.MM.JJJJ",
+  "mitgliedGeburtsort": "",
+  "mitgliedGeburtsland": "ISO-Code (DE, TR, SY...)",
+  "mitgliedStrasse": "", 
+  "mitgliedHausnummer": "", 
+  "mitgliedPlz": "", 
+  "ort": "",
+  "mitgliedKvNummer": "", 
+  "mitgliedKrankenkasse": "",
+  "familienstand": "ledig|verheiratet|geschieden|verwitwet",
+  "telefon": "", 
+  "email": "",
+  "viactivGeschlecht": "weiblich|maennlich|divers",
+  "viactivStaatsangehoerigkeit": "ISO-Code (DE, TR, SY, PL...)",
+  "viactivBeschaeftigung": "beschaeftigt|ausbildung|rente|freiwillig_versichert|studiere|al_geld_1|al_geld_2|minijob|selbststaendig|einkommen_ueber_grenze",
+  "viactivVersicherungsart": "pflichtversichert|privat|freiwillig_versichert|nicht_gesetzlich|familienversichert|zuzug_ausland",
+  "viactivArbeitgeber": {
+    "name": "",
+    "strasse": "",
+    "hausnummer": "",
+    "plz": "",
+    "ort": ""
+  },
+  "viactivBonusVertragsnummer": "",
+  "viactivBonusIBAN": "",
+  "viactivBonusKontoinhaber": "",
+  "ehegatte": {
+    "vorname": "",
+    "name": "",
+    "geburtsdatum": "",
+    "geschlecht": "m|w|d",
+    "geburtsname": "",
+    "geburtsort": "",
+    "geburtsland": "ISO-Code",
+    "staatsangehoerigkeit": "ISO-Code",
+    "beschaeftigung": "beschaeftigt|ausbildung|rente|...",
+    "versichertennummer": "",
+    "bisherigArt": "mitgliedschaft|familienversicherung|nicht_gesetzlich",
+    "bisherigBestandBei": "",
+    "abweichendeAnschrift": ""
+  },
+  "kinder": [{
+    "vorname": "",
+    "name": "",
+    "geburtsdatum": "",
+    "geschlecht": "m|w|d",
+    "geburtsname": "",
+    "geburtsort": "",
+    "geburtsland": "ISO-Code",
+    "staatsangehoerigkeit": "ISO-Code",
+    "verwandtschaft": "leiblich|stief|enkel|pflege",
+    "versichertennummer": "",
+    "bisherigArt": "mitgliedschaft|familienversicherung|nicht_gesetzlich"
+  }]
+}`;
+
+// Novitas Schema - Familienversicherung (ohne Adress-/Geburtsfelder für Mitglied)
+const novitasSchema = `{
+  "mitgliedVorname": "",
+  "mitgliedName": "",
+  "mitgliedKvNummer": "",
+  "mitgliedKrankenkasse": "",
+  "familienstand": "ledig|verheiratet|geschieden|verwitwet",
+  "telefon": "",
+  "email": "",
+  "ehegatte": {
+    "vorname": "",
+    "name": "",
+    "geburtsdatum": "TT.MM.JJJJ",
+    "geschlecht": "m|w",
+    "geburtsname": "",
+    "geburtsort": "",
+    "geburtsland": "Klartext (z.B. Deutschland, Türkei)",
+    "staatsangehoerigkeit": "Klartext (z.B. deutsch, türkisch)",
+    "bisherigArt": "mitgliedschaft|familienversicherung",
+    "bisherigVorname": "",
+    "bisherigNachname": ""
+  },
+  "kinder": [{
+    "vorname": "",
+    "name": "",
+    "geburtsdatum": "TT.MM.JJJJ",
+    "geschlecht": "m|w",
+    "geburtsname": "",
+    "geburtsort": "",
+    "geburtsland": "Klartext",
+    "staatsangehoerigkeit": "Klartext",
+    "verwandtschaft": "leiblich|stief|pflege|adoptiert"
+  }]
+}`;
+
+// DAK Schema - Familienversicherung
+const dakSchema = `{
+  "mitgliedVorname": "",
+  "mitgliedName": "",
+  "mitgliedGeburtsdatum": "TT.MM.JJJJ",
+  "mitgliedStrasse": "",
+  "mitgliedHausnummer": "",
+  "mitgliedPlz": "",
+  "ort": "",
+  "mitgliedKvNummer": "",
+  "mitgliedKrankenkasse": "",
+  "familienstand": "ledig|verheiratet|geschieden|verwitwet",
+  "telefon": "",
+  "email": "",
+  "ehegatte": {
+    "vorname": "",
+    "name": "",
+    "geburtsdatum": "TT.MM.JJJJ",
+    "geschlecht": "m|w|d",
+    "geburtsname": "",
+    "geburtsort": "",
+    "geburtsland": "Klartext",
+    "staatsangehoerigkeit": "Klartext",
+    "bisherigArt": "mitgliedschaft|familienversicherung"
+  },
+  "kinder": [{
+    "vorname": "",
+    "name": "",
+    "geburtsdatum": "TT.MM.JJJJ",
+    "geschlecht": "m|w|d",
+    "geburtsname": "",
+    "geburtsort": "",
+    "geburtsland": "Klartext",
+    "staatsangehoerigkeit": "Klartext",
+    "verwandtschaft": "leiblich|stief|pflege"
+  }]
+}`;
+
+// Default/Fallback Schema (BKK GS)
+const defaultFamilySchema = `{
   "mode": "familienversicherung_und_rundum",
   "mitgliedName": "Nachname des Mitglieds",
   "mitgliedVorname": "Vorname des Mitglieds",
   "mitgliedGeburtsdatum": "TT.MM.JJJJ",
   "mitgliedGeburtsort": "Geburtsort des Mitglieds",
-  "mitgliedGeburtsland": "Geburtsland des Mitglieds (erkenne aus Geburtsort, z.B. 'Berlin' → 'Deutschland', 'Istanbul' → 'Türkei', 'Warschau' → 'Polen')",
+  "mitgliedGeburtsland": "Geburtsland (ISO-Code)",
   "mitgliedStrasse": "Straßenname",
   "mitgliedHausnummer": "Hausnummer",
   "mitgliedPlz": "Postleitzahl",
   "mitgliedKvNummer": "Krankenversicherungsnummer",
   "mitgliedKrankenkasse": "Name der Krankenkasse",
-  "familienstand": "ledig" | "verheiratet" | "geschieden" | "verwitwet",
+  "familienstand": "ledig|verheiratet|geschieden|verwitwet",
   "telefon": "Telefonnummer",
   "email": "E-Mail-Adresse",
   "beginnFamilienversicherung": "TT.MM.JJJJ",
   "datum": "JJJJ-MM-TT",
   "ort": "Wohnort",
-  "ehegatteKrankenkasse": "Name der bisherigen Krankenkasse des Ehegatten (oft gleich wie mitgliedKrankenkasse)",
+  "ehegatteKrankenkasse": "Name der bisherigen Krankenkasse des Ehegatten",
   "ehegatte": {
     "name": "Nachname",
     "vorname": "Vorname",
-    "geschlecht": "m" | "w",
+    "geschlecht": "m|w",
     "geburtsdatum": "TT.MM.JJJJ",
     "geburtsname": "Geburtsname",
     "geburtsort": "Geburtsort",
-    "geburtsland": "Geburtsland (erkenne aus Geburtsort)",
+    "geburtsland": "Geburtsland",
     "staatsangehoerigkeit": "Staatsangehörigkeit",
     "versichertennummer": "Versichertennummer",
     "bisherigBestandBei": "Vorherige Krankenkasse",
     "bisherigEndeteAm": "TT.MM.JJJJ",
-    "bisherigArt": "mitgliedschaft" | "familienversicherung",
-    "familienversichert": true | false
+    "bisherigArt": "mitgliedschaft|familienversicherung",
+    "familienversichert": true
   },
-  "kinder": [
-    {
-      "name": "Nachname",
-      "vorname": "Vorname",
-      "geschlecht": "m" | "w",
-      "geburtsdatum": "TT.MM.JJJJ",
-      "geburtsort": "Geburtsort",
-      "geburtsland": "Geburtsland (erkenne aus Geburtsort)",
-      "staatsangehoerigkeit": "Staatsangehörigkeit",
-      "versichertennummer": "Versichertennummer",
-      "verwandtschaft": "leiblich" | "adoptiert" | "stief" | "pflege",
-      "bisherigBestandBei": "Vorherige Krankenkasse",
-      "bisherigEndeteAm": "TT.MM.JJJJ",
-      "bisherigArt": "mitgliedschaft" | "familienversicherung",
-      "familienversichert": true | false
-    }
-  ],
+  "kinder": [{
+    "name": "Nachname",
+    "vorname": "Vorname",
+    "geschlecht": "m|w",
+    "geburtsdatum": "TT.MM.JJJJ",
+    "geburtsort": "Geburtsort",
+    "geburtsland": "Geburtsland",
+    "staatsangehoerigkeit": "Staatsangehörigkeit",
+    "versichertennummer": "Versichertennummer",
+    "verwandtschaft": "leiblich|adoptiert|stief|pflege",
+    "bisherigBestandBei": "Vorherige Krankenkasse",
+    "bisherigEndeteAm": "TT.MM.JJJJ",
+    "bisherigArt": "mitgliedschaft|familienversicherung",
+    "familienversichert": true
+  }],
   "rundumSicherPaket": {
     "iban": "IBAN",
     "kontoinhaber": "Name des Kontoinhabers",
@@ -66,20 +197,19 @@ const familyJsonSchema = `{
   }
 }`;
 
-// Vereinfachtes Schema nur für Rundum-Sicher-Paket (ohne Familienmitglieder)
-const rundumOnlyJsonSchema = `{
+const defaultRundumOnlySchema = `{
   "mode": "nur_rundum",
   "mitgliedName": "Nachname des Mitglieds",
   "mitgliedVorname": "Vorname des Mitglieds",
   "mitgliedGeburtsdatum": "TT.MM.JJJJ",
   "mitgliedGeburtsort": "Geburtsort des Mitglieds",
-  "mitgliedGeburtsland": "Geburtsland des Mitglieds (erkenne aus Geburtsort, z.B. 'Berlin' → 'Deutschland', 'Istanbul' → 'Türkei')",
+  "mitgliedGeburtsland": "Geburtsland (ISO-Code)",
   "mitgliedStrasse": "Straßenname",
   "mitgliedHausnummer": "Hausnummer",
   "mitgliedPlz": "Postleitzahl",
   "mitgliedKvNummer": "Krankenversicherungsnummer",
   "mitgliedKrankenkasse": "Name der Krankenkasse",
-  "familienstand": "ledig" | "verheiratet" | "geschieden" | "verwitwet",
+  "familienstand": "ledig|verheiratet|geschieden|verwitwet",
   "telefon": "Telefonnummer",
   "email": "E-Mail-Adresse",
   "datum": "JJJJ-MM-TT",
@@ -91,6 +221,105 @@ const rundumOnlyJsonSchema = `{
   }
 }`;
 
+// Schema-Router: Gibt passendes Schema und Prompt basierend auf Krankenkasse zurück
+const getSchemaForKrankenkasse = (kasse: string, mode: string): { schema: string; prompt: string } => {
+  const isFamily = mode !== 'nur_rundum';
+  
+  switch (kasse) {
+    case 'viactiv':
+      return {
+        schema: viactivSchema,
+        prompt: `Extrahiere Daten für VIACTIV Beitrittserklärung.
+
+PFLICHTFELDER MITGLIED (ALLE WICHTIG!):
+- Vorname, Name, Geburtsdatum
+- Geburtsort und Geburtsland (BEIDE PFLICHT!) - Geburtsland als ISO-Code (DE, TR, SY, PL...)
+- Adresse (Straße, Hausnummer, PLZ, Ort)
+- KV-Nummer, Krankenkasse
+- Geschlecht (weiblich/maennlich/divers)
+- Staatsangehörigkeit als ISO-Code (DE, TR, SY, PL...)
+- Beschäftigungsstatus, Versicherungsart
+
+ARBEITGEBER (PFLICHT wenn Beschäftigung = "beschaeftigt"):
+- Name, Straße, Hausnummer, PLZ, Ort - ALLE FELDER!
+
+BONUS-PROGRAMM:
+- Vertragsnummer, IBAN, Kontoinhaber (falls vorhanden)
+
+EHEGATTE (ALLE Felder wenn vorhanden):
+- Vorname, Name, Geburtsdatum, Geschlecht
+- Geburtsname, Geburtsort, Geburtsland (ISO-Code)
+- Staatsangehörigkeit (ISO-Code), Beschäftigung
+- VERSICHERTENNUMMER (PFLICHT!)
+- Bisherige Versicherungsart
+
+KINDER (ALLE Felder pro Kind):
+- Vorname, Name, Geburtsdatum, Geschlecht
+- Geburtsname, Geburtsort, Geburtsland (ISO-Code)
+- Staatsangehörigkeit (ISO-Code), Verwandtschaft
+- VERSICHERTENNUMMER (PFLICHT!)`
+      };
+      
+    case 'novitas':
+      return {
+        schema: novitasSchema,
+        prompt: `Extrahiere Daten für Novitas BKK Familienversicherung.
+
+WICHTIG - NUR DIESE FELDER FÜR MITGLIED:
+- Vorname, Name (KEINE Adresse, KEIN Geburtsdatum!)
+- KV-Nummer, Krankenkasse
+- Familienstand, Telefon, Email
+
+EHEGATTE (alle Felder):
+- Vorname, Name, Geburtsdatum, Geschlecht
+- Geburtsname, Geburtsort, Geburtsland (als KLARTEXT: Deutschland, Türkei, etc.)
+- Staatsangehörigkeit (als KLARTEXT: deutsch, türkisch, etc.)
+- Bisherige Versicherungsart (mitgliedschaft/familienversicherung)
+- bisherigVorname, bisherigNachname (Name des bisherigen Mitglieds)
+
+KINDER (alle Felder pro Kind):
+- Vorname, Name, Geburtsdatum, Geschlecht
+- Geburtsname, Geburtsort, Geburtsland (KLARTEXT)
+- Staatsangehörigkeit (KLARTEXT)
+- Verwandtschaft (leiblich/stief/pflege/adoptiert)`
+      };
+      
+    case 'dak':
+      return {
+        schema: dakSchema,
+        prompt: `Extrahiere Daten für DAK Familienversicherung.
+
+MITGLIED:
+- Vorname, Name, Geburtsdatum
+- Adresse (Straße, Hausnummer, PLZ, Ort)
+- KV-Nummer, Krankenkasse
+- Familienstand, Telefon, Email
+
+EHEGATTE (alle Felder):
+- Vorname, Name, Geburtsdatum
+- Geschlecht (m/w/d)
+- Geburtsname, Geburtsort, Geburtsland (KLARTEXT)
+- Staatsangehörigkeit (KLARTEXT)
+- Bisherige Versicherungsart
+
+KINDER (alle Felder, max 2 pro PDF):
+- Vorname, Name, Geburtsdatum
+- Geschlecht (m/w/d)
+- Geburtsname, Geburtsort, Geburtsland (KLARTEXT)
+- Staatsangehörigkeit (KLARTEXT)
+- Verwandtschaft (leiblich/stief/pflege)`
+      };
+      
+    default:
+      return {
+        schema: isFamily ? defaultFamilySchema : defaultRundumOnlySchema,
+        prompt: `Extrahiere allgemeine Versicherungsdaten.
+Identifiziere die Rollen (Mitglied, Ehegatte, Kinder) basierend auf Namen und Geburtsdaten.
+Extrahiere alle Familienmitglieder wenn vorhanden.`
+      };
+  }
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -99,7 +328,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { text, images, mode } = body;
+    const { text, images, mode, selectedKrankenkasse } = body;
     
     // Validate input - either text or images required
     if ((!text || typeof text !== 'string') && (!images || !Array.isArray(images) || images.length === 0)) {
@@ -109,9 +338,11 @@ serve(async (req) => {
       );
     }
 
-    // Determine which mode we're in
-    const isRundumOnly = mode === 'nur_rundum';
-    const jsonSchema = isRundumOnly ? rundumOnlyJsonSchema : familyJsonSchema;
+    // Get schema and prompt based on selected Krankenkasse
+    const { schema: jsonSchema, prompt: kassePrompt } = getSchemaForKrankenkasse(
+      selectedKrankenkasse || '', 
+      mode || 'familienversicherung_und_rundum'
+    );
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
@@ -125,17 +356,13 @@ serve(async (req) => {
     console.log('Processing insurance data with Gemini...');
     console.log('Input type:', images ? `${imageFiles.length} images, ${pdfFiles.length} PDFs` : 'text');
     console.log('Mode:', mode || 'familienversicherung_und_rundum');
+    console.log('Selected Krankenkasse:', selectedKrankenkasse || 'none (default)');
 
-    // Modus-spezifische Anweisungen
-    const modeInstruction = isRundumOnly 
-      ? `Du extrahierst NUR die Daten des Mitglieds selbst. IGNORIERE alle Familienmitglieder (Ehegatte, Kinder) in den Dokumenten komplett. Es handelt sich um einen Einzelantrag für das Rundum-Sicher-Paket.`
-      : `Identifiziere die Rollen (Mitglied, Ehegatte, Kinder) basierend auf Namen und Geburtsdaten. Extrahiere alle Familienmitglieder.`;
+    const systemPrompt = `Du bist ein Experte für Versicherungsdaten. Analysiere diese Dokumente.
 
-    const systemPrompt = `Du bist ein Experte für Versicherungsdaten. Analysiere diesen Stapel an Dokumenten.
+${kassePrompt}
 
-${modeInstruction}
-
-Extrahiere alle relevanten Daten (Name, Vorname, Geburtsdatum, KV-Nummer, IBAN, Krankenkasse, Arbeitgeber/Jobcenter) und gib sie EXAKT in diesem JSON-Schema zurück:
+Extrahiere alle relevanten Daten und gib sie EXAKT in diesem JSON-Schema zurück:
 
 ${jsonSchema}
 
