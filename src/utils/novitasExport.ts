@@ -114,8 +114,9 @@ const fillBasicFields = (
   setTextField("fna_BeginnFamiVers", dates.beginDate);
   setTextField("fna_Telefon", formData.telefon);
   setTextField("fna_Email", formData.email);
-  setTextField("datum", dates.today);
-  setTextField("ort", formData.ort);
+  // Kombiniertes Format: "Ort, Datum" (z.B. "Berlin, 30.01.2026")
+  const ortDatum = formData.ort ? `${formData.ort}, ${dates.today}` : dates.today;
+  setTextField("datum", ortDatum);
   
   // Familienstand - use RadioButton (not Checkbox!)
   const familienstandMap: Record<string, string> = {
