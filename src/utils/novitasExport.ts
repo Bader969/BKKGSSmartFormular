@@ -197,8 +197,9 @@ const fillSpouseFields = (
     setTextField("famv_name_bisher_kv_partner", formData.mitgliedName);
   }
   
-  // Current Kasse if continues
-  if (ehegatte.bisherigBestehtWeiter) {
+  // Current Kasse if continues - only fill if insurance continues at a DIFFERENT provider (not NOVITAS)
+  if (ehegatte.bisherigBestehtWeiter && ehegatte.bisherigBestehtWeiterBei && 
+      !ehegatte.bisherigBestehtWeiterBei.toLowerCase().includes('novitas')) {
     setTextField("fna_PartnerAktuelleKasse", ehegatte.bisherigBestehtWeiterBei);
   }
   
