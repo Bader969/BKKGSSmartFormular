@@ -145,8 +145,8 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
         </div>
       )}
       
-      {/* Versichertennummer - bei Novitas nicht anzeigen (kein PDF-Feld) */}
-      {selectedKrankenkasse !== 'novitas' && (
+      {/* Versichertennummer - bei Novitas und DAK nicht anzeigen (kein PDF-Feld) */}
+      {selectedKrankenkasse !== 'novitas' && selectedKrankenkasse !== 'dak' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             type="text"
@@ -173,8 +173,8 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
         </div>
       )}
       
-      {/* Bei Novitas nur das Verwandtschaftsverhältnis anzeigen (für Kinder) */}
-      {selectedKrankenkasse === 'novitas' && type === 'child' && (
+      {/* Bei Novitas oder DAK nur das Verwandtschaftsverhältnis anzeigen (für Kinder) */}
+      {(selectedKrankenkasse === 'novitas' || selectedKrankenkasse === 'dak') && type === 'child' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             type="select"
