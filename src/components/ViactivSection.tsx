@@ -284,20 +284,20 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <FormField
                 type="text"
-                label="Name"
-                id="viactiv-ehegatte-name"
-                value={formData.ehegatte.name}
-                onChange={(value) => updateEhegatte({ name: value })}
-                placeholder="Nachname"
-                validate={validateName}
-              />
-              <FormField
-                type="text"
                 label="Vorname"
                 id="viactiv-ehegatte-vorname"
                 value={formData.ehegatte.vorname}
                 onChange={(value) => updateEhegatte({ vorname: value })}
                 placeholder="Vorname"
+                validate={validateName}
+              />
+              <FormField
+                type="text"
+                label="Name"
+                id="viactiv-ehegatte-name"
+                value={formData.ehegatte.name}
+                onChange={(value) => updateEhegatte({ name: value })}
+                placeholder="Nachname"
                 validate={validateName}
               />
               <FormField
@@ -473,20 +473,20 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <FormField
                         type="text"
-                        label="Name"
-                        id={`viactiv-kind${index}-name`}
-                        value={kind.name}
-                        onChange={(value) => updateKind(index, { name: value })}
-                        placeholder="Nachname"
-                        validate={validateName}
-                      />
-                      <FormField
-                        type="text"
                         label="Vorname"
                         id={`viactiv-kind${index}-vorname`}
                         value={kind.vorname}
                         onChange={(value) => updateKind(index, { vorname: value })}
                         placeholder="Vorname"
+                        validate={validateName}
+                      />
+                      <FormField
+                        type="text"
+                        label="Name"
+                        id={`viactiv-kind${index}-name`}
+                        value={kind.name}
+                        onChange={(value) => updateKind(index, { name: value })}
+                        placeholder="Nachname"
                         validate={validateName}
                       />
                       <FormField
