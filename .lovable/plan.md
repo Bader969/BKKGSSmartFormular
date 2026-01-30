@@ -1,24 +1,51 @@
 
 
-# Fix: VIACTIV Ehegatte BE - Adressdaten vom Hauptmitglied übernehmen
+# Novitas BKK: Auto-Sync "bisherige Versicherung besteht weiter bei" mit Hauptmitglied-Krankenkasse
 
 ## Problem
 
-Bei der Ehegatte-Beitrittserklärung (wenn der Ehegatte eine eigene Mitgliedschaft hat) werden die Adressfelder **Straße** und **PLZ** nicht ins PDF geschrieben, wenn das Feld `abweichendeAnschrift` einen Wert enthält.
+Bei Novitas BKK wird das Feld "bisherige Versicherung besteht weiter bei" (unter dem Checkbox "bisherige Versicherung besteht weiter") immer mit "NOVITAS BKK" vorausgefüllt.
 
-### Aktuelle Logik (Zeilen 341-353):
+**Gewünscht:** Das Feld soll automatisch mit dem Namen der Krankenkasse des Hauptmitglieds (`formData.mitgliedKrankenkasse`) synchronisiert werden.
 
+---
+
+## Betroffene Dateien
+
+### 1. `src/components/FamilyMemberForm.tsx`
+
+Dieses Formular wird für Ehegatte und Kinder verwendet. Das Problem ist in Zeilen 213-221:
+
+**Aktuell:**
 ```typescript
-if (spouse.abweichendeAnschrift) {
-  setTextField("Straße", "");           // ❌ Wird leer gesetzt
-  setTextField("Hausnummer", "");       // ❌ Wird leer gesetzt
-  setTextField("PLZ", "");              // ❌ Wird leer gesetzt
-  setTextField("Ort", spouse.abweichendeAnschrift);
-} else {
-  setTextField("Straße", formData.mitgliedStrasse || "");
-  setTextField("Hausnummer", formData.mitgliedHausnummer || "");
-  setTextField("PLZ", formData.mitgliedPlz || "");
-  setTextField("Ort", formData.ort || "");
+<FormField
+  type="text"
+  label="Bei"
+  id={`${prefix}-bestehtWeiterBei`}
+  value={member.bisherigBestehtWeiterBei || getDefaultKrankenkasseName(selectedKrankenkasse)}
+  onChange={(value) => updateMember({ bisherigBestehtWeiterBei: value })}
+  placeholder={getDefaultKrankenkasseName(selectedKrankenkasse)}
+  required
+/>
+```
+
+**Problem:** `getDefaultKrankenkasseName(selectedKrankenkasse)` gibt "NOVITAS BKK" zurück, nicht den tatsächlichen Wert aus dem Hauptmitglied-Feld.
+
+### 2. `src/utils/novitasExport.ts`
+
+Die Export-Logik verwendet bereits einen Fallback auf "NOVITAS BKK":
+
+**Ehegatte (Zeilen 176-180):**
+```typescript
+if (ehegatte.bisherigBestehtWeiter) {
+  setTextField("fna_PartnerNameAltkasse", ehegatte.bisherigBestehtWeiterBei || "NOVITAS BKK");
+}
+```
+
+**Kinder (Zeilen 264-267):**
+```typescript
+if (kind.bisherigBestehtWeiter) {
+  setTextField(`famv_kv_kind_${i}`, kind.bisherigBestehtWeiterBei || "NOVITAS BKK");
 }
 ```
 
@@ -26,40 +53,85 @@ if (spouse.abweichendeAnschrift) {
 
 ## Lösung
 
-Die Adressdaten (Straße, Hausnummer, PLZ) sollen **immer** vom Hauptmitglied übernommen werden. Nur der Ort kann abweichend sein.
+### Schritt 1: FamilyMemberForm.tsx anpassen
 
-### Neue Logik:
+Die Komponente muss `mitgliedKrankenkasse` als neuen Prop erhalten und diesen Wert als Default verwenden.
 
+**Interface erweitern:**
 ```typescript
-// Adresse IMMER vom Hauptmitglied übernehmen
-setTextField("Straße", formData.mitgliedStrasse || "");
-setTextField("Hausnummer", formData.mitgliedHausnummer || "");
-setTextField("PLZ", formData.mitgliedPlz || "");
+interface FamilyMemberFormProps {
+  member: FamilyMember;
+  updateMember: (updates: Partial<FamilyMember>) => void;
+  type: 'spouse' | 'child';
+  childIndex?: number;
+  selectedKrankenkasse?: Krankenkasse;
+  mitgliedKrankenkasse?: string;  // NEU
+}
+```
 
-// Ort: abweichende Anschrift oder vom Hauptmitglied
-if (spouse.abweichendeAnschrift) {
-  setTextField("Ort", spouse.abweichendeAnschrift);
-} else {
-  setTextField("Ort", formData.ort || "");
+**Neuer Default-Wert:**
+```typescript
+// Bei Novitas: mitgliedKrankenkasse als Default, sonst getDefaultKrankenkasseName
+const getDefaultBeiValue = (): string => {
+  if (selectedKrankenkasse === 'novitas' && mitgliedKrankenkasse) {
+    return mitgliedKrankenkasse;
+  }
+  return getDefaultKrankenkasseName(selectedKrankenkasse);
+};
+```
+
+**FormField anpassen:**
+```typescript
+<FormField
+  type="text"
+  label="Bei"
+  id={`${prefix}-bestehtWeiterBei`}
+  value={member.bisherigBestehtWeiterBei || getDefaultBeiValue()}
+  onChange={(value) => updateMember({ bisherigBestehtWeiterBei: value })}
+  placeholder={getDefaultBeiValue()}
+  required
+/>
+```
+
+### Schritt 2: SpouseSection.tsx und ChildrenSection.tsx anpassen
+
+Den neuen Prop `mitgliedKrankenkasse` an FamilyMemberForm übergeben.
+
+### Schritt 3: novitasExport.ts anpassen
+
+Den Fallback von "NOVITAS BKK" auf `formData.mitgliedKrankenkasse` ändern:
+
+**Ehegatte:**
+```typescript
+if (ehegatte.bisherigBestehtWeiter) {
+  setTextField("fna_PartnerNameAltkasse", ehegatte.bisherigBestehtWeiterBei || formData.mitgliedKrankenkasse);
+}
+```
+
+**Kinder:**
+```typescript
+if (kind.bisherigBestehtWeiter) {
+  setTextField(`famv_kv_kind_${i}`, kind.bisherigBestehtWeiterBei || formData.mitgliedKrankenkasse);
 }
 ```
 
 ---
 
-## Änderung
+## Zusammenfassung der Änderungen
 
-| Datei | Zeilen | Beschreibung |
-|-------|--------|--------------|
-| `src/utils/viactivExport.ts` | 341-353 | Adressfelder immer vom Hauptmitglied übernehmen |
+| Datei | Änderung |
+|-------|----------|
+| `src/components/FamilyMemberForm.tsx` | Neuer Prop `mitgliedKrankenkasse`, Default-Logik anpassen |
+| `src/components/SpouseSection.tsx` | Prop `mitgliedKrankenkasse` übergeben |
+| `src/components/ChildrenSection.tsx` | Prop `mitgliedKrankenkasse` übergeben |
+| `src/utils/novitasExport.ts` | Fallback auf `formData.mitgliedKrankenkasse` statt "NOVITAS BKK" |
 
 ---
 
 ## Ergebnis
 
-| Feld | Vorher | Nachher |
-|------|--------|---------|
-| Straße | Leer (wenn abweichende Anschrift) | **Vom Hauptmitglied** |
-| Hausnummer | Leer (wenn abweichende Anschrift) | **Vom Hauptmitglied** |
-| PLZ | Leer (wenn abweichende Anschrift) | **Vom Hauptmitglied** |
-| Ort | Abweichende Anschrift oder Hauptmitglied | Abweichende Anschrift oder Hauptmitglied (unverändert) |
+| Vorher | Nachher |
+|--------|---------|
+| "NOVITAS BKK" (hardcoded) | Dynamisch: Wert aus "Name der Krankenkasse" des Hauptmitglieds |
+| Export: Fallback "NOVITAS BKK" | Export: Fallback `formData.mitgliedKrankenkasse` |
 
