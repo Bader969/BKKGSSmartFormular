@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { FormSection } from './FormSection';
 import { FormField } from './FormField';
 import { FormData, VIACTIV_GESCHLECHT_OPTIONS, VIACTIV_BESCHAEFTIGUNG_OPTIONS, VIACTIV_VERSICHERUNGSART_OPTIONS, ArbeitgeberDaten, FamilyMember, createEmptyFamilyMember } from '@/types/form';
@@ -6,7 +6,7 @@ import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import { validateName, validateStrasse, validateHausnummer, validatePlz, validateOrt, validateSelect } from '@/utils/validation';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { NATIONALITY_OPTIONS, COUNTRY_OPTIONS } from '@/utils/countries';
 import { calculateDates } from '@/utils/dateUtils';
@@ -19,6 +19,40 @@ interface ViactivSectionProps {
 
 export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, updateFormData }) => {
   const { endDate } = calculateDates();
+  
+  // Hilfsfunktion für Altersberechnung
+  const calculateAge = (geburtsdatum: string): number => {
+    if (!geburtsdatum) return 0;
+    
+    let birthDate: Date | null = null;
+    
+    // ISO format: YYYY-MM-DD
+    if (geburtsdatum.includes('-')) {
+      const parts = geburtsdatum.split('-');
+      if (parts.length === 3) {
+        birthDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      }
+    }
+    // German format: TT.MM.JJJJ
+    else if (geburtsdatum.includes('.')) {
+      const parts = geburtsdatum.split('.');
+      if (parts.length === 3) {
+        birthDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      }
+    }
+    
+    if (!birthDate) return 0;
+    
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
   
   const updateArbeitgeber = (updates: Partial<ArbeitgeberDaten>) => {
     updateFormData({
@@ -48,6 +82,28 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
     const newKinder = formData.kinder.filter((_, i) => i !== index);
     updateFormData({ kinder: newKinder });
   };
+  
+  // Automatische Erkennung: ALG II + Kind >= 15 = eigene Mitgliedschaft
+  useEffect(() => {
+    const isAlgII = formData.viactivBeschaeftigung === 'al_geld_2';
+    
+    if (isAlgII && formData.kinder.length > 0) {
+      const updatedKinder = formData.kinder.map((kind) => {
+        const age = calculateAge(kind.geburtsdatum);
+        // Nur automatisch setzen wenn Kind >= 15 UND Hauptmitglied ALG II
+        if (age >= 15 && !kind.eigeneMitgliedschaft) {
+          return { ...kind, eigeneMitgliedschaft: true };
+        }
+        return kind;
+      });
+      
+      // Nur updaten wenn sich etwas geändert hat
+      const hasChanges = updatedKinder.some((k, i) => k.eigeneMitgliedschaft !== formData.kinder[i].eigeneMitgliedschaft);
+      if (hasChanges) {
+        updateFormData({ kinder: updatedKinder });
+      }
+    }
+  }, [formData.viactivBeschaeftigung]);
 
   const geschlechtOptions = VIACTIV_GESCHLECHT_OPTIONS.map(opt => ({
     value: opt.value,
@@ -640,11 +696,56 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                       </div>
                     </div>
 
+                    {/* Eigene Mitgliedschaft Option - nur für Kinder >= 15 anzeigen */}
+                    {calculateAge(kind.geburtsdatum) >= 15 && (
+                      <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <Checkbox
+                            id={`viactiv-kind${index}-eigene-mitgliedschaft`}
+                            checked={kind.eigeneMitgliedschaft}
+                            onCheckedChange={(checked) => 
+                              updateKind(index, { eigeneMitgliedschaft: checked === true })
+                            }
+                          />
+                          <Label 
+                            htmlFor={`viactiv-kind${index}-eigene-mitgliedschaft`} 
+                            className="text-sm font-medium cursor-pointer"
+                          >
+                            Kind hat eigene Mitgliedschaft (nicht familienversichert)
+                          </Label>
+                        </div>
+                        {formData.viactivBeschaeftigung === 'al_geld_2' && (
+                          <p className="text-xs text-amber-700 mt-2 flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            <strong>Automatisch aktiviert:</strong> Da Sie ALG II beziehen und das Kind 15+ Jahre alt ist, 
+                            benötigt das Kind eine eigene Mitgliedschaft.
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Bei eigener Mitgliedschaft wird eine separate Beitrittserklärung und Bonus-Erwachsene (170€) erstellt.
+                          Das Kind wird nicht in die Familienversicherung eingetragen.
+                        </p>
+                      </div>
+                    )}
+
                     {index < formData.kinder.length - 1 && (
                       <hr className="my-6 border-accent/30" />
                     )}
                   </div>
                 ))}
+
+                {/* Hinweis bei ALG II Auswahl */}
+                {formData.viactivBeschaeftigung === 'al_geld_2' && formData.kinder.some(k => calculateAge(k.geburtsdatum) >= 15) && (
+                  <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-sm text-amber-800 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span>
+                        <strong>Hinweis ALG II:</strong> Kinder ab 15 Jahren benötigen bei ALG II-Bezug 
+                        eine eigene Mitgliedschaft. Diese werden automatisch mit eigener Beitrittserklärung exportiert.
+                      </span>
+                    </p>
+                  </div>
+                )}
 
                 <Button
                   type="button"

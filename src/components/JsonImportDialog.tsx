@@ -102,6 +102,7 @@ const createViactivExampleJson = (): Partial<FormData> => ({
     versichertennummer: 'B987654321',
     familienversichert: true,
     beschaeftigung: 'beschaeftigt',
+    eigeneMitgliedschaft: false,
   },
   kinder: [
     {
@@ -126,6 +127,7 @@ const createViactivExampleJson = (): Partial<FormData> => ({
       versichertennummer: 'C111222333',
       familienversichert: true,
       beschaeftigung: '',
+      eigeneMitgliedschaft: false,
     },
   ],
 });
@@ -162,6 +164,7 @@ const createNovitasExampleJson = (): Partial<FormData> => ({
     versichertennummer: '',
     familienversichert: true,
     beschaeftigung: '',
+    eigeneMitgliedschaft: false,
   },
   kinder: [
     {
@@ -186,6 +189,7 @@ const createNovitasExampleJson = (): Partial<FormData> => ({
       versichertennummer: '',
       familienversichert: true,
       beschaeftigung: '',
+      eigeneMitgliedschaft: false,
     },
   ],
 });
@@ -226,6 +230,7 @@ const createDakExampleJson = (): Partial<FormData> => ({
     versichertennummer: '',
     familienversichert: true,
     beschaeftigung: '',
+    eigeneMitgliedschaft: false,
   },
   kinder: [
     {
@@ -250,6 +255,7 @@ const createDakExampleJson = (): Partial<FormData> => ({
       versichertennummer: '',
       familienversichert: true,
       beschaeftigung: '',
+      eigeneMitgliedschaft: false,
     },
   ],
 });
@@ -289,6 +295,7 @@ const createGenericExampleJson = (): Partial<FormData> => ({
     versichertennummer: '',
     familienversichert: true,
     beschaeftigung: '',
+    eigeneMitgliedschaft: false,
   },
   kinder: [
     {
@@ -313,6 +320,7 @@ const createGenericExampleJson = (): Partial<FormData> => ({
       versichertennummer: '',
       familienversichert: true,
       beschaeftigung: '',
+      eigeneMitgliedschaft: false,
     },
   ],
 });

@@ -387,41 +387,44 @@ export const exportViactivBonusPDFs = async (formData: FormData): Promise<number
       count++;
     }
 
-    // 3. Kinder (falls vorhanden und Familienversicherung aktiviert)
+    // 3. Kinder - NEU: Unterscheidung nach eigener Mitgliedschaft
     if (formData.viactivFamilienangehoerigeMitversichern && formData.kinder.length > 0) {
       for (const kind of formData.kinder) {
         if (!kind.name || !kind.vorname) continue;
         
-        console.log(`VIACTIV Bonus: Erstelle PDF für Kind ${kind.vorname} ${kind.name} (Alter: ${calculateAge(kind.geburtsdatum)})`);
+        const age = calculateAge(kind.geburtsdatum);
         
-        if (isChild(kind.geburtsdatum)) {
-          // Unter 15: Kinder-PDF (110€)
-          const kindPdfBytes = await createBonusKinderPDF(
-            formData,
-            kind,
-            formData.unterschrift, // Hauptmitglied unterschreibt für Kinder
-          );
-          const kindFilename = generateBonusFilename(
-            kind.name,
-            kind.vorname,
-            kind.geburtsdatum,
-          );
-          downloadPDF(kindPdfBytes, kindFilename);
-        } else {
-          // 15+: Erwachsene-PDF (170€) - unterschrieben vom Hauptmitglied
+        // NEU: Kind mit eigener Mitgliedschaft = IMMER Erwachsenen-Bonus
+        if (kind.eigeneMitgliedschaft) {
+          console.log(`VIACTIV Bonus: Kind ${kind.vorname} ${kind.name} hat eigene Mitgliedschaft -> Erwachsenen-Bonus`);
           const kindPdfBytes = await createBonusErwachsenePDF(
             formData,
             kind.vorname,
             kind.name,
             kind.geburtsdatum,
             kind.versichertennummer,
-            formData.unterschrift, // Hauptmitglied unterschreibt
+            formData.unterschrift,
           );
-          const kindFilename = generateBonusFilename(
-            kind.name,
+          const kindFilename = generateBonusFilename(kind.name, kind.vorname, kind.geburtsdatum);
+          downloadPDF(kindPdfBytes, kindFilename);
+        } 
+        // Unter 15 und familienversichert = Kinder-Bonus
+        else if (age < 15) {
+          const kindPdfBytes = await createBonusKinderPDF(formData, kind, formData.unterschrift);
+          const kindFilename = generateBonusFilename(kind.name, kind.vorname, kind.geburtsdatum);
+          downloadPDF(kindPdfBytes, kindFilename);
+        }
+        // 15+ und familienversichert = Erwachsenen-Bonus
+        else {
+          const kindPdfBytes = await createBonusErwachsenePDF(
+            formData,
             kind.vorname,
+            kind.name,
             kind.geburtsdatum,
+            kind.versichertennummer,
+            formData.unterschrift,
           );
+          const kindFilename = generateBonusFilename(kind.name, kind.vorname, kind.geburtsdatum);
           downloadPDF(kindPdfBytes, kindFilename);
         }
         count++;

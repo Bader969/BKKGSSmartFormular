@@ -24,6 +24,8 @@ export interface FamilyMember {
   familienversichert: boolean;
   // VIACTIV Ehegatte-BE Felder
   beschaeftigung: '' | 'beschaeftigt' | 'ausbildung' | 'rente' | 'freiwillig_versichert' | 'studiere' | 'al_geld_1' | 'al_geld_2' | 'minijob' | 'selbststaendig' | 'einkommen_ueber_grenze';
+  // VIACTIV Kind mit eigener Mitgliedschaft (für Kinder >= 15 bei ALG II)
+  eigeneMitgliedschaft: boolean;
 }
 
 // Arzt-Daten für Rundum-Sicher-Paket
@@ -260,6 +262,7 @@ export const createEmptyFamilyMember = (): FamilyMember => ({
   versichertennummer: '',
   familienversichert: true,
   beschaeftigung: '',
+  eigeneMitgliedschaft: false,
 });
 
 export const createInitialFormData = (): FormData => {

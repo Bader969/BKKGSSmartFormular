@@ -230,10 +230,18 @@ const Index = () => {
       // VIACTIV Export
       if (formData.selectedKrankenkasse === 'viactiv') {
         if (formData.viactivFamilienangehoerigeMitversichern) {
-          const numberOfFamilyPDFs = Math.max(1, Math.ceil(formData.kinder.length / 3));
+          // Berechne Anzahl der PDFs inkl. eigener Mitgliedschaft für Kinder
+          const kinderMitEigenerMitgliedschaft = formData.kinder.filter(k => k.eigeneMitgliedschaft).length;
+          const familienversicherteKinder = formData.kinder.length - kinderMitEigenerMitgliedschaft;
+          
+          const numberOfFamilyPDFs = familienversicherteKinder > 0 || formData.ehegatte.name 
+            ? Math.max(1, Math.ceil(familienversicherteKinder / 3)) 
+            : 0;
+          
           const hasSpouseWithOwnMembership = formData.ehegatte.name && formData.ehegatte.bisherigArt === 'mitgliedschaft';
-          const numberOfBEs = hasSpouseWithOwnMembership ? 2 : 1;
+          const numberOfBEs = 1 + (hasSpouseWithOwnMembership ? 1 : 0) + kinderMitEigenerMitgliedschaft;
           const numberOfBonusPDFs = 1 + (formData.ehegatte.name ? 1 : 0) + formData.kinder.length;
+          
           toast.info(`Es werden ${numberOfBEs} Beitrittserklärung(en), ${numberOfFamilyPDFs} Familienversicherungs-PDF(s) und ${numberOfBonusPDFs} Bonus-PDF(s) erstellt...`);
           await exportViactivBeitrittserklaerung(formData);
           await exportViactivFamilienversicherung(formData);
