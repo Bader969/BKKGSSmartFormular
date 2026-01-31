@@ -366,6 +366,7 @@ const createViactivFamilyPDF = async (
 /**
  * Exportiert VIACTIV Familienversicherung PDF(s)
  * Bei mehr als 3 Kindern werden mehrere PDFs erstellt
+ * Kinder mit eigener Mitgliedschaft werden ausgeschlossen
  */
 export const exportViactivFamilienversicherung = async (formData: FormData): Promise<void> => {
   if (!formData.viactivFamilienangehoerigeMitversichern) {
@@ -373,8 +374,16 @@ export const exportViactivFamilienversicherung = async (formData: FormData): Pro
     return;
   }
 
-  const children = formData.kinder;
-  const numberOfPDFs = Math.max(1, Math.ceil(children.length / 3));
+  // NEU: Nur Kinder OHNE eigene Mitgliedschaft in Familienversicherung eintragen
+  const familienversicherteKinder = formData.kinder.filter(kind => !kind.eigeneMitgliedschaft);
+  
+  // Wenn keine Kinder mehr für Familienversicherung UND kein Ehegatte, kein PDF erstellen
+  if (familienversicherteKinder.length === 0 && !formData.ehegatte.name) {
+    console.log("Keine familienversicherten Angehörigen, kein PDF erstellt");
+    return;
+  }
+
+  const numberOfPDFs = Math.max(1, Math.ceil(familienversicherteKinder.length / 3));
   
   const today = new Date();
   // Datum mit Punkten: TT.MM.JJJJ
@@ -386,7 +395,7 @@ export const exportViactivFamilienversicherung = async (formData: FormData): Pro
   try {
     for (let pdfIndex = 0; pdfIndex < numberOfPDFs; pdfIndex++) {
       const startChildIndex = pdfIndex * 3;
-      const childrenForThisPDF = children.slice(startChildIndex, startChildIndex + 3);
+      const childrenForThisPDF = familienversicherteKinder.slice(startChildIndex, startChildIndex + 3);
 
       const pdfBytes = await createViactivFamilyPDF(formData, childrenForThisPDF, pdfIndex + 1);
 

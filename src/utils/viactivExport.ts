@@ -1,5 +1,5 @@
 import { PDFDocument } from "pdf-lib";
-import { FormData } from "@/types/form";
+import { FormData, FamilyMember } from "@/types/form";
 import { getNationalityName } from "@/utils/countries";
 
 /**
@@ -408,6 +408,101 @@ export const createViactivBeitrittserklaerungForSpouse = async (formData: FormDa
   return await pdfDoc.save();
 };
 
+/**
+ * Erstellt eine Beitrittserklärung für ein Kind mit eigener Mitgliedschaft
+ */
+export const createViactivBeitrittserklaerungForChild = async (
+  formData: FormData, 
+  kind: FamilyMember
+): Promise<Uint8Array> => {
+  const pdfUrl = "/viactiv-beitrittserklaerung.pdf";
+  const existingPdfBytes = await fetch(pdfUrl).then((res) => res.arrayBuffer());
+  const pdfDoc = await PDFDocument.load(existingPdfBytes);
+  const form = pdfDoc.getForm();
+  
+  const helpers = createPDFHelpers(form);
+  const { setTextField, setCheckbox } = helpers;
+
+  // === AUTOMATISCH AUSGEFÜLLT ===
+  const datumMitgliedschaft = getDatumMitgliedschaft();
+  setTextField("Datum Mitgliedschaft", datumMitgliedschaft);
+  
+  const versichertBis = getVersichertBis();
+  setTextField("versichert bis (Datum)", versichertBis);
+  
+  setCheckbox("Mein Versicherungsstatus ist unverändert", true);
+  setCheckbox("Datenschutz- und werberechliche Einwilligungserklärung", true);
+
+  // === PERSÖNLICHE DATEN DES KINDES ===
+  setTextField("Name", kind.name);
+  setTextField("Vorname", kind.vorname);
+  
+  const geburtsdatumFormatted = formatInputDate(kind.geburtsdatum);
+  setTextField("Geburtsdatum", geburtsdatumFormatted);
+  
+  setTextField("Geburtsort", kind.geburtsort || "");
+  setTextField("Geburtsland", kind.geburtsland || "");
+  setTextField("Geburtsname", kind.geburtsname || kind.name);
+  
+  const staatsangehoerigkeitVoll = getNationalityName(kind.staatsangehoerigkeit) || kind.staatsangehoerigkeit || "deutsch";
+  setTextField("Staatsangehörigkeit", staatsangehoerigkeitVoll);
+
+  // === GESCHLECHT ===
+  setCheckbox("weiblich", kind.geschlecht === "w");
+  setCheckbox("männlich", kind.geschlecht === "m");
+  setCheckbox("divers", kind.geschlecht === "d" || kind.geschlecht === "x");
+
+  // === ADRESSE (vom Hauptmitglied) ===
+  setTextField("Straße", formData.mitgliedStrasse || "");
+  setTextField("Hausnummer", formData.mitgliedHausnummer || "");
+  setTextField("PLZ", formData.mitgliedPlz || "");
+  
+  if (kind.abweichendeAnschrift) {
+    setTextField("Ort", kind.abweichendeAnschrift);
+  } else {
+    setTextField("Ort", formData.ort || "");
+  }
+  
+  // === KONTAKT (vom Hauptmitglied) ===
+  setTextField("Telefon", formData.telefon || "");
+  setTextField("E-Mail", formData.email || "");
+
+  // === FAMILIENSTAND (Kind ist ledig) ===
+  setCheckbox("ledig", true);
+  setCheckbox("verheiratet", false);
+  setCheckbox("Lebenspartnerschaft", false);
+
+  // === BESCHÄFTIGUNGSSTATUS (Kind - in der Regel nicht beschäftigt) ===
+  // Alle Checkboxen leer lassen da Kind normalerweise nicht beschäftigt
+
+  // === BISHERIGE VERSICHERUNGSART ===
+  // Kind war familienversichert
+  setCheckbox("pflichtversichert", false);
+  setCheckbox("privat", false);
+  setCheckbox("freiwillig versichert", false);
+  setCheckbox("nicht gesetzl. versichert", false);
+  setCheckbox("familienversichert", true);
+  setCheckbox("Zuzug aus dem Ausland", false);
+
+  // === BISHERIGE KRANKENKASSE ===
+  setTextField("Name der letzten KrankenkasseKrankenversicherung", kind.bisherigBestandBei || formData.mitgliedKrankenkasse || "");
+
+  // === FAMILIENANGEHÖRIGE MITVERSICHERN (nein für Kind) ===
+  setCheckbox("Familienangehörige sollen mitversichert werden", false);
+
+  // === DATUM UND UNTERSCHRIFT ===
+  const today = new Date();
+  const datumHeute = formatDateGermanWithDots(today);
+  setTextField("Datum und Unterschrift", datumHeute);
+
+  // Unterschrift: Hauptmitglied unterschreibt für Kind
+  if (formData.unterschrift) {
+    await embedSignature(pdfDoc, formData.unterschrift, 180, 735, 0);
+  }
+
+  return await pdfDoc.save();
+};
+
 export const exportViactivBeitrittserklaerung = async (formData: FormData): Promise<void> => {
   try {
     // Hauptmitglied BE exportieren
@@ -435,6 +530,20 @@ export const exportViactivBeitrittserklaerung = async (formData: FormData): Prom
       const spouseFilename = `Viactiv_${spouseNachname}, ${spouseVorname}_BE_${datumForFilename}.pdf`;
       
       downloadPDF(spousePdfBytes, spouseFilename);
+    }
+
+    // NEU: Kinder BE (wenn eigene Mitgliedschaft)
+    if (formData.viactivFamilienangehoerigeMitversichern) {
+      for (let i = 0; i < formData.kinder.length; i++) {
+        const kind = formData.kinder[i];
+        if (kind.name && kind.eigeneMitgliedschaft) {
+          console.log(`VIACTIV: Erstelle Beitrittserklärung für Kind ${kind.vorname} ${kind.name} mit eigener Mitgliedschaft`);
+          
+          const kindPdfBytes = await createViactivBeitrittserklaerungForChild(formData, kind);
+          const kindFilename = `Viactiv_${kind.name}, ${kind.vorname}_BE_${datumForFilename}.pdf`;
+          downloadPDF(kindPdfBytes, kindFilename);
+        }
+      }
     }
   } catch (error) {
     console.error("Error exporting VIACTIV PDF:", error);
