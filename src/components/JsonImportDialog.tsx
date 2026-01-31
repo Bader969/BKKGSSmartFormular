@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Upload, Copy, Check, Sparkles, Loader2, X, FileImage, Shield, Image, Download, FileText, Lock, AlertTriangle } from 'lucide-react';
+import { Upload, Copy, Check, Sparkles, Loader2, X, FileImage, Shield, Image, Download, FileText, AlertTriangle } from 'lucide-react';
 import { FormData, FormMode, Krankenkasse } from '@/types/form';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,9 +11,6 @@ import { Progress } from '@/components/ui/progress';
 import { createCombinedPdf, downloadBlob } from '@/utils/pdfUtils';
 import { formatDateForInput } from '@/utils/dateUtils';
 import { applyKrankenkassenMapping } from '@/utils/krankenkassenMapping';
-
-// Passwort für den Zugang zum Import-Dialog
-const IMPORT_PASSWORD = 'Ahmad19Bader96';
 
 /**
  * Convert a File to base64 string (without data URL prefix)
@@ -334,8 +331,6 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
   const [isDragging, setIsDragging] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState(false);
 
   // Dynamisches Beispiel-JSON basierend auf ausgewählter Krankenkasse
@@ -674,29 +669,9 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
   const hasImages = uploadedFiles.some(f => f.mimeType.startsWith('image/'));
   const hasPdfs = uploadedFiles.some(f => f.mimeType === 'application/pdf');
 
-  const handlePasswordSubmit = () => {
-    if (passwordInput === IMPORT_PASSWORD) {
-      setIsAuthenticated(true);
-      setPasswordError(false);
-      setPasswordInput('');
-    } else {
-      setPasswordError(true);
-      toast.error('Falsches Passwort');
-    }
-  };
-
-  const handleDialogClose = (isOpen: boolean) => {
-    setOpen(isOpen);
-    if (!isOpen) {
-      // Reset password state when dialog closes
-      setIsAuthenticated(false);
-      setPasswordInput('');
-      setPasswordError(false);
-    }
-  };
 
   return (
-    <Dialog open={open} onOpenChange={handleDialogClose}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
           <Upload className="h-4 w-4" />
@@ -704,43 +679,12 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        {!isAuthenticated ? (
-          // Password Screen
-          <div className="py-8">
-            <DialogHeader className="mb-6">
-              <DialogTitle className="flex items-center gap-2 justify-center">
-                <Lock className="h-5 w-5" />
-                Passwort erforderlich
-              </DialogTitle>
-              <DialogDescription className="text-center">
-                Bitte geben Sie das Passwort ein, um auf den Import zuzugreifen.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex flex-col items-center gap-4 max-w-xs mx-auto">
-              <Input
-                type="password"
-                placeholder="Passwort eingeben..."
-                value={passwordInput}
-                onChange={(e) => {
-                  setPasswordInput(e.target.value);
-                  setPasswordError(false);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handlePasswordSubmit();
-                  }
-                }}
-                className={passwordError ? 'border-destructive' : ''}
-              />
-              <Button onClick={handlePasswordSubmit} className="w-full gap-2">
-                <Lock className="h-4 w-4" />
-                Entsperren
-              </Button>
-            </div>
-          </div>
-        ) : (
-          // Main Content (after password)
-          <>
+        <DialogHeader>
+          <DialogTitle>Dokumente & Daten importieren</DialogTitle>
+          <DialogDescription>
+            Laden Sie Dokumente hoch oder fügen Sie Text ein – die KI extrahiert automatisch alle Versicherungsdaten.
+          </DialogDescription>
+        </DialogHeader>
             <DialogHeader>
               <DialogTitle>Dokumente & Daten importieren</DialogTitle>
               <DialogDescription>
@@ -931,9 +875,7 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
               {exampleJson}
             </pre>
           </details>
-            </div>
-          </>
-        )}
+        </div>
       </DialogContent>
     </Dialog>
   );
