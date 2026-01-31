@@ -45,25 +45,41 @@ interface UploadedFile {
   mimeType: string;
 }
 
-// Beispiel-JSON-Daten für Familienversicherung + Rundum
-const createFamilyExampleJson = (): Partial<FormData> => ({
-  mode: 'familienversicherung_und_rundum',
+// ==========================================
+// KRANKENKASSENSPEZIFISCHE BEISPIEL-JSON FUNKTIONEN
+// ==========================================
+
+// VIACTIV Beispiel-JSON
+const createViactivExampleJson = (): Partial<FormData> => ({
   mitgliedName: 'Mustermann',
   mitgliedVorname: 'Max',
   mitgliedGeburtsdatum: '15.05.1985',
   mitgliedGeburtsort: 'Berlin',
-  mitgliedGeburtsland: 'Deutschland',
+  mitgliedGeburtsland: 'DE',
   mitgliedStrasse: 'Musterstraße',
   mitgliedHausnummer: '12a',
   mitgliedPlz: '12345',
+  ort: 'Musterstadt',
   mitgliedKvNummer: 'A123456789',
-  mitgliedKrankenkasse: 'BKK GS',
+  mitgliedKrankenkasse: 'VIACTIV Krankenkasse',
   familienstand: 'verheiratet',
   telefon: '0123456789',
   email: 'max.mustermann@example.com',
-  beginnFamilienversicherung: '01.04.2026',
-  datum: '2026-01-10',
-  ort: 'Musterstadt',
+  viactivGeschlecht: 'maennlich',
+  viactivStaatsangehoerigkeit: 'DE',
+  viactivBeschaeftigung: 'beschaeftigt',
+  viactivVersicherungsart: 'pflichtversichert',
+  viactivArbeitgeber: {
+    name: 'Musterfirma GmbH',
+    strasse: 'Industrieweg',
+    hausnummer: '5',
+    plz: '12345',
+    ort: 'Musterstadt',
+    beschaeftigtSeit: '',
+  },
+  viactivBonusVertragsnummer: '123456789',
+  viactivBonusIBAN: 'DE89370400440532013000',
+  viactivBonusKontoinhaber: 'Max Mustermann',
   ehegatte: {
     name: 'Mustermann',
     vorname: 'Maria',
@@ -72,22 +88,21 @@ const createFamilyExampleJson = (): Partial<FormData> => ({
     abweichendeAnschrift: '',
     verwandtschaft: '',
     isEhegatteVerwandt: false,
-    bisherigEndeteAm: '31.12.2025',
+    bisherigEndeteAm: '',
     bisherigBestandBei: 'AOK',
     bisherigArt: 'mitgliedschaft',
-    bisherigVorname: 'Max',
-    bisherigNachname: 'Mustermann',
+    bisherigVorname: '',
+    bisherigNachname: '',
     bisherigBestehtWeiter: true,
     bisherigBestehtWeiterBei: '',
     geburtsname: 'Musterfrau',
-    geburtsort: 'Berlin',
-    geburtsland: 'Deutschland',
-    staatsangehoerigkeit: 'deutsch',
+    geburtsort: 'Hamburg',
+    geburtsland: 'DE',
+    staatsangehoerigkeit: 'DE',
     versichertennummer: 'B987654321',
     familienversichert: true,
-    beschaeftigung: '',
+    beschaeftigung: 'beschaeftigt',
   },
-  ehegatteKrankenkasse: 'AOK',
   kinder: [
     {
       name: 'Mustermann',
@@ -97,7 +112,67 @@ const createFamilyExampleJson = (): Partial<FormData> => ({
       abweichendeAnschrift: '',
       verwandtschaft: 'leiblich',
       isEhegatteVerwandt: false,
-      bisherigEndeteAm: '31.12.2025',
+      bisherigEndeteAm: '',
+      bisherigBestandBei: 'AOK',
+      bisherigArt: 'familienversicherung',
+      bisherigVorname: '',
+      bisherigNachname: '',
+      bisherigBestehtWeiter: true,
+      bisherigBestehtWeiterBei: '',
+      geburtsname: '',
+      geburtsort: 'Musterstadt',
+      geburtsland: 'DE',
+      staatsangehoerigkeit: 'DE',
+      versichertennummer: 'C111222333',
+      familienversichert: true,
+      beschaeftigung: '',
+    },
+  ],
+});
+
+// Novitas BKK Beispiel-JSON (ohne Versichertennummer für Familie)
+const createNovitasExampleJson = (): Partial<FormData> => ({
+  mitgliedName: 'Mustermann',
+  mitgliedVorname: 'Max',
+  mitgliedKvNummer: 'A123456789',
+  mitgliedKrankenkasse: 'Novitas BKK',
+  familienstand: 'verheiratet',
+  telefon: '0123456789',
+  email: 'max.mustermann@example.com',
+  ort: 'Musterstadt',
+  ehegatte: {
+    name: 'Mustermann',
+    vorname: 'Maria',
+    geschlecht: 'w',
+    geburtsdatum: '20.08.1987',
+    abweichendeAnschrift: '',
+    verwandtschaft: '',
+    isEhegatteVerwandt: false,
+    bisherigEndeteAm: '',
+    bisherigBestandBei: 'AOK',
+    bisherigArt: 'mitgliedschaft',
+    bisherigVorname: 'Max',
+    bisherigNachname: 'Mustermann',
+    bisherigBestehtWeiter: true,
+    bisherigBestehtWeiterBei: '',
+    geburtsname: 'Musterfrau',
+    geburtsort: 'Hamburg',
+    geburtsland: 'Deutschland',
+    staatsangehoerigkeit: 'deutsch',
+    versichertennummer: '',
+    familienversichert: true,
+    beschaeftigung: '',
+  },
+  kinder: [
+    {
+      name: 'Mustermann',
+      vorname: 'Lisa',
+      geschlecht: 'w',
+      geburtsdatum: '10.03.2015',
+      abweichendeAnschrift: '',
+      verwandtschaft: 'leiblich',
+      isEhegatteVerwandt: false,
+      bisherigEndeteAm: '',
       bisherigBestandBei: 'AOK',
       bisherigArt: 'familienversicherung',
       bisherigVorname: 'Maria',
@@ -108,63 +183,138 @@ const createFamilyExampleJson = (): Partial<FormData> => ({
       geburtsort: 'Musterstadt',
       geburtsland: 'Deutschland',
       staatsangehoerigkeit: 'deutsch',
-      versichertennummer: 'C111222333',
+      versichertennummer: '',
       familienversichert: true,
       beschaeftigung: '',
     },
   ],
-  rundumSicherPaket: {
-    iban: 'DE89370400440532013000',
-    kontoinhaber: 'Max Mustermann',
-    zeitraumVon: '2026-01-01',
-    zeitraumBis: '2026-12-31',
-    datumRSP: '2026-01-10',
-    arztMitglied: { name: 'Dr. Müller', ort: 'Musterstadt' },
-    arztEhegatte: { name: 'Dr. Schmidt', ort: 'Musterstadt' },
-    aerzteKinder: [{ name: 'Dr. Kinderarzt', ort: 'Musterstadt' }],
-    zusatzversicherung1: 'zahnzusatz',
-    zusatzversicherung2: 'unfall',
-    jahresbeitrag: '500',
-    datenschutz1: true,
-    datenschutz2: true,
-  },
-  mitgliedVersichertennummer: 'A123456789',
 });
 
-// Vereinfachtes JSON nur für Rundum-Sicher-Paket (ohne Ehegatte/Kinder)
-const createRundumOnlyExampleJson = (): Partial<FormData> => ({
-  mode: 'nur_rundum',
+// DAK Beispiel-JSON (ohne Versichertennummer für Familie)
+const createDakExampleJson = (): Partial<FormData> => ({
   mitgliedName: 'Mustermann',
   mitgliedVorname: 'Max',
   mitgliedGeburtsdatum: '15.05.1985',
-  mitgliedGeburtsort: 'Berlin',
-  mitgliedGeburtsland: 'Deutschland',
   mitgliedStrasse: 'Musterstraße',
   mitgliedHausnummer: '12a',
   mitgliedPlz: '12345',
+  ort: 'Musterstadt',
   mitgliedKvNummer: 'A123456789',
-  mitgliedKrankenkasse: 'BKK GS',
-  familienstand: 'ledig',
+  mitgliedKrankenkasse: 'DAK-Gesundheit',
+  familienstand: 'verheiratet',
   telefon: '0123456789',
   email: 'max.mustermann@example.com',
-  datum: '2026-01-10',
-  ort: 'Musterstadt',
-  rundumSicherPaket: {
-    iban: 'DE89370400440532013000',
-    kontoinhaber: 'Max Mustermann',
-    zeitraumVon: '2026-01-01',
-    zeitraumBis: '2026-12-31',
-    datumRSP: '2026-01-10',
-    arztMitglied: { name: 'Dr. Müller', ort: 'Musterstadt' },
-    arztEhegatte: { name: '', ort: '' },
-    aerzteKinder: [],
-    zusatzversicherung1: 'zahnzusatz',
-    zusatzversicherung2: '',
-    jahresbeitrag: '500',
-    datenschutz1: true,
-    datenschutz2: true,
+  ehegatte: {
+    name: 'Mustermann',
+    vorname: 'Maria',
+    geschlecht: 'w',
+    geburtsdatum: '20.08.1987',
+    abweichendeAnschrift: '',
+    verwandtschaft: '',
+    isEhegatteVerwandt: false,
+    bisherigEndeteAm: '',
+    bisherigBestandBei: 'AOK',
+    bisherigArt: 'mitgliedschaft',
+    bisherigVorname: '',
+    bisherigNachname: '',
+    bisherigBestehtWeiter: true,
+    bisherigBestehtWeiterBei: '',
+    geburtsname: 'Musterfrau',
+    geburtsort: 'Hamburg',
+    geburtsland: 'Deutschland',
+    staatsangehoerigkeit: 'deutsch',
+    versichertennummer: '',
+    familienversichert: true,
+    beschaeftigung: '',
   },
-  mitgliedVersichertennummer: 'A123456789',
+  kinder: [
+    {
+      name: 'Mustermann',
+      vorname: 'Lisa',
+      geschlecht: 'w',
+      geburtsdatum: '10.03.2015',
+      abweichendeAnschrift: '',
+      verwandtschaft: 'leiblich',
+      isEhegatteVerwandt: false,
+      bisherigEndeteAm: '',
+      bisherigBestandBei: 'AOK',
+      bisherigArt: 'familienversicherung',
+      bisherigVorname: '',
+      bisherigNachname: '',
+      bisherigBestehtWeiter: true,
+      bisherigBestehtWeiterBei: '',
+      geburtsname: '',
+      geburtsort: 'Musterstadt',
+      geburtsland: 'Deutschland',
+      staatsangehoerigkeit: 'deutsch',
+      versichertennummer: '',
+      familienversichert: true,
+      beschaeftigung: '',
+    },
+  ],
+});
+
+// Generisches Beispiel (Fallback wenn keine Krankenkasse ausgewählt)
+const createGenericExampleJson = (): Partial<FormData> => ({
+  mitgliedName: 'Mustermann',
+  mitgliedVorname: 'Max',
+  mitgliedGeburtsdatum: '15.05.1985',
+  mitgliedStrasse: 'Musterstraße',
+  mitgliedHausnummer: '12a',
+  mitgliedPlz: '12345',
+  ort: 'Musterstadt',
+  mitgliedKvNummer: 'A123456789',
+  familienstand: 'verheiratet',
+  telefon: '0123456789',
+  email: 'max.mustermann@example.com',
+  ehegatte: {
+    name: 'Mustermann',
+    vorname: 'Maria',
+    geschlecht: 'w',
+    geburtsdatum: '20.08.1987',
+    abweichendeAnschrift: '',
+    verwandtschaft: '',
+    isEhegatteVerwandt: false,
+    bisherigEndeteAm: '',
+    bisherigBestandBei: '',
+    bisherigArt: 'mitgliedschaft',
+    bisherigVorname: '',
+    bisherigNachname: '',
+    bisherigBestehtWeiter: true,
+    bisherigBestehtWeiterBei: '',
+    geburtsname: 'Musterfrau',
+    geburtsort: 'Hamburg',
+    geburtsland: 'Deutschland',
+    staatsangehoerigkeit: 'deutsch',
+    versichertennummer: '',
+    familienversichert: true,
+    beschaeftigung: '',
+  },
+  kinder: [
+    {
+      name: 'Mustermann',
+      vorname: 'Lisa',
+      geschlecht: 'w',
+      geburtsdatum: '10.03.2015',
+      abweichendeAnschrift: '',
+      verwandtschaft: 'leiblich',
+      isEhegatteVerwandt: false,
+      bisherigEndeteAm: '',
+      bisherigBestandBei: '',
+      bisherigArt: 'familienversicherung',
+      bisherigVorname: '',
+      bisherigNachname: '',
+      bisherigBestehtWeiter: true,
+      bisherigBestehtWeiterBei: '',
+      geburtsname: '',
+      geburtsort: 'Musterstadt',
+      geburtsland: 'Deutschland',
+      staatsangehoerigkeit: 'deutsch',
+      versichertennummer: '',
+      familienversichert: true,
+      beschaeftigung: '',
+    },
+  ],
 });
 
 export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, setFormData, currentMode, selectedKrankenkasse = '' }) => {
@@ -180,15 +330,28 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState(false);
 
-  // Modus-abhängiges Beispiel-JSON
+  // Dynamisches Beispiel-JSON basierend auf ausgewählter Krankenkasse
   const exampleJson = useMemo(() => {
-    const exampleData = currentMode === 'nur_rundum' 
-      ? createRundumOnlyExampleJson() 
-      : createFamilyExampleJson();
+    const activeKasse = selectedKrankenkasse || formData.selectedKrankenkasse || '';
+    
+    let exampleData: Partial<FormData>;
+    
+    switch (activeKasse) {
+      case 'viactiv':
+        exampleData = createViactivExampleJson();
+        break;
+      case 'novitas':
+        exampleData = createNovitasExampleJson();
+        break;
+      case 'dak':
+        exampleData = createDakExampleJson();
+        break;
+      default:
+        exampleData = createGenericExampleJson();
+    }
+    
     return JSON.stringify(exampleData, null, 2);
-  }, [currentMode]);
-
-  const isRundumOnlyMode = currentMode === 'nur_rundum';
+  }, [selectedKrankenkasse, formData.selectedKrankenkasse]);
 
   const handleCopyExample = async () => {
     try {
@@ -421,14 +584,83 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
     }
   };
 
-  // Zeigt aktuelle Daten an - im nur_rundum Modus ohne ehegatte/kinder
+  // Zeigt aktuelle Daten an - krankenkassenspezifisch gefiltert
   const handleShowCurrentData = () => {
-    if (isRundumOnlyMode) {
-      const { ehegatte, kinder, ehegatteKrankenkasse, beginnFamilienversicherung, unterschriftFamilie, ...restData } = formData;
-      setJsonInput(JSON.stringify(restData, null, 2));
-    } else {
-      setJsonInput(JSON.stringify(formData, null, 2));
+    const activeKasse = selectedKrankenkasse || formData.selectedKrankenkasse || '';
+    
+    // Immer ausgeschlossene Felder (Unterschriften)
+    const baseExclusions = ['unterschrift', 'unterschriftFamilie'];
+    
+    // Krankenkassenspezifische Ausschlüsse
+    let exclusions = [...baseExclusions];
+    
+    switch (activeKasse) {
+      case 'viactiv':
+        // VIACTIV braucht kein rundumSicherPaket und beginnFamilienversicherung
+        exclusions.push('rundumSicherPaket', 'beginnFamilienversicherung', 'mitgliedVersichertennummer');
+        break;
+      case 'novitas':
+        // Novitas braucht keine Adress-/Geburtsfelder des Mitglieds und kein RSP
+        exclusions.push(
+          'rundumSicherPaket', 
+          'mitgliedGeburtsort', 
+          'mitgliedGeburtsland',
+          'mitgliedStrasse', 
+          'mitgliedHausnummer', 
+          'mitgliedPlz',
+          'mitgliedGeburtsdatum',
+          'mitgliedVersichertennummer',
+          'viactivGeschlecht',
+          'viactivBeschaeftigung',
+          'viactivVersicherungsart',
+          'viactivArbeitgeber',
+          'viactivBonusVertragsnummer',
+          'viactivBonusIBAN',
+          'viactivBonusKontoinhaber',
+          'viactivStaatsangehoerigkeit',
+          'viactivFamilienangehoerigeMitversichern'
+        );
+        break;
+      case 'dak':
+        // DAK braucht kein RSP und keine VIACTIV-Felder
+        exclusions.push(
+          'rundumSicherPaket',
+          'mitgliedGeburtsort',
+          'mitgliedGeburtsland',
+          'mitgliedVersichertennummer',
+          'viactivGeschlecht',
+          'viactivBeschaeftigung',
+          'viactivVersicherungsart',
+          'viactivArbeitgeber',
+          'viactivBonusVertragsnummer',
+          'viactivBonusIBAN',
+          'viactivBonusKontoinhaber',
+          'viactivStaatsangehoerigkeit',
+          'viactivFamilienangehoerigeMitversichern'
+        );
+        break;
+      default:
+        // Generischer Fallback - RSP und VIACTIV-Felder ausschließen
+        exclusions.push(
+          'rundumSicherPaket',
+          'viactivGeschlecht',
+          'viactivBeschaeftigung',
+          'viactivVersicherungsart',
+          'viactivArbeitgeber',
+          'viactivBonusVertragsnummer',
+          'viactivBonusIBAN',
+          'viactivBonusKontoinhaber',
+          'viactivStaatsangehoerigkeit',
+          'viactivFamilienangehoerigeMitversichern'
+        );
     }
+    
+    // Felder filtern
+    const filteredData = Object.fromEntries(
+      Object.entries(formData).filter(([key]) => !exclusions.includes(key))
+    );
+    
+    setJsonInput(JSON.stringify(filteredData, null, 2));
   };
 
   const hasImages = uploadedFiles.some(f => f.mimeType.startsWith('image/'));
