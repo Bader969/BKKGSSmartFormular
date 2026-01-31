@@ -83,11 +83,11 @@ interface PersonFieldMapping {
   geburtsland: string;
   staatsangehoerigkeit: string;
   kasseName: string;
-  // Vorversicherungsart Checkboxen
-  vorversGesetzlich: string;
-  vorversFamilie: string;
-  vorversPrivat: string;
+  // Vorversicherungsart Checkboxen - KORRIGIERTE REIHENFOLGE: gar nicht, privat, familienversichert, eigene
   vorversNicht: string;
+  vorversPrivat: string;
+  vorversFamilie: string;
+  vorversGesetzlich: string;
   // Vorversicherung bis Datum
   vorversBisT: [string, string];
   vorversBisM: [string, string];
@@ -98,9 +98,15 @@ interface PersonFieldMapping {
   gebHauptversT: [string, string];
   gebHauptversM: [string, string];
   gebHauptversJ: [string, string, string, string];
+  // Verwandtschaft Checkboxen (nur für Kinder)
+  verwandtschaftLeibl?: string;
+  verwandtschaftEnkel?: string;
+  verwandtschaftStief?: string;
+  verwandtschaftPflege?: string;
 }
 
 // Spouse (Ehegatte) - Column 1 (Left)
+// KORRIGIERT: Vorversicherung Reihenfolge: gar nicht (62), privat (63), familienversichert (64), eigene (65)
 const SPOUSE_FIELDS: PersonFieldMapping = {
   vorname: 'Vorname 1',
   familienname: 'Familienname 1',
@@ -117,10 +123,11 @@ const SPOUSE_FIELDS: PersonFieldMapping = {
   geburtsland: 'Familienname 19',
   staatsangehoerigkeit: 'Familienname 22',
   kasseName: 'Familienname 25',
-  vorversGesetzlich: 'Kontrollkästchen 62',
-  vorversFamilie: 'Kontrollkästchen 63',
-  vorversPrivat: 'Kontrollkästchen 64',
-  vorversNicht: 'Kontrollkästchen 65',
+  // KORRIGIERT: Vorversicherung Mapping
+  vorversNicht: 'Kontrollkästchen 62',      // gar nicht versichert
+  vorversPrivat: 'Kontrollkästchen 63',     // privat versichert
+  vorversFamilie: 'Kontrollkästchen 64',    // familienversichert
+  vorversGesetzlich: 'Kontrollkästchen 65', // eigene Versicherung (Mitgliedschaft)
   vorversBisT: ['Geburtsdatum T7', 'Geburtsdatum T10'],
   vorversBisM: ['Geburtsdatum M7', 'Geburtsdatum M10'],
   vorversBisJ: ['Geburtsdatum J13', 'Geburtsdatum J16', 'Geburtsdatum J19', 'Geburtsdatum J22'],
@@ -131,6 +138,7 @@ const SPOUSE_FIELDS: PersonFieldMapping = {
 };
 
 // Kind 1 - Column 2 (Middle)
+// KORRIGIERT: Vorversicherung Reihenfolge + Verwandtschaft Checkboxen hinzugefügt
 const CHILD1_FIELDS: PersonFieldMapping = {
   vorname: 'Vorname 2',
   familienname: 'Familienname 2',
@@ -147,10 +155,11 @@ const CHILD1_FIELDS: PersonFieldMapping = {
   geburtsland: 'Familienname 20',
   staatsangehoerigkeit: 'Familienname 23',
   kasseName: 'Familienname 26',
-  vorversGesetzlich: 'Kontrollkästchen 66',
-  vorversFamilie: 'Kontrollkästchen 67',
-  vorversPrivat: 'Kontrollkästchen 68',
-  vorversNicht: 'Kontrollkästchen 69',
+  // KORRIGIERT: Vorversicherung Mapping
+  vorversNicht: 'Kontrollkästchen 66',      // gar nicht versichert
+  vorversPrivat: 'Kontrollkästchen 67',     // privat versichert
+  vorversFamilie: 'Kontrollkästchen 68',    // familienversichert
+  vorversGesetzlich: 'Kontrollkästchen 69', // eigene Versicherung (Mitgliedschaft)
   vorversBisT: ['Geburtsdatum T8', 'Geburtsdatum T11'],
   vorversBisM: ['Geburtsdatum M8', 'Geburtsdatum M11'],
   vorversBisJ: ['Geburtsdatum J14', 'Geburtsdatum J17', 'Geburtsdatum J20', 'Geburtsdatum J23'],
@@ -158,9 +167,15 @@ const CHILD1_FIELDS: PersonFieldMapping = {
   gebHauptversT: ['Geburtsdatum T14', 'Geburtsdatum T17'],
   gebHauptversM: ['Geburtsdatum M14', 'Geburtsdatum M17'],
   gebHauptversJ: ['Geburtsdatum J26', 'Geburtsdatum J29', 'Geburtsdatum J32', 'Geburtsdatum J35'],
+  // NEU: Verwandtschaft Checkboxen
+  verwandtschaftLeibl: 'Kontrollkästchen 21',
+  verwandtschaftEnkel: 'Kontrollkästchen 22',
+  verwandtschaftStief: 'Kontrollkästchen 23',
+  verwandtschaftPflege: 'Kontrollkästchen 24',
 };
 
 // Kind 2 - Column 3 (Right)
+// KORRIGIERT: Vorversicherung 79 statt 73 + Verwandtschaft Checkboxen
 const CHILD2_FIELDS: PersonFieldMapping = {
   vorname: 'Vorname 3',
   familienname: 'Familienname 3',
@@ -177,10 +192,11 @@ const CHILD2_FIELDS: PersonFieldMapping = {
   geburtsland: 'Familienname 21',
   staatsangehoerigkeit: 'Familienname 24',
   kasseName: 'Familienname 27',
-  vorversGesetzlich: 'Kontrollkästchen 70',
-  vorversFamilie: 'Kontrollkästchen 71',
-  vorversPrivat: 'Kontrollkästchen 72',
-  vorversNicht: 'Kontrollkästchen 73',
+  // KORRIGIERT: Vorversicherung Mapping - ACHTUNG: 79 statt 73!
+  vorversNicht: 'Kontrollkästchen 70',      // gar nicht versichert
+  vorversPrivat: 'Kontrollkästchen 71',     // privat versichert
+  vorversFamilie: 'Kontrollkästchen 72',    // familienversichert
+  vorversGesetzlich: 'Kontrollkästchen 79', // eigene Versicherung (79, nicht 73!)
   vorversBisT: ['Geburtsdatum T9', 'Geburtsdatum T12'],
   vorversBisM: ['Geburtsdatum M9', 'Geburtsdatum M12'],
   vorversBisJ: ['Geburtsdatum J15', 'Geburtsdatum J18', 'Geburtsdatum J21', 'Geburtsdatum J24'],
@@ -188,6 +204,11 @@ const CHILD2_FIELDS: PersonFieldMapping = {
   gebHauptversT: ['Geburtsdatum T15', 'Geburtsdatum T18'],
   gebHauptversM: ['Geburtsdatum M15', 'Geburtsdatum M18'],
   gebHauptversJ: ['Geburtsdatum J27', 'Geburtsdatum J30', 'Geburtsdatum J33', 'Geburtsdatum J36'],
+  // NEU: Verwandtschaft Checkboxen
+  verwandtschaftLeibl: 'Kontrollkästchen 25',
+  verwandtschaftEnkel: 'Kontrollkästchen 26',
+  verwandtschaftStief: 'Kontrollkästchen 27',
+  verwandtschaftPflege: 'Kontrollkästchen 28',
 };
 
 const fillPersonFields = (
@@ -264,18 +285,17 @@ const fillPersonFields = (
     : (member.bisherigBestandBei || formData.mitgliedKrankenkasse || 'DAK');
   setTextField(mapping.kasseName, kasseName);
 
-  // Vorversicherungsart
+  // Vorversicherungsart - KORRIGIERTE LOGIK
   if (member.bisherigArt === 'mitgliedschaft') {
-    setCheckbox(mapping.vorversGesetzlich, true);
+    setCheckbox(mapping.vorversGesetzlich, true); // eigene Versicherung
   } else if (member.bisherigArt === 'familienversicherung') {
     setCheckbox(mapping.vorversFamilie, true);
   } else if (member.bisherigArt === 'nicht_gesetzlich') {
-    setCheckbox(mapping.vorversPrivat, true);
-  } else {
-    // Default to Familienversicherung if besteht weiter
-    if (member.bisherigBestehtWeiter) {
-      setCheckbox(mapping.vorversFamilie, true);
-    }
+    setCheckbox(mapping.vorversPrivat, true); // privat
+  } else if (!member.bisherigArt && !member.bisherigBestehtWeiter) {
+    setCheckbox(mapping.vorversNicht, true); // gar nicht versichert
+  } else if (member.bisherigBestehtWeiter) {
+    setCheckbox(mapping.vorversFamilie, true); // Default: familienversichert
   }
 
   // Vorversicherung bis Datum
@@ -308,6 +328,14 @@ const fillPersonFields = (
     setTextField(mapping.gebHauptversJ[2], hauptversGebSplit.J3);
     setTextField(mapping.gebHauptversJ[3], hauptversGebSplit.J4);
   }
+
+  // NEU: Verwandtschaft Checkboxen (nur für Kinder)
+  if (mapping.verwandtschaftLeibl) {
+    setCheckbox(mapping.verwandtschaftLeibl, member.verwandtschaft === 'leiblich');
+    setCheckbox(mapping.verwandtschaftEnkel!, member.verwandtschaft === 'enkel');
+    setCheckbox(mapping.verwandtschaftStief!, member.verwandtschaft === 'stief');
+    setCheckbox(mapping.verwandtschaftPflege!, member.verwandtschaft === 'pflege');
+  }
 };
 
 const fillHeaderFields = (
@@ -334,6 +362,7 @@ const fillHeaderFields = (
   setTextField('KVNR.Seite 2', formData.mitgliedKvNummer);
   setTextField('KVNR.Seite 3', formData.mitgliedKvNummer);
   
+  // KORREKTUR 1: Geburtsdatum auf allen 3 Seiten (PDF-Lib setzt Felder mit gleichem Namen automatisch)
   const geburtsdatumFormatted = formatDateGerman(formData.mitgliedGeburtsdatum);
   setTextField('Geburtsdatum.Seite 1.', geburtsdatumFormatted);
 };
@@ -367,13 +396,32 @@ const fillHardcodedFields = (
   // Anlass: Beginn meiner Mitgliedschaft
   setCheckbox('Kontrollkästchen 1', true);
 
-  // Unterschrift (Nachname simuliert)
-  setTextField('Textfeld 418', formData.mitgliedName);
+  // KORREKTUR 2: Beginn Familienversicherung automatisch berechnen
+  const dates = calculateDates();
+  setTextField('Textfeld 1', dates.beginDate);
+
+  // KORREKTUR 3: Familienstand Checkboxen
+  setCheckbox('Kontrollkästchen 6', formData.familienstand === 'ledig');
+  setCheckbox('Kontrollkästchen 7', formData.familienstand === 'verheiratet');
+  setCheckbox('Kontrollkästchen 8', formData.familienstand === 'getrennt');
+  setCheckbox('Kontrollkästchen 9', formData.familienstand === 'verwitwet');
+
+  // KORREKTUR 9: Unterschrift Datum (heutiges Datum)
+  const today = new Date();
+  const datumHeute = `${today.getDate().toString().padStart(2, '0')}.${(today.getMonth() + 1).toString().padStart(2, '0')}.${today.getFullYear()}`;
+  setTextField('Textfeld 417', datumHeute);
+
+  // KORREKTUR 10: Telefon
+  setTextField('Textfeld 420', formData.telefon || '');
+
+  // KORREKTUR 11: Email
+  setTextField('Textfeld 421', formData.email || '');
+
+  // KORREKTUR 13: Unterschriften werden jetzt als Bilder eingebettet (nicht mehr als Text)
+  // Die Text-Unterschriften werden nicht mehr gesetzt
   
-  // Ehegatte Unterschrift (falls vorhanden)
+  // Ehegatte Einkünfte checkbox on page 3
   if (formData.ehegatte.name) {
-    setTextField('Textfeld 419', formData.ehegatte.name);
-    // Ehegatte Einkünfte checkbox on page 3
     setCheckbox('Kontrollkästchen 261', true);
   }
 };
@@ -393,10 +441,24 @@ const fillSpouseOnPage3 = (
     }
   };
 
+  const setCheckbox = (fieldName: string, checked: boolean) => {
+    try {
+      const field = form.getCheckBox(fieldName);
+      if (checked) {
+        field.check();
+      } else {
+        field.uncheck();
+      }
+    } catch (e) {
+      console.warn(`Checkbox ${fieldName} not found`);
+    }
+  };
+
   const ehegatte = formData.ehegatte;
   
-  // Familienname 154 = Name Ehegatte
-  setTextField('Familienname 154', `${ehegatte.vorname} ${ehegatte.name}`.trim());
+  // KORREKTUR 6: Vorname und Nachname getrennt
+  setTextField('Familienname 154', ehegatte.vorname);
+  setTextField('Familienname 155', ehegatte.name);
 
   // Geburtsdatum T53...J108
   const gebSplit = splitDate(ehegatte.geburtsdatum);
@@ -409,6 +471,63 @@ const fillSpouseOnPage3 = (
     setTextField('Geburtsdatum J106', gebSplit.J2);
     setTextField('Geburtsdatum J107', gebSplit.J3);
     setTextField('Geburtsdatum J108', gebSplit.J4);
+  }
+
+  // KORREKTUR 7: Ehegatte verwandt mit Kindern
+  setCheckbox('Kontrollkästchen 256', ehegatte.isEhegatteVerwandt === true);
+  setCheckbox('Kontrollkästchen 257', ehegatte.isEhegatteVerwandt === false);
+
+  // KORREKTUR 8: Ehegatte ist Mitglied einer gesetzlichen Krankenkasse?
+  const ehegatteIstMitglied = ehegatte.bisherigArt === 'mitgliedschaft';
+  setCheckbox('Kontrollkästchen 258', ehegatteIstMitglied);
+  setCheckbox('Kontrollkästchen 259', !ehegatteIstMitglied);
+
+  // Krankenkasse Name (wenn ja)
+  if (ehegatteIstMitglied) {
+    setTextField('Familienname 156', ehegatte.bisherigBestandBei || formData.ehegatteKrankenkasse || '');
+  }
+};
+
+// KORREKTUR 13: Unterschriften als Bild einbetten
+const embedSignature = async (
+  pdfDoc: PDFDocument,
+  signatureData: string,
+  x: number,
+  y: number,
+  pageIndex: number
+): Promise<void> => {
+  if (!signatureData) return;
+
+  try {
+    const base64Data = signatureData.split(',')[1];
+    if (!base64Data) return;
+    
+    const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+    
+    let image;
+    if (signatureData.includes('image/png')) {
+      image = await pdfDoc.embedPng(imageBytes);
+    } else {
+      image = await pdfDoc.embedJpg(imageBytes);
+    }
+    
+    const pages = pdfDoc.getPages();
+    if (pageIndex >= pages.length) return;
+    
+    const page = pages[pageIndex];
+    
+    // Signatur skalieren (max 100x30)
+    const aspectRatio = image.width / image.height;
+    let width = 100;
+    let height = width / aspectRatio;
+    if (height > 30) {
+      height = 30;
+      width = height * aspectRatio;
+    }
+    
+    page.drawImage(image, { x, y, width, height });
+  } catch (error) {
+    console.warn('Signatur konnte nicht eingebettet werden:', error);
   }
 };
 
@@ -431,8 +550,8 @@ export const exportDAKFamilienversicherung = async (formData: FormData): Promise
     // Fill hardcoded fields
     fillHardcodedFields(form, formData);
     
-    // Fill spouse on first PDF only (column 1)
-    if (pdfIndex === 0 && formData.ehegatte.name) {
+    // KORREKTUR 12: Ehegatte in ALLEN PDFs eintragen (nicht nur im ersten)
+    if (formData.ehegatte.name) {
       fillPersonFields(form, formData.ehegatte, SPOUSE_FIELDS, formData, dates);
       fillSpouseOnPage3(form, formData);
     }
@@ -442,16 +561,15 @@ export const exportDAKFamilienversicherung = async (formData: FormData): Promise
     const childrenForThisPdf = formData.kinder.slice(startChildIndex, startChildIndex + 2);
     
     childrenForThisPdf.forEach((kind, idx) => {
-      // If first PDF and spouse exists, children go to columns 2 and 3
-      // If first PDF and no spouse, first child goes to column 1 (treated as spouse position)
-      // For subsequent PDFs, children go to columns 2 and 3 (column 1 reserved for spouse header info)
+      // If spouse exists, children go to columns 2 and 3
+      // If no spouse, first child goes to column 1 (treated as spouse position)
       
       let mapping: PersonFieldMapping;
       
-      if (pdfIndex === 0 && !formData.ehegatte.name && idx === 0) {
+      if (!formData.ehegatte.name && idx === 0) {
         // No spouse, first child uses spouse column
         mapping = SPOUSE_FIELDS;
-      } else if (pdfIndex === 0 && !formData.ehegatte.name && idx === 1) {
+      } else if (!formData.ehegatte.name && idx === 1) {
         // No spouse, second child uses child 1 column
         mapping = CHILD1_FIELDS;
       } else if (idx === 0) {
@@ -463,8 +581,13 @@ export const exportDAKFamilienversicherung = async (formData: FormData): Promise
       fillPersonFields(form, kind, mapping, formData, dates);
     });
     
-    // Flatten only text fields to preserve checkboxes
-    // Actually don't flatten to allow further editing
+    // KORREKTUR 13: Unterschriften als Bilder einbetten (Seite 3 = Index 2)
+    if (formData.unterschrift) {
+      await embedSignature(pdfDoc, formData.unterschrift, 185, 493, 2);
+    }
+    if (formData.ehegatte.name && formData.unterschriftFamilie) {
+      await embedSignature(pdfDoc, formData.unterschriftFamilie, 375, 493, 2);
+    }
     
     // Save and download
     const pdfBytes = await pdfDoc.save();
