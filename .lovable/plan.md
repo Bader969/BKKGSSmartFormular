@@ -1,247 +1,158 @@
 
 
-# Krankenkassenspezifische Beispiel-JSON Generierung
+# VIACTIV Kinder mit eigener Mitgliedschaft - Implementierungsplan
 
-## Problem
+## Zusammenfassung der Anforderung
 
-Die Funktionen `createFamilyExampleJson()` und `createRundumOnlyExampleJson()` im `JsonImportDialog.tsx` sind **statisch** und zeigen immer das alte BKK GS Format mit Feldern wie:
+Neue Logik fuer VIACTIV Kinder-Export:
 
-- `rundumSicherPaket`
-- `mitgliedKrankenkasse: 'BKK GS'`
-- `beginnFamilienversicherung`
+1. **Kinder >= 15 Jahre mit eigener Mitgliedschaft** (automatisch oder manuell):
+   - Eigene Beitrittserklarung (BE)
+   - Bonus fuer Erwachsene (170 Euro)
+   - NICHT in Familienversicherung eintragen
 
-Dies ist irreführend, da BKK GS ausgeblendet ist und die anderen Krankenkassen (VIACTIV, Novitas, DAK) andere Felder benötigen.
+2. **Kinder < 15 Jahre**:
+   - In Familienversicherung eintragen
+   - Bonus fuer Kinder (110 Euro)
+
+3. **Automatische Erkennung**:
+   - Wenn Hauptmitglied ALG II bezieht UND Kind >= 15 Jahre → Kind bekommt eigene Mitgliedschaft
 
 ---
 
-## Lösung
+## Technische Aenderungen
 
-Die Beispiel-JSON-Generierung muss **dynamisch** basierend auf `selectedKrankenkasse` erfolgen.
+### Phase 1: Datenmodell erweitern
+
+**Datei:** `src/types/form.ts`
+
+Neues Feld `eigeneMitgliedschaft` zu `FamilyMember` hinzufuegen:
+
+```typescript
+export interface FamilyMember {
+  // ... bestehende Felder
+  eigeneMitgliedschaft: boolean;  // NEU: Kind hat eigene Mitgliedschaft
+}
+```
+
+Und in `createEmptyFamilyMember()`:
+
+```typescript
+export const createEmptyFamilyMember = (): FamilyMember => ({
+  // ... bestehende Felder
+  eigeneMitgliedschaft: false,  // NEU
+});
+```
 
 ---
 
-## Technische Änderungen
+### Phase 2: UI-Anpassung (ViactivSection)
 
-### Datei: `src/components/JsonImportDialog.tsx`
+**Datei:** `src/components/ViactivSection.tsx`
 
-#### 1. Neue krankenkassenspezifische Beispiel-Funktionen erstellen
-
-**VIACTIV Beispiel:**
-```typescript
-const createViactivExampleJson = (): Partial<FormData> => ({
-  mitgliedName: 'Mustermann',
-  mitgliedVorname: 'Max',
-  mitgliedGeburtsdatum: '15.05.1985',
-  mitgliedGeburtsort: 'Berlin',
-  mitgliedGeburtsland: 'DE',
-  mitgliedStrasse: 'Musterstraße',
-  mitgliedHausnummer: '12a',
-  mitgliedPlz: '12345',
-  ort: 'Musterstadt',
-  mitgliedKvNummer: 'A123456789',
-  mitgliedKrankenkasse: 'VIACTIV',
-  familienstand: 'verheiratet',
-  telefon: '0123456789',
-  email: 'max.mustermann@example.com',
-  viactivGeschlecht: 'maennlich',
-  viactivStaatsangehoerigkeit: 'DE',
-  viactivBeschaeftigung: 'beschaeftigt',
-  viactivVersicherungsart: 'pflichtversichert',
-  viactivArbeitgeber: {
-    name: 'Musterfirma GmbH',
-    strasse: 'Industrieweg',
-    hausnummer: '5',
-    plz: '12345',
-    ort: 'Musterstadt',
-    beschaeftigtSeit: ''
-  },
-  viactivBonusVertragsnummer: '123456789',
-  viactivBonusIBAN: 'DE89370400440532013000',
-  viactivBonusKontoinhaber: 'Max Mustermann',
-  ehegatte: {
-    vorname: 'Maria',
-    name: 'Mustermann',
-    geburtsdatum: '20.08.1987',
-    geschlecht: 'w',
-    geburtsname: 'Musterfrau',
-    geburtsort: 'Hamburg',
-    geburtsland: 'DE',
-    staatsangehoerigkeit: 'DE',
-    beschaeftigung: 'beschaeftigt',
-    versichertennummer: 'B987654321',
-    bisherigArt: 'mitgliedschaft',
-    bisherigBestandBei: 'AOK',
-    // ... weitere Felder
-  },
-  kinder: [{
-    vorname: 'Lisa',
-    name: 'Mustermann',
-    geburtsdatum: '10.03.2015',
-    geschlecht: 'w',
-    geburtsort: 'Musterstadt',
-    geburtsland: 'DE',
-    staatsangehoerigkeit: 'DE',
-    verwandtschaft: 'leiblich',
-    versichertennummer: 'C111222333',
-    // ... weitere Felder
-  }]
-});
-```
-
-**Novitas BKK Beispiel:**
-```typescript
-const createNovitasExampleJson = (): Partial<FormData> => ({
-  mitgliedName: 'Mustermann',
-  mitgliedVorname: 'Max',
-  mitgliedKvNummer: 'A123456789',
-  mitgliedKrankenkasse: 'Novitas BKK',
-  familienstand: 'verheiratet',
-  telefon: '0123456789',
-  email: 'max.mustermann@example.com',
-  ehegatte: {
-    vorname: 'Maria',
-    name: 'Mustermann',
-    geburtsdatum: '20.08.1987',
-    geschlecht: 'w',
-    geburtsname: 'Musterfrau',
-    geburtsort: 'Hamburg',
-    geburtsland: 'Deutschland',
-    staatsangehoerigkeit: 'deutsch',
-    bisherigArt: 'mitgliedschaft',
-    bisherigVorname: 'Max',
-    bisherigNachname: 'Mustermann',
-    // KEINE versichertennummer (nicht benötigt)
-  },
-  kinder: [{
-    vorname: 'Lisa',
-    name: 'Mustermann',
-    geburtsdatum: '10.03.2015',
-    geschlecht: 'w',
-    geburtsort: 'Musterstadt',
-    geburtsland: 'Deutschland',
-    staatsangehoerigkeit: 'deutsch',
-    verwandtschaft: 'leiblich',
-    // KEINE versichertennummer
-  }]
-});
-```
-
-**DAK Beispiel:**
-```typescript
-const createDakExampleJson = (): Partial<FormData> => ({
-  mitgliedName: 'Mustermann',
-  mitgliedVorname: 'Max',
-  mitgliedGeburtsdatum: '15.05.1985',
-  mitgliedStrasse: 'Musterstraße',
-  mitgliedHausnummer: '12a',
-  mitgliedPlz: '12345',
-  ort: 'Musterstadt',
-  mitgliedKvNummer: 'A123456789',
-  mitgliedKrankenkasse: 'DAK-Gesundheit',
-  familienstand: 'verheiratet',
-  telefon: '0123456789',
-  email: 'max.mustermann@example.com',
-  ehegatte: {
-    vorname: 'Maria',
-    name: 'Mustermann',
-    geburtsdatum: '20.08.1987',
-    geschlecht: 'w',
-    geburtsname: 'Musterfrau',
-    geburtsort: 'Hamburg',
-    geburtsland: 'Deutschland',
-    staatsangehoerigkeit: 'deutsch',
-    bisherigArt: 'mitgliedschaft',
-  },
-  kinder: [{
-    vorname: 'Lisa',
-    name: 'Mustermann',
-    geburtsdatum: '10.03.2015',
-    geschlecht: 'w',
-    geburtsort: 'Musterstadt',
-    geburtsland: 'Deutschland',
-    staatsangehoerigkeit: 'deutsch',
-    verwandtschaft: 'leiblich',
-  }]
-});
-```
-
-#### 2. Dynamische Schema-Auswahl im useMemo Hook
-
-Zeile 184-189 anpassen:
+#### 2.1 Hilfsfunktion fuer Altersberechnung hinzufuegen
 
 ```typescript
-const exampleJson = useMemo(() => {
-  const activeKasse = selectedKrankenkasse || formData.selectedKrankenkasse || '';
+const calculateAge = (geburtsdatum: string): number => {
+  if (!geburtsdatum) return 0;
   
-  let exampleData: Partial<FormData>;
+  let birthDate: Date | null = null;
   
-  switch (activeKasse) {
-    case 'viactiv':
-      exampleData = createViactivExampleJson();
-      break;
-    case 'novitas':
-      exampleData = createNovitasExampleJson();
-      break;
-    case 'dak':
-      exampleData = createDakExampleJson();
-      break;
-    default:
-      // Fallback: Generisches Beispiel ohne krankenkassenspezifische Felder
-      exampleData = createGenericExampleJson();
+  // ISO format: YYYY-MM-DD
+  if (geburtsdatum.includes('-')) {
+    const parts = geburtsdatum.split('-');
+    if (parts.length === 3) {
+      birthDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    }
+  }
+  // German format: TT.MM.JJJJ
+  else if (geburtsdatum.includes('.')) {
+    const parts = geburtsdatum.split('.');
+    if (parts.length === 3) {
+      birthDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+    }
   }
   
-  return JSON.stringify(exampleData, null, 2);
-}, [selectedKrankenkasse, formData.selectedKrankenkasse]);
-```
-
-#### 3. "Aktuelle Daten anzeigen" krankenkassenspezifisch filtern
-
-Zeile 425-432 anpassen:
-
-```typescript
-const handleShowCurrentData = () => {
-  const activeKasse = selectedKrankenkasse || formData.selectedKrankenkasse || '';
+  if (!birthDate) return 0;
   
-  // Immer ausgeschlossene Felder
-  const baseExclusions = ['unterschrift', 'unterschriftFamilie'];
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
   
-  // Krankenkassenspezifische Ausschlüsse
-  let exclusions = [...baseExclusions];
-  
-  switch (activeKasse) {
-    case 'viactiv':
-      // VIACTIV braucht kein rundumSicherPaket
-      exclusions.push('rundumSicherPaket', 'beginnFamilienversicherung');
-      break;
-    case 'novitas':
-      // Novitas braucht keine Adress-/Geburtsfelder des Mitglieds
-      exclusions.push('rundumSicherPaket', 'mitgliedGeburtsort', 'mitgliedGeburtsland', 
-                      'mitgliedStrasse', 'mitgliedHausnummer', 'mitgliedPlz');
-      break;
-    case 'dak':
-      exclusions.push('rundumSicherPaket');
-      break;
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
   }
   
-  // Felder filtern
-  const filteredData = Object.fromEntries(
-    Object.entries(formData).filter(([key]) => !exclusions.includes(key))
-  );
-  
-  setJsonInput(JSON.stringify(filteredData, null, 2));
+  return age;
 };
 ```
 
-#### 4. Hinweis-Text im Dialog aktualisieren
+#### 2.2 Automatische Erkennung bei ALG II + Kind >= 15
 
-Wenn keine Krankenkasse ausgewählt ist, einen Hinweis anzeigen:
+In der Kinder-Sektion, nach dem Geburtsdatum-Feld:
 
 ```typescript
-{!selectedKrankenkasse && !formData.selectedKrankenkasse && (
-  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
-    <p className="text-sm text-yellow-800 flex items-center gap-2">
-      <AlertTriangle className="h-4 w-4" />
-      Bitte wählen Sie zuerst eine Krankenkasse aus, um das passende Beispiel-JSON zu sehen.
+// Automatische Logik: ALG II + Kind >= 15 = eigene Mitgliedschaft
+useEffect(() => {
+  formData.kinder.forEach((kind, index) => {
+    const age = calculateAge(kind.geburtsdatum);
+    const isAlgII = formData.viactivBeschaeftigung === 'al_geld_2';
+    
+    // Nur automatisch setzen wenn Kind >= 15 UND Hauptmitglied ALG II
+    if (isAlgII && age >= 15 && !kind.eigeneMitgliedschaft) {
+      updateKind(index, { eigeneMitgliedschaft: true });
+    }
+  });
+}, [formData.viactivBeschaeftigung, formData.kinder]);
+```
+
+#### 2.3 Checkbox fuer manuelle Auswahl "Eigene Mitgliedschaft"
+
+Nach dem Verwandtschaftsverhaltnis-Feld, neuen Block hinzufuegen:
+
+```typescript
+{/* Eigene Mitgliedschaft Option - nur fuer Kinder >= 15 anzeigen */}
+{calculateAge(kind.geburtsdatum) >= 15 && (
+  <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+    <div className="flex items-center space-x-3">
+      <Checkbox
+        id={`viactiv-kind${index}-eigene-mitgliedschaft`}
+        checked={kind.eigeneMitgliedschaft}
+        onCheckedChange={(checked) => 
+          updateKind(index, { eigeneMitgliedschaft: checked === true })
+        }
+      />
+      <Label 
+        htmlFor={`viactiv-kind${index}-eigene-mitgliedschaft`} 
+        className="text-sm font-medium cursor-pointer"
+      >
+        Kind hat eigene Mitgliedschaft (nicht familienversichert)
+      </Label>
+    </div>
+    {formData.viactivBeschaeftigung === 'al_geld_2' && (
+      <p className="text-xs text-amber-700 mt-2">
+        <strong>Automatisch aktiviert:</strong> Da Sie ALG II beziehen und das Kind 15+ Jahre alt ist, 
+        benoetigt das Kind eine eigene Mitgliedschaft.
+      </p>
+    )}
+    <p className="text-xs text-muted-foreground mt-2">
+      Bei eigener Mitgliedschaft wird eine separate Beitrittserklaerung und Bonus-Erwachsene (170 Euro) erstellt.
+      Das Kind wird nicht in die Familienversicherung eingetragen.
+    </p>
+  </div>
+)}
+```
+
+#### 2.4 Info-Banner bei ALG II Auswahl
+
+Nach dem Beschaeftigungsstatus-Dropdown:
+
+```typescript
+{formData.viactivBeschaeftigung === 'al_geld_2' && formData.kinder.some(k => calculateAge(k.geburtsdatum) >= 15) && (
+  <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+    <p className="text-sm text-amber-800">
+      <strong>Hinweis ALG II:</strong> Kinder ab 15 Jahren benoetigen bei ALG II-Bezug 
+      eine eigene Mitgliedschaft. Diese werden automatisch mit eigener Beitrittserklaerung exportiert.
     </p>
   </div>
 )}
@@ -249,20 +160,309 @@ Wenn keine Krankenkasse ausgewählt ist, einen Hinweis anzeigen:
 
 ---
 
-## Zusammenfassung
+### Phase 3: Export-Logik anpassen
 
-| Änderung | Beschreibung |
-|----------|--------------|
-| Neue Beispiel-Funktionen | VIACTIV, Novitas, DAK spezifisch |
-| Dynamischer useMemo | Schema-Auswahl basierend auf selectedKrankenkasse |
-| Gefilterte aktuelle Daten | Nur relevante Felder pro Krankenkasse |
-| Hinweis-Text | Warnung wenn keine Kasse ausgewählt |
+#### 3.1 Neue Funktion: Beitrittserklaerung fuer Kind
+
+**Datei:** `src/utils/viactivExport.ts`
+
+Neue Funktion hinzufuegen (aehnlich wie `createViactivBeitrittserklaerungForSpouse`):
+
+```typescript
+/**
+ * Erstellt eine Beitrittserklaerung fuer ein Kind mit eigener Mitgliedschaft
+ */
+export const createViactivBeitrittserklaerungForChild = async (
+  formData: FormData, 
+  kind: FamilyMember,
+  kindIndex: number
+): Promise<Uint8Array> => {
+  const pdfUrl = "/viactiv-beitrittserklaerung.pdf";
+  const existingPdfBytes = await fetch(pdfUrl).then((res) => res.arrayBuffer());
+  const pdfDoc = await PDFDocument.load(existingPdfBytes);
+  const form = pdfDoc.getForm();
+  
+  const helpers = createPDFHelpers(form);
+  const { setTextField, setCheckbox } = helpers;
+
+  // === AUTOMATISCH AUSGEFUELLT ===
+  const datumMitgliedschaft = getDatumMitgliedschaft();
+  setTextField("Datum Mitgliedschaft", datumMitgliedschaft);
+  
+  const versichertBis = getVersichertBis();
+  setTextField("versichert bis (Datum)", versichertBis);
+  
+  setCheckbox("Mein Versicherungsstatus ist unveraendert", true);
+  setCheckbox("Datenschutz- und werberechliche Einwilligungserklaerung", true);
+
+  // === PERSOENLICHE DATEN DES KINDES ===
+  setTextField("Name", kind.name);
+  setTextField("Vorname", kind.vorname);
+  
+  const geburtsdatumFormatted = formatInputDate(kind.geburtsdatum);
+  setTextField("Geburtsdatum", geburtsdatumFormatted);
+  
+  setTextField("Geburtsort", kind.geburtsort || "");
+  setTextField("Geburtsland", kind.geburtsland || "");
+  setTextField("Geburtsname", kind.geburtsname || kind.name);
+  
+  const staatsangehoerigkeitVoll = getNationalityName(kind.staatsangehoerigkeit) || kind.staatsangehoerigkeit || "deutsch";
+  setTextField("Staatsangehoerigkeit", staatsangehoerigkeitVoll);
+
+  // === GESCHLECHT ===
+  setCheckbox("weiblich", kind.geschlecht === "w");
+  setCheckbox("maennlich", kind.geschlecht === "m");
+  setCheckbox("divers", kind.geschlecht === "d" || kind.geschlecht === "x");
+
+  // === ADRESSE (vom Hauptmitglied) ===
+  setTextField("Strasse", formData.mitgliedStrasse || "");
+  setTextField("Hausnummer", formData.mitgliedHausnummer || "");
+  setTextField("PLZ", formData.mitgliedPlz || "");
+  
+  if (kind.abweichendeAnschrift) {
+    setTextField("Ort", kind.abweichendeAnschrift);
+  } else {
+    setTextField("Ort", formData.ort || "");
+  }
+  
+  // === KONTAKT (vom Hauptmitglied) ===
+  setTextField("Telefon", formData.telefon || "");
+  setTextField("E-Mail", formData.email || "");
+
+  // === FAMILIENSTAND (Kind ist ledig) ===
+  setCheckbox("ledig", true);
+  setCheckbox("verheiratet", false);
+  setCheckbox("Lebenspartnerschaft", false);
+
+  // === BESCHAEFTIGUNGSSTATUS (Kind - in der Regel nicht beschaeftigt) ===
+  // Alle Checkboxen leer lassen da Kind normalerweise nicht beschaeftigt
+
+  // === BISHERIGE VERSICHERUNGSART ===
+  // Kind war familienversichert
+  setCheckbox("pflichtversichert", false);
+  setCheckbox("privat", false);
+  setCheckbox("freiwillig versichert", false);
+  setCheckbox("nicht gesetzl. versichert", false);
+  setCheckbox("familienversichert", true);
+  setCheckbox("Zuzug aus dem Ausland", false);
+
+  // === BISHERIGE KRANKENKASSE ===
+  setTextField("Name der letzten KrankenkasseKrankenversicherung", kind.bisherigBestandBei || formData.mitgliedKrankenkasse || "");
+
+  // === FAMILIENANGEHOERIGE MITVERSICHERN (nein fuer Kind) ===
+  setCheckbox("Familienangehoerige sollen mitversichert werden", false);
+
+  // === DATUM UND UNTERSCHRIFT ===
+  const today = new Date();
+  const datumHeute = formatDateGermanWithDots(today);
+  setTextField("Datum und Unterschrift", datumHeute);
+
+  // Unterschrift: Hauptmitglied unterschreibt fuer Kind
+  if (formData.unterschrift) {
+    await embedSignature(pdfDoc, formData.unterschrift, 180, 735, 0);
+  }
+
+  return await pdfDoc.save();
+};
+```
+
+#### 3.2 Export-Funktion erweitern
+
+In `exportViactivBeitrittserklaerung`:
+
+```typescript
+export const exportViactivBeitrittserklaerung = async (formData: FormData): Promise<void> => {
+  try {
+    const today = new Date();
+    const datumForFilename = formatDateGermanWithDots(today);
+    
+    // 1. Hauptmitglied BE exportieren
+    const pdfBytes = await createViactivBeitrittserklaerungPDF(formData);
+    const nachname = formData.mitgliedName || 'Nachname';
+    const vorname = formData.mitgliedVorname || 'Vorname';
+    const filename = `Viactiv_${nachname}, ${vorname}_BE_${datumForFilename}.pdf`;
+    downloadPDF(pdfBytes, filename);
+
+    // 2. Ehegatte BE (wenn eigene Mitgliedschaft)
+    if (formData.viactivFamilienangehoerigeMitversichern && 
+        formData.ehegatte.name && 
+        formData.ehegatte.bisherigArt === 'mitgliedschaft') {
+      const spousePdfBytes = await createViactivBeitrittserklaerungForSpouse(formData);
+      const spouseFilename = `Viactiv_${formData.ehegatte.name}, ${formData.ehegatte.vorname}_BE_${datumForFilename}.pdf`;
+      downloadPDF(spousePdfBytes, spouseFilename);
+    }
+
+    // 3. NEU: Kinder BE (wenn eigene Mitgliedschaft)
+    if (formData.viactivFamilienangehoerigeMitversichern) {
+      for (let i = 0; i < formData.kinder.length; i++) {
+        const kind = formData.kinder[i];
+        if (kind.name && kind.eigeneMitgliedschaft) {
+          console.log(`VIACTIV: Erstelle Beitrittserklaerung fuer Kind ${kind.vorname} ${kind.name} mit eigener Mitgliedschaft`);
+          
+          const kindPdfBytes = await createViactivBeitrittserklaerungForChild(formData, kind, i);
+          const kindFilename = `Viactiv_${kind.name}, ${kind.vorname}_BE_${datumForFilename}.pdf`;
+          downloadPDF(kindPdfBytes, kindFilename);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error exporting VIACTIV Beitrittserklaerung:", error);
+    throw error;
+  }
+};
+```
 
 ---
 
-## Dateien
+### Phase 4: Familienversicherung-Export anpassen
 
-| Datei | Änderungen |
-|-------|------------|
-| `src/components/JsonImportDialog.tsx` | 4 neue Beispiel-Funktionen, dynamische Auswahl, gefilterter Export |
+**Datei:** `src/utils/viactivFamilyExport.ts`
+
+Kinder mit eigener Mitgliedschaft aus der Familienversicherung ausschliessen:
+
+```typescript
+export const exportViactivFamilienversicherung = async (formData: FormData): Promise<void> => {
+  if (!formData.viactivFamilienangehoerigeMitversichern) {
+    console.log("Familienversicherung nicht aktiviert, kein PDF erstellt");
+    return;
+  }
+
+  // NEU: Nur Kinder OHNE eigene Mitgliedschaft in Familienversicherung eintragen
+  const familienversicherteKinder = formData.kinder.filter(kind => !kind.eigeneMitgliedschaft);
+  
+  // Wenn keine Kinder mehr fuer Familienversicherung UND kein Ehegatte, kein PDF erstellen
+  if (familienversicherteKinder.length === 0 && !formData.ehegatte.name) {
+    console.log("Keine familienversicherten Angehoerigen, kein PDF erstellt");
+    return;
+  }
+
+  const numberOfPDFs = Math.max(1, Math.ceil(familienversicherteKinder.length / 3));
+  
+  // ... Rest der Funktion mit familienversicherteKinder statt formData.kinder
+};
+```
+
+---
+
+### Phase 5: Bonus-Export anpassen
+
+**Datei:** `src/utils/viactivBonusExport.ts`
+
+Logik fuer Kinder mit eigener Mitgliedschaft:
+
+```typescript
+export const exportViactivBonusPDFs = async (formData: FormData): Promise<number> => {
+  let count = 0;
+
+  try {
+    // 1. Hauptmitglied - immer Erwachsene (170 Euro)
+    // ... bestehende Logik
+
+    // 2. Ehegatte
+    // ... bestehende Logik
+
+    // 3. Kinder - NEU: Unterscheidung nach eigener Mitgliedschaft
+    if (formData.viactivFamilienangehoerigeMitversichern && formData.kinder.length > 0) {
+      for (const kind of formData.kinder) {
+        if (!kind.name || !kind.vorname) continue;
+        
+        const age = calculateAge(kind.geburtsdatum);
+        
+        // NEU: Kind mit eigener Mitgliedschaft = IMMER Erwachsenen-Bonus
+        if (kind.eigeneMitgliedschaft) {
+          console.log(`VIACTIV Bonus: Kind ${kind.vorname} ${kind.name} hat eigene Mitgliedschaft -> Erwachsenen-Bonus`);
+          const kindPdfBytes = await createBonusErwachsenePDF(
+            formData,
+            kind.vorname,
+            kind.name,
+            kind.geburtsdatum,
+            kind.versichertennummer,
+            formData.unterschrift,
+          );
+          const kindFilename = generateBonusFilename(kind.name, kind.vorname, kind.geburtsdatum);
+          downloadPDF(kindPdfBytes, kindFilename);
+        } 
+        // Unter 15 und familienversichert = Kinder-Bonus
+        else if (age < 15) {
+          const kindPdfBytes = await createBonusKinderPDF(formData, kind, formData.unterschrift);
+          const kindFilename = generateBonusFilename(kind.name, kind.vorname, kind.geburtsdatum);
+          downloadPDF(kindPdfBytes, kindFilename);
+        }
+        // 15+ und familienversichert = Erwachsenen-Bonus (wie bisher)
+        else {
+          const kindPdfBytes = await createBonusErwachsenePDF(
+            formData,
+            kind.vorname,
+            kind.name,
+            kind.geburtsdatum,
+            kind.versichertennummer,
+            formData.unterschrift,
+          );
+          const kindFilename = generateBonusFilename(kind.name, kind.vorname, kind.geburtsdatum);
+          downloadPDF(kindPdfBytes, kindFilename);
+        }
+        count++;
+      }
+    }
+
+    return count;
+  } catch (error) {
+    console.error("VIACTIV Bonus Export error:", error);
+    throw error;
+  }
+};
+```
+
+---
+
+### Phase 6: Export-Zusammenfassung in Index.tsx
+
+**Datei:** `src/pages/Index.tsx`
+
+Toast-Nachricht aktualisieren:
+
+```typescript
+if (formData.viactivFamilienangehoerigeMitversichern) {
+  const kinderMitEigenerMitgliedschaft = formData.kinder.filter(k => k.eigeneMitgliedschaft).length;
+  const familienversicherteKinder = formData.kinder.length - kinderMitEigenerMitgliedschaft;
+  
+  const numberOfFamilyPDFs = familienversicherteKinder > 0 || formData.ehegatte.name 
+    ? Math.max(1, Math.ceil(familienversicherteKinder / 3)) 
+    : 0;
+  
+  const hasSpouseWithOwnMembership = formData.ehegatte.name && formData.ehegatte.bisherigArt === 'mitgliedschaft';
+  const numberOfBEs = 1 + (hasSpouseWithOwnMembership ? 1 : 0) + kinderMitEigenerMitgliedschaft;
+  const numberOfBonusPDFs = 1 + (formData.ehegatte.name ? 1 : 0) + formData.kinder.length;
+  
+  toast.info(`Es werden ${numberOfBEs} BE(s), ${numberOfFamilyPDFs} Familienversicherungs-PDF(s) und ${numberOfBonusPDFs} Bonus-PDF(s) erstellt...`);
+  
+  await exportViactivBeitrittserklaerung(formData);
+  await exportViactivFamilienversicherung(formData);
+  await exportViactivBonusPDFs(formData);
+}
+```
+
+---
+
+## Zusammenfassung der Dateiaenderungen
+
+| Datei | Aenderungen |
+|-------|-------------|
+| `src/types/form.ts` | Neues Feld `eigeneMitgliedschaft` in FamilyMember |
+| `src/components/ViactivSection.tsx` | UI fuer eigene Mitgliedschaft, automatische ALG II Erkennung |
+| `src/utils/viactivExport.ts` | Neue Funktion `createViactivBeitrittserklaerungForChild`, Export-Logik erweitern |
+| `src/utils/viactivFamilyExport.ts` | Kinder mit eigener Mitgliedschaft ausschliessen |
+| `src/utils/viactivBonusExport.ts` | Logik fuer Kinder mit eigener Mitgliedschaft |
+| `src/pages/Index.tsx` | Toast-Nachricht aktualisieren |
+
+---
+
+## Export-Logik Uebersicht
+
+| Situation | Beitrittserklaerung | Familienversicherung | Bonus |
+|-----------|---------------------|----------------------|-------|
+| Kind < 15, familienversichert | Nein | Ja | Kinder (110 Euro) |
+| Kind >= 15, familienversichert | Nein | Ja | Erwachsene (170 Euro) |
+| Kind >= 15, eigene Mitgliedschaft | Ja | Nein | Erwachsene (170 Euro) |
+| ALG II + Kind >= 15 | Ja (automatisch) | Nein | Erwachsene (170 Euro) |
 
