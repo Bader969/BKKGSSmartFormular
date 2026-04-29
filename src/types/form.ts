@@ -379,5 +379,14 @@ export const createInitialFormData = (): FormData => {
       ...createEmptyBigBankDaten(),
       datum: formatDateForInput(today),
     },
+    bigVersicherungsstatus: '',
+    bigHoeheEuro: '',
+    bigVersicherungsarten: {
+      privateZusatz: false,
+      berufsunfaehigkeit: false,
+      unfall: false,
+      grundfaehigkeit: false,
+    },
+    bigMitversicherte: [],
   };
 };
