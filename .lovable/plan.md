@@ -1,119 +1,93 @@
-# VIACTIV Beitrittserklärung – Korrekturen
+## Ziel
 
-## Probleme
+Neue Krankenkasse **"BIG direkt gesund (Plusbonus)"** als zusätzliche Option im Krankenkassen-Dropdown integrieren. Eigenes Formular mit minimalem Eingabe-Set + PDF-Export gegen die hochgeladene Vorlage `Antrag_Plusbonus-interaktiv-_2026-2.pdf`.
 
-1. **Geburtsdatum** wird nach KI-Validierung im UI angezeigt, aber beim PDF-Export NICHT in das Feld `Geburtsdatum` geschrieben.
-2. **Arbeitgeber-PLZ** wird im UI eingegeben, aber NICHT in das PDF-Feld `Arbeitgeber PLZ` exportiert.
-3. **Jobcenter-Logik fehlt**: Wenn der Kunde keinen Arbeitgeber hat (z. B. ALG II / ALG I), sollen automatisch die Daten von Jobcenter / Agentur für Arbeit in die Arbeitgeber-Felder geschrieben werden.
+## Pflichtfelder (laut Anforderung)
 
-## Ursachenanalyse
+Mitglied:
+- Vorname, Name, Straße, Hausnummer, PLZ, Ort
+- Geschlecht (männlich / weiblich / divers)
 
-### Geburtsdatum
-`formatInputDate()` in `src/utils/viactivExport.ts` splittet nur an `-` (HTML date input → `YYYY-MM-DD`). Die KI liefert oft `TT.MM.JJJJ` (laut Schema), das wird unverändert zurückgegeben und teilweise vom PDF-Textfeld nicht akzeptiert (Format-Erwartung TTMMJJJJ ohne Punkte). Außerdem fehlt jegliche Robustheit für gemischte Formate.
+Zahlungsempfänger*in (Bankdaten):
+- Kontoinhaber*in
+- Kreditinstitut
+- IBAN
+- BIC
+- Ort (für Unterschrift Bankdaten)
+- Datum (TTMMJJ)
+- **Unterschrift Kontoinhaber** — auf der gleichen Ebene wie das Datum
 
-### Arbeitgeber-PLZ
-Das Feld heißt im PDF korrekt `Arbeitgeber PLZ` und wird in `viactivExport.ts` (Zeile 257) gesetzt. Das eigentliche Problem: Bei Beschäftigungsstatus ≠ `beschaeftigt` (z. B. `al_geld_2`) ist `formData.viactivArbeitgeber.plz` typischerweise leer, und der UI-Block "Arbeitgeber" wird oft nicht ausgefüllt → leerer String → kein PDF-Wert. Dazu kommt: Wenn der User ALG I / ALG II bezieht, wird im UI vermutlich gar kein Arbeitgeber erfasst, dadurch bleiben PLZ + alle Arbeitgeberfelder leer.
+Mitglieds-Daten werden aus der bereits existierenden `MemberSection` wiederverwendet (Vorname, Name, Adresse). Geschlecht und Bankdaten kommen in einer neuen `BigPlusbonusSection`. Für die Unterschrift wird die bereits erfasste Mitglieds-Unterschrift wiederverwendet (gleicher Pad wie alle anderen KK).
 
-(Wenn die PLZ trotz Eingabe nicht erscheint, prüft der Fix außerdem PDF-Field-Encoding-Varianten konsistent.)
+## Field-Mapping (CSV → PDF AcroFields)
 
-## Lösung
+Aus `Antrag_Plusbonus-interaktiv-_2026-fields-2.csv` ergibt sich folgendes Mapping (alle relevanten Felder befinden sich auf Seite 1):
 
-### 1. `src/utils/viactivExport.ts` – `formatInputDate` robust machen
+| PDF-Feld | Quelle FormData |
+|---|---|
+| `männlich` / `weiblich` / `divers` (Checkbox) | `bigGeschlecht` |
+| `Name` | `mitgliedName` |
+| `Vorname` | `mitgliedVorname` |
+| `Straße` | `mitgliedStrasse` |
+| `Hausnummer` | `mitgliedHausnummer` |
+| `PLZ` | `mitgliedPlz` |
+| `Ort` | `ort` |
+| `Kontoinhaberin` | `bigBank.kontoinhaber` |
+| `Kreditinstitut` | `bigBank.kreditinstitut` |
+| `IBAN Internationale Bankkontonummer` | `bigBank.iban` |
+| `BIC` | `bigBank.bic` |
+| `Ort_2` | `bigBank.ort` |
+| `Datum TTMMJJ` | `bigBank.datum` (TTMMJJ-Format) |
+| `Signatur16` | Mitglieds-Unterschrift als Bild (selbe Ebene wie `Datum TTMMJJ`) |
 
-Akzeptiert jetzt:
-- `YYYY-MM-DD` → `TTMMJJJJ`
-- `TT.MM.JJJJ` → `TTMMJJJJ`
-- `TT/MM/JJJJ` → `TTMMJJJJ`
-- alles andere → leerer String, damit ungültige Werte nicht ins PDF wandern
+**Optional/automatisch leer gelassen** (laut Anforderung nicht Pflicht, daher nicht erfasst und nicht ausgefüllt):
+- `Beginn der Mitgliedschaft möglich`, `undefined`
+- `Neuabschluss` / `bestehende Zusatzversicherung`, `Euro`, `Name Vorname*`, `Höhe der Police*`
+- Alle Versicherungstyp-Checkboxes (`private Zusatzversicherung…`, `Berufsunfähigkeitsversicherung`, `Unfallversicherung`, `Grundfähigkeitsversicherung`)
+- `Ort_3`, `Datum TTMMJJ_2`, `Signatur17` (zweiter Unterschriftsblock unten — nicht angefordert)
 
-```ts
-const formatInputDate = (dateStr: string): string => {
-  if (!dateStr) return "";
-  const s = dateStr.trim();
-  // YYYY-MM-DD
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (m) return `${m[3]}${m[2]}${m[1]}`;
-  // TT.MM.JJJJ oder TT/MM/JJJJ
-  m = s.match(/^(\d{2})[./-](\d{2})[./-](\d{4})$/);
-  if (m) return `${m[1]}${m[2]}${m[3]}`;
-  return "";
-};
-```
+## Umsetzungsschritte
 
-Damit wird `Geburtsdatum` zuverlässig als `TTMMJJJJ` ausgefüllt – an allen Stellen (Mitglied, Ehegatte BE, Kind BE, `Beschäftigt seit`).
+1. **PDF-Vorlage einbinden**
+   - `user-uploads://Antrag_Plusbonus-interaktiv-_2026-2.pdf` → `public/big-plusbonus.pdf` kopieren.
 
-### 2. Jobcenter-/Agentur-für-Arbeit-Fallback für Arbeitgeber
+2. **Typen erweitern** (`src/types/form.ts`)
+   - Krankenkasse-Typ: `'big_plusbonus'` ergänzen, in `KRANKENKASSEN_OPTIONS` neuen Eintrag `{ value: 'big_plusbonus', label: 'BIG direkt gesund (Plusbonus)' }`.
+   - Neuer Typ `BigGeschlecht = 'maennlich' | 'weiblich' | 'divers' | ''`.
+   - Neues Interface `BigBankDaten { kontoinhaber, kreditinstitut, iban, bic, ort, datum }` + `createEmptyBigBankDaten()`.
+   - `FormData` um `bigGeschlecht: BigGeschlecht` und `bigBank: BigBankDaten` erweitern; Defaults in `createInitialFormData` setzen (Datum = heute im TTMMJJ-Format, Ort = leer, Kontoinhaber = `Vorname Name` Sync analog Bonus-Logik).
 
-Neue Helferfunktion in `viactivExport.ts`, die je nach Beschäftigungsstatus die Arbeitgeber-Felder auflöst:
+3. **Neue UI-Komponente** `src/components/BigPlusbonusSection.tsx`
+   - Abschnitt "Geschlecht" (Radio: männlich / weiblich / divers).
+   - Abschnitt "Zahlungsempfänger*in": Kontoinhaber, Kreditinstitut, IBAN, BIC, Ort, Datum (date input).
+   - Hinweis: Unterschrift = Mitglieds-Unterschrift aus `SignatureSection`.
 
-```ts
-const resolveArbeitgeber = (formData: FormData) => {
-  const ag = formData.viactivArbeitgeber;
-  const hasArbeitgeber = !!(ag?.name || ag?.strasse || ag?.plz);
-  if (hasArbeitgeber) return ag;
+4. **Index integrieren** (`src/pages/Index.tsx`)
+   - `getHeaderTitle` / `getHeaderSubtitle`: Fall `big_plusbonus` → "BIG direkt gesund Formular" / "BIG direkt gesund – Plusbonus".
+   - Im Sektionen-Block: bei `selectedKrankenkasse === 'big_plusbonus'` die `MemberSection` (existierend) + neue `BigPlusbonusSection` + `SignatureSection` rendern (keine Ehegatte/Kinder).
+   - Validierung: Vorname, Name, Strasse, Hausnummer, PLZ, Ort, `bigGeschlecht`, alle 6 Bankfelder, Unterschrift.
+   - Export-Branch: `await exportBigPlusbonus(formData)` + Toast.
 
-  // Fallback Jobcenter / Agentur für Arbeit
-  if (formData.viactivBeschaeftigung === 'al_geld_2') {
-    // ALG II → Jobcenter (PLZ + Ort = Wohnort des Mitglieds)
-    return {
-      name: 'Jobcenter',
-      strasse: '',
-      hausnummer: '',
-      plz: formData.mitgliedPlz || '',
-      ort: formData.ort || '',
-      beschaeftigtSeit: '',
-    };
-  }
-  if (formData.viactivBeschaeftigung === 'al_geld_1') {
-    // ALG I → Agentur für Arbeit
-    return {
-      name: 'Agentur für Arbeit',
-      strasse: '',
-      hausnummer: '',
-      plz: formData.mitgliedPlz || '',
-      ort: formData.ort || '',
-      beschaeftigtSeit: '',
-    };
-  }
-  return ag;
-};
-```
+5. **Export-Utility** `src/utils/bigPlusbonusExport.ts`
+   - Lädt `/big-plusbonus.pdf` via pdf-lib, holt Form, setzt Textfelder & Checkboxen wie im Mapping oben.
+   - Datum in TTMMJJ-Format konvertieren (Helper).
+   - Unterschrift als PNG-Bild via `embedPng` einbetten und positioniert über das `Signatur16`-Widget legen (`x≈301, y≈407, w≈261, h≈12` — Koordinaten aus CSV; pdf-lib Y ist von unten gemessen → `pageHeight - top - height` umrechnen, analog `dakExport.ts`).
+   - `form.flatten()` und Download als `BIG-Plusbonus_<Nachname>_<Vorname>.pdf`.
 
-In `createViactivBeitrittserklaerungPDF` wird statt direkt `formData.viactivArbeitgeber` der Rückgabewert dieser Funktion verwendet:
+6. **Header-Label-Memory** aktualisieren falls nötig (Core-Memory bereits abgedeckt durch dynamische Header).
 
-```ts
-const ag = resolveArbeitgeber(formData);
-setTextField("Name des Arbeitgebers", ag.name || "");
-setTextField("Arbeitgeber Straße", ag.strasse || "");
-setTextField("Arbeitgeber Hausnummer", ag.hausnummer || "");
-setTextField("Arbeitgeber PLZ", ag.plz || "");
-setTextField("Arbeitgeber Ort", ag.ort || "");
-setTextField("Beschäftigt seit", formatInputDate(ag.beschaeftigtSeit) || "");
-```
+## Dateien
 
-### 3. Verbesserte Logs für Debugging
+| Datei | Änderung |
+|---|---|
+| `public/big-plusbonus.pdf` | NEU (Kopie der Vorlage) |
+| `src/types/form.ts` | Typen + Defaults |
+| `src/components/BigPlusbonusSection.tsx` | NEU |
+| `src/utils/bigPlusbonusExport.ts` | NEU |
+| `src/pages/Index.tsx` | Dropdown-Eintrag, Header, Render-Branch, Validierung, Export-Aufruf |
 
-Beim Setzen von `Geburtsdatum` und `Arbeitgeber PLZ` zusätzlich den Roh-Inputwert loggen, um zukünftige Probleme schneller zu finden:
+## Hinweise
 
-```ts
-console.log("VIACTIV Geburtsdatum raw:", formData.mitgliedGeburtsdatum,
-            "→ formatted:", geburtsdatumFormatted);
-console.log("VIACTIV Arbeitgeber PLZ:", ag.plz, "Quelle:",
-            hasArbeitgeber ? "User" : `Fallback (${formData.viactivBeschaeftigung})`);
-```
-
-## Betroffene Datei
-
-| Datei | Änderungen |
-|-------|------------|
-| `src/utils/viactivExport.ts` | `formatInputDate` robuster, neue `resolveArbeitgeber` Hilfsfunktion, Verwendung in BE-Hauptmitglied (Spouse-/Child-BE bleiben unverändert, da dort kein Arbeitgeber relevant ist), zusätzliche Logs |
-
-## Übersicht Verhalten Arbeitgeber-Felder im PDF
-
-| Beschäftigung | Arbeitgeber befüllt? | PDF-Inhalt Arbeitgeber-Felder |
-|---|---|---|
-| `beschaeftigt` | Ja (Pflicht) | Eingaben aus UI |
-| `al_geld_1` | leer | Name = "Agentur für Arbeit", PLZ/Ort = Wohnsitz Mitglied |
-| `al_geld_2` | leer | Name = "Jobcenter", PLZ/Ort = Wohnsitz Mitglied |
-| sonstiges | leer | leer (keine Änderung) |
-| beliebig | befüllt | Eingaben aus UI (Vorrang vor Fallback) |
+- Keine PII-Speicherung, keine zusätzlichen Krankenkassen-spezifischen Imports — folgt bestehendem Pattern (VIACTIV/DAK/Novitas).
+- Vorname steht weiterhin vor Name (Core-Memory eingehalten).
+- Pflichtkontakte (Telefon/Email) sind per Core-Memory mandatorisch — werden hier ebenfalls validiert.
