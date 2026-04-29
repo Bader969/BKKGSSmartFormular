@@ -180,6 +180,20 @@ export const createEmptyBigBankDaten = (): BigBankDaten => ({
   datum: '',
 });
 
+export type BigVersicherungsstatus = 'neuabschluss' | 'bestehend' | '';
+
+export interface BigVersicherungsarten {
+  privateZusatz: boolean;
+  berufsunfaehigkeit: boolean;
+  unfall: boolean;
+  grundfaehigkeit: boolean;
+}
+
+export interface BigMitversicherte {
+  nameVorname: string;
+  hoehePolice: string;
+}
+
 export interface FormData {
   // Formular-Modus
   mode: FormMode;
