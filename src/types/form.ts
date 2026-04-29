@@ -263,6 +263,10 @@ export interface FormData {
   // BIG direkt gesund (Plusbonus) Felder
   bigGeschlecht: BigGeschlecht;
   bigBank: BigBankDaten;
+  bigVersicherungsstatus: BigVersicherungsstatus;
+  bigHoeheEuro: string;
+  bigVersicherungsarten: BigVersicherungsarten;
+  bigMitversicherte: BigMitversicherte[];
 }
 
 export const createEmptyArztDaten = (): ArztDaten => ({
