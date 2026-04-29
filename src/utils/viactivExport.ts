@@ -11,10 +11,15 @@ import { getNationalityName } from "@/utils/countries";
 
 const formatInputDate = (dateStr: string): string => {
   if (!dateStr) return "";
-  const parts = dateStr.split("-");
-  if (parts.length !== 3) return dateStr;
-  // Format: TTMMJJJJ (ohne Punkte für VIACTIV PDF)
-  return `${parts[2]}${parts[1]}${parts[0]}`;
+  const s = dateStr.trim();
+  // YYYY-MM-DD (HTML date input)
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return `${m[3]}${m[2]}${m[1]}`;
+  // TT.MM.JJJJ oder TT/MM/JJJJ oder TT-MM-JJJJ
+  m = s.match(/^(\d{2})[./-](\d{2})[./-](\d{4})$/);
+  if (m) return `${m[1]}${m[2]}${m[3]}`;
+  console.warn("VIACTIV formatInputDate: unrecognized date format:", dateStr);
+  return "";
 };
 
 const formatDateGerman = (date: Date): string => {
@@ -134,6 +139,47 @@ const downloadPDF = (pdfBytes: Uint8Array, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
+/**
+ * Auflösung Arbeitgeber-Felder: Wenn der User keinen Arbeitgeber eingetragen hat,
+ * werden Jobcenter (ALG II) bzw. Agentur für Arbeit (ALG I) als Fallback verwendet.
+ * Wohnort des Mitglieds wird als Adresse herangezogen.
+ */
+const resolveArbeitgeber = (
+  formData: FormData,
+): { data: FormData["viactivArbeitgeber"]; source: string } => {
+  const ag = formData.viactivArbeitgeber;
+  const hasArbeitgeber = !!(ag && (ag.name || ag.strasse || ag.plz || ag.ort));
+  if (hasArbeitgeber) return { data: ag, source: "User" };
+
+  if (formData.viactivBeschaeftigung === "al_geld_2") {
+    return {
+      data: {
+        name: "Jobcenter",
+        strasse: "",
+        hausnummer: "",
+        plz: formData.mitgliedPlz || "",
+        ort: formData.ort || "",
+        beschaeftigtSeit: "",
+      },
+      source: "Fallback Jobcenter (ALG II)",
+    };
+  }
+  if (formData.viactivBeschaeftigung === "al_geld_1") {
+    return {
+      data: {
+        name: "Agentur für Arbeit",
+        strasse: "",
+        hausnummer: "",
+        plz: formData.mitgliedPlz || "",
+        ort: formData.ort || "",
+        beschaeftigtSeit: "",
+      },
+      source: "Fallback Agentur für Arbeit (ALG I)",
+    };
+  }
+  return { data: ag, source: "leer" };
+};
+
 const embedSignature = async (
   pdfDoc: PDFDocument,
   signatureData: string,
@@ -201,7 +247,12 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   
   // Geburtsdatum formatieren und setzen
   const geburtsdatumFormatted = formatInputDate(formData.mitgliedGeburtsdatum);
-  console.log("VIACTIV Setting Geburtsdatum:", geburtsdatumFormatted);
+  console.log(
+    "VIACTIV Geburtsdatum raw:",
+    formData.mitgliedGeburtsdatum,
+    "→ formatted:",
+    geburtsdatumFormatted,
+  );
   setTextField("Geburtsdatum", geburtsdatumFormatted);
   
   setTextField("Geburtsort", formData.mitgliedGeburtsort || "");
@@ -250,13 +301,21 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   setCheckbox("Einkommen über 64.350 Euro-Stand 2022", formData.viactivBeschaeftigung === "einkommen_ueber_grenze");
 
   // === ARBEITGEBER ===
-  const ag = formData.viactivArbeitgeber;
+  const { data: ag, source: agSource } = resolveArbeitgeber(formData);
+  console.log(
+    "VIACTIV Arbeitgeber Quelle:",
+    agSource,
+    "PLZ:",
+    ag?.plz,
+    "Name:",
+    ag?.name,
+  );
   setTextField("Name des Arbeitgebers", ag.name || "");
   setTextField("Arbeitgeber Straße", ag.strasse || "");
   setTextField("Arbeitgeber Hausnummer", ag.hausnummer || "");
   setTextField("Arbeitgeber PLZ", ag.plz || "");
   setTextField("Arbeitgeber Ort", ag.ort || "");
-  setTextField("Beschäftigt seit", formatInputDate(ag.beschaeftigtSeit) || "");
+  setTextField("Beschäftigt seit", formatInputDate(ag.beschaeftigtSeit || ""));
 
   // === BISHERIGE VERSICHERUNGSART ===
   setCheckbox("pflichtversichert", formData.viactivVersicherungsart === "pflichtversichert");
