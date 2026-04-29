@@ -484,6 +484,11 @@ const Index = () => {
                 </>
               )}
               
+              {/* BIG direkt gesund (Plusbonus) spezifische Sektionen */}
+              {formData.selectedKrankenkasse === 'big_plusbonus' && (
+                <BigPlusbonusSection formData={formData} updateFormData={updateFormData} />
+              )}
+
               <SignatureSection formData={formData} updateFormData={updateFormData} />
               
               {/* Export Button */}
