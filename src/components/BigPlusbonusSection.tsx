@@ -4,7 +4,6 @@ import { FormField } from './FormField';
 import { FormData, BIG_GESCHLECHT_OPTIONS, BigBankDaten, BigGeschlecht } from '@/types/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { CreditCard, User } from 'lucide-react';
 
 interface Props {
   formData: FormData;
@@ -18,7 +17,7 @@ export const BigPlusbonusSection: React.FC<Props> = ({ formData, updateFormData 
 
   return (
     <>
-      <FormSection title="Geschlecht" icon={User}>
+      <FormSection title="Geschlecht" variant="member">
         <RadioGroup
           value={formData.bigGeschlecht}
           onValueChange={(v) => updateFormData({ bigGeschlecht: v as BigGeschlecht })}
@@ -37,7 +36,7 @@ export const BigPlusbonusSection: React.FC<Props> = ({ formData, updateFormData 
         </RadioGroup>
       </FormSection>
 
-      <FormSection title="Zahlungsempfänger*in (SEPA-Lastschriftmandat)" icon={CreditCard}>
+      <FormSection title="Zahlungsempfänger*in (SEPA-Lastschriftmandat)" variant="info">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             type="text"
