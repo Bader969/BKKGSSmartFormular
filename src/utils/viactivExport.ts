@@ -11,10 +11,15 @@ import { getNationalityName } from "@/utils/countries";
 
 const formatInputDate = (dateStr: string): string => {
   if (!dateStr) return "";
-  const parts = dateStr.split("-");
-  if (parts.length !== 3) return dateStr;
-  // Format: TTMMJJJJ (ohne Punkte für VIACTIV PDF)
-  return `${parts[2]}${parts[1]}${parts[0]}`;
+  const s = dateStr.trim();
+  // YYYY-MM-DD (HTML date input)
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return `${m[3]}${m[2]}${m[1]}`;
+  // TT.MM.JJJJ oder TT/MM/JJJJ oder TT-MM-JJJJ
+  m = s.match(/^(\d{2})[./-](\d{2})[./-](\d{4})$/);
+  if (m) return `${m[1]}${m[2]}${m[3]}`;
+  console.warn("VIACTIV formatInputDate: unrecognized date format:", dateStr);
+  return "";
 };
 
 const formatDateGerman = (date: Date): string => {
