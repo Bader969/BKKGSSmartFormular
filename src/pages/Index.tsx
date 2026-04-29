@@ -6,6 +6,7 @@ import { ChildrenSection } from '@/components/ChildrenSection';
 import { SignatureSection } from '@/components/SignatureSection';
 import { RundumSicherPaketSection } from '@/components/RundumSicherPaketSection';
 import { ViactivSection } from '@/components/ViactivSection';
+import { BigPlusbonusSection } from '@/components/BigPlusbonusSection';
 import { Button } from '@/components/ui/button';
 import { FileDown, FileText, AlertCircle, Users, User, Building2 } from 'lucide-react';
 import { exportFilledPDF, exportRundumSicherPaketOnly } from '@/utils/pdfExport';
@@ -14,6 +15,7 @@ import { exportViactivFamilienversicherung } from '@/utils/viactivFamilyExport';
 import { exportViactivBonusPDFs } from '@/utils/viactivBonusExport';
 import { exportNovitasFamilienversicherung } from '@/utils/novitasExport';
 import { exportDAKFamilienversicherung } from '@/utils/dakExport';
+import { exportBigPlusbonus } from '@/utils/bigPlusbonusExport';
 import { toast } from 'sonner';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -61,6 +63,9 @@ const Index = () => {
         if (!newData.viactivBonusKontoinhaber || newData.viactivBonusKontoinhaber === oldFullName) {
           newData.viactivBonusKontoinhaber = newFullName;
         }
+        if (!newData.bigBank.kontoinhaber || newData.bigBank.kontoinhaber === oldFullName) {
+          newData.bigBank = { ...newData.bigBank, kontoinhaber: newFullName };
+        }
       }
       
       return newData;
@@ -77,6 +82,7 @@ const Index = () => {
       case 'novitas': return 'Novitas BKK Formular';
       case 'dak': return 'DAK Formular';
       case 'bkk_gs': return 'BKK GS Formular';
+      case 'big_plusbonus': return 'BIG direkt gesund Formular';
       default: return 'Smart Formular';
     }
   };
@@ -87,6 +93,7 @@ const Index = () => {
       case 'novitas': return 'Novitas BKK - Familienversicherung';
       case 'dak': return 'DAK - Familienversicherung';
       case 'bkk_gs': return 'BKK GILDEMEISTER SEIDENSTICK - Online-Formular';
+      case 'big_plusbonus': return 'BIG direkt gesund - Plusbonus Antrag';
       default: return 'Bitte wählen Sie eine Krankenkasse aus';
     }
   };
@@ -99,7 +106,7 @@ const Index = () => {
     }
     
     // Geburtsdatum nur prüfen wenn NICHT Novitas (bei Novitas ausgeblendet)
-    if (formData.selectedKrankenkasse !== 'novitas' && !formData.mitgliedGeburtsdatum) {
+    if (formData.selectedKrankenkasse !== 'novitas' && formData.selectedKrankenkasse !== 'big_plusbonus' && !formData.mitgliedGeburtsdatum) {
       toast.error('Bitte geben Sie das Geburtsdatum des Mitglieds ein.');
       return;
     }
@@ -107,6 +114,23 @@ const Index = () => {
     if (!formData.unterschrift) {
       toast.error('Bitte unterschreiben Sie das Formular.');
       return;
+    }
+
+    // BIG Plusbonus-spezifische Validierung
+    if (formData.selectedKrankenkasse === 'big_plusbonus') {
+      if (!formData.mitgliedStrasse || !formData.mitgliedHausnummer || !formData.mitgliedPlz || !formData.ort) {
+        toast.error('Bitte vollständige Adresse (Straße, Hausnr., PLZ, Ort) eingeben.');
+        return;
+      }
+      if (!formData.bigGeschlecht) {
+        toast.error('Bitte wählen Sie das Geschlecht aus.');
+        return;
+      }
+      const b = formData.bigBank;
+      if (!b.kontoinhaber || !b.kreditinstitut || !b.iban || !b.bic || !b.ort || !b.datum) {
+        toast.error('Bitte alle Bankdaten (Kontoinhaber, Kreditinstitut, IBAN, BIC, Ort, Datum) ausfüllen.');
+        return;
+      }
     }
     
     // VIACTIV-spezifische Validierung
@@ -227,8 +251,14 @@ const Index = () => {
     
     setIsExporting(true);
     try {
+      // BIG Plusbonus Export
+      if (formData.selectedKrankenkasse === 'big_plusbonus') {
+        toast.info('BIG direkt gesund Plusbonus PDF wird erstellt...');
+        await exportBigPlusbonus(formData);
+        toast.success('BIG Plusbonus PDF erfolgreich exportiert!');
+      }
       // VIACTIV Export
-      if (formData.selectedKrankenkasse === 'viactiv') {
+      else if (formData.selectedKrankenkasse === 'viactiv') {
         if (formData.viactivFamilienangehoerigeMitversichern) {
           // Berechne Anzahl der PDFs inkl. eigener Mitgliedschaft für Kinder
           const kinderMitEigenerMitgliedschaft = formData.kinder.filter(k => k.eigeneMitgliedschaft).length;
