@@ -180,6 +180,20 @@ export const createEmptyBigBankDaten = (): BigBankDaten => ({
   datum: '',
 });
 
+export type BigVersicherungsstatus = 'neuabschluss' | 'bestehend' | '';
+
+export interface BigVersicherungsarten {
+  privateZusatz: boolean;
+  berufsunfaehigkeit: boolean;
+  unfall: boolean;
+  grundfaehigkeit: boolean;
+}
+
+export interface BigMitversicherte {
+  nameVorname: string;
+  hoehePolice: string;
+}
+
 export interface FormData {
   // Formular-Modus
   mode: FormMode;
@@ -249,6 +263,10 @@ export interface FormData {
   // BIG direkt gesund (Plusbonus) Felder
   bigGeschlecht: BigGeschlecht;
   bigBank: BigBankDaten;
+  bigVersicherungsstatus: BigVersicherungsstatus;
+  bigHoeheEuro: string;
+  bigVersicherungsarten: BigVersicherungsarten;
+  bigMitversicherte: BigMitversicherte[];
 }
 
 export const createEmptyArztDaten = (): ArztDaten => ({
@@ -361,5 +379,14 @@ export const createInitialFormData = (): FormData => {
       ...createEmptyBigBankDaten(),
       datum: formatDateForInput(today),
     },
+    bigVersicherungsstatus: '',
+    bigHoeheEuro: '',
+    bigVersicherungsarten: {
+      privateZusatz: false,
+      berufsunfaehigkeit: false,
+      unfall: false,
+      grundfaehigkeit: false,
+    },
+    bigMitversicherte: [],
   };
 };

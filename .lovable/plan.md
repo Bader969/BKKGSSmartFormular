@@ -1,93 +1,93 @@
 ## Ziel
 
-Neue Krankenkasse **"BIG direkt gesund (Plusbonus)"** als zusätzliche Option im Krankenkassen-Dropdown integrieren. Eigenes Formular mit minimalem Eingabe-Set + PDF-Export gegen die hochgeladene Vorlage `Antrag_Plusbonus-interaktiv-_2026-2.pdf`.
+BIG direkt gesund (Plusbonus) Formular vervollständigen — fehlende UI-Felder ergänzen, irrelevante Felder ausblenden und alle übrigen PDF-AcroFields aus der Vorlage korrekt füllen.
 
-## Pflichtfelder (laut Anforderung)
+## Probleme & Korrekturen
 
-Mitglied:
-- Vorname, Name, Straße, Hausnummer, PLZ, Ort
-- Geschlecht (männlich / weiblich / divers)
+### 1. Irrelevante Felder bei BIG ausblenden (UI)
 
-Zahlungsempfänger*in (Bankdaten):
-- Kontoinhaber*in
-- Kreditinstitut
-- IBAN
-- BIC
-- Ort (für Unterschrift Bankdaten)
-- Datum (TTMMJJ)
-- **Unterschrift Kontoinhaber** — auf der gleichen Ebene wie das Datum
+Im `MemberSection` werden zurzeit auch bei `big_plusbonus` folgende Felder gerendert, die nicht gebraucht werden:
+- Geburtsdatum, Geburtsort, Geburtsland
+- KV-Nummer, Name der Krankenkasse
+- Familienstand, Telefon, E-Mail
 
-Mitglieds-Daten werden aus der bereits existierenden `MemberSection` wiederverwendet (Vorname, Name, Adresse). Geschlecht und Bankdaten kommen in einer neuen `BigPlusbonusSection`. Für die Unterschrift wird die bereits erfasste Mitglieds-Unterschrift wiederverwendet (gleicher Pad wie alle anderen KK).
+Diese Blöcke werden bei `selectedKrankenkasse === 'big_plusbonus'` ausgeblendet (analog zur bestehenden Novitas-Logik). Validierung in `Index.tsx` für diese Felder bei BIG entfernen (Telefon/Email-Pflicht aus Core-Memory wird hier explizit für BIG aufgehoben, da der Antrag sie nicht enthält).
 
-## Field-Mapping (CSV → PDF AcroFields)
+Adresse (Straße/Hausnr./PLZ/Ort) bleibt sichtbar.
 
-Aus `Antrag_Plusbonus-interaktiv-_2026-fields-2.csv` ergibt sich folgendes Mapping (alle relevanten Felder befinden sich auf Seite 1):
+### 2. Fehlende UI-Bereiche in `BigPlusbonusSection`
 
-| PDF-Feld | Quelle FormData |
+Folgende neue Eingabeblöcke hinzufügen:
+
+**a) Versicherungsstatus (Neuabschluss / bestehende Zusatzversicherung)**
+- Radio-Gruppe: Neuabschluss / bestehende Zusatzversicherung
+- Höhe in Euro (Textfeld)
+
+**b) Versicherungsart (Mehrfachauswahl, 4 Checkboxen)**
+- private Zusatzversicherung im Sinne von §22 sowie §16
+- Berufsunfähigkeitsversicherung
+- Unfallversicherung
+- Grundfähigkeitsversicherung
+
+**c) "Gilt auch für folgende mitversicherte Angehörige" (bis zu 3 Einträge)**
+- Pro Eintrag: Name Vorname + Höhe der Police in Euro
+- Add/Remove-Buttons (max. 3)
+
+### 3. Typen erweitern (`src/types/form.ts`)
+
+Im `FormData` ergänzen:
+```typescript
+bigVersicherungsstatus: 'neuabschluss' | 'bestehend' | '';
+bigHoeheEuro: string;
+bigVersicherungsarten: {
+  privateZusatz: boolean;
+  berufsunfaehigkeit: boolean;
+  unfall: boolean;
+  grundfaehigkeit: boolean;
+};
+bigMitversicherte: Array<{ nameVorname: string; hoehePolice: string }>; // max 3
+```
+Defaults in `createInitialFormData` setzen (alle leer/false, leeres Array).
+
+### 4. PDF-Mapping erweitern (`src/utils/bigPlusbonusExport.ts`)
+
+Zusätzliche AcroFields aus der CSV mappen:
+
+| PDF-Feld | Quelle |
 |---|---|
-| `männlich` / `weiblich` / `divers` (Checkbox) | `bigGeschlecht` |
-| `Name` | `mitgliedName` |
-| `Vorname` | `mitgliedVorname` |
-| `Straße` | `mitgliedStrasse` |
-| `Hausnummer` | `mitgliedHausnummer` |
-| `PLZ` | `mitgliedPlz` |
-| `Ort` | `ort` |
-| `Kontoinhaberin` | `bigBank.kontoinhaber` |
-| `Kreditinstitut` | `bigBank.kreditinstitut` |
-| `IBAN Internationale Bankkontonummer` | `bigBank.iban` |
-| `BIC` | `bigBank.bic` |
-| `Ort_2` | `bigBank.ort` |
-| `Datum TTMMJJ` | `bigBank.datum` (TTMMJJ-Format) |
-| `Signatur16` | Mitglieds-Unterschrift als Bild (selbe Ebene wie `Datum TTMMJJ`) |
+| `Neuabschluss` (Checkbox) | `bigVersicherungsstatus === 'neuabschluss'` |
+| `bestehende Zusatzversicherung` (Checkbox) | `bigVersicherungsstatus === 'bestehend'` |
+| `Euro` (Textfeld) | `bigHoeheEuro` |
+| `private Zusatzversicherung im Sinne von  22 sowie  16` (Checkbox) | `bigVersicherungsarten.privateZusatz` |
+| `Berufsunfähigkeitsversicherung` (Checkbox) | `bigVersicherungsarten.berufsunfaehigkeit` |
+| `Unfallversicherung` (Checkbox) | `bigVersicherungsarten.unfall` |
+| `Grundfähigkeitsversicherung` (Checkbox) | `bigVersicherungsarten.grundfaehigkeit` |
+| `Name Vorname` / `Höhe der Police in Euro` | `bigMitversicherte[0]` |
+| `Name Vorname_2` / `Höhe der Police in Euro_2` | `bigMitversicherte[1]` |
+| `Name Vorname_3` / `Höhe der Police in Euro_3` | `bigMitversicherte[2]` |
 
-**Optional/automatisch leer gelassen** (laut Anforderung nicht Pflicht, daher nicht erfasst und nicht ausgefüllt):
-- `Beginn der Mitgliedschaft möglich`, `undefined`
-- `Neuabschluss` / `bestehende Zusatzversicherung`, `Euro`, `Name Vorname*`, `Höhe der Police*`
-- Alle Versicherungstyp-Checkboxes (`private Zusatzversicherung…`, `Berufsunfähigkeitsversicherung`, `Unfallversicherung`, `Grundfähigkeitsversicherung`)
-- `Ort_3`, `Datum TTMMJJ_2`, `Signatur17` (zweiter Unterschriftsblock unten — nicht angefordert)
+Hinweis: Feldnamen in der CSV haben Encoding-Eigenheiten (Umlaute, doppelte Spaces "von  22"). Beim `setText`/`setCheck` einen Fallback-Mechanismus einbauen, der mehrere Schreibweisen probiert (mit/ohne Umlaute, einfache vs. doppelte Spaces) — analog zur Encoding-Fallback-Logik in `viactivExport.ts`.
 
-## Umsetzungsschritte
+### 5. Validierung & Index-Anpassung
 
-1. **PDF-Vorlage einbinden**
-   - `user-uploads://Antrag_Plusbonus-interaktiv-_2026-2.pdf` → `public/big-plusbonus.pdf` kopieren.
-
-2. **Typen erweitern** (`src/types/form.ts`)
-   - Krankenkasse-Typ: `'big_plusbonus'` ergänzen, in `KRANKENKASSEN_OPTIONS` neuen Eintrag `{ value: 'big_plusbonus', label: 'BIG direkt gesund (Plusbonus)' }`.
-   - Neuer Typ `BigGeschlecht = 'maennlich' | 'weiblich' | 'divers' | ''`.
-   - Neues Interface `BigBankDaten { kontoinhaber, kreditinstitut, iban, bic, ort, datum }` + `createEmptyBigBankDaten()`.
-   - `FormData` um `bigGeschlecht: BigGeschlecht` und `bigBank: BigBankDaten` erweitern; Defaults in `createInitialFormData` setzen (Datum = heute im TTMMJJ-Format, Ort = leer, Kontoinhaber = `Vorname Name` Sync analog Bonus-Logik).
-
-3. **Neue UI-Komponente** `src/components/BigPlusbonusSection.tsx`
-   - Abschnitt "Geschlecht" (Radio: männlich / weiblich / divers).
-   - Abschnitt "Zahlungsempfänger*in": Kontoinhaber, Kreditinstitut, IBAN, BIC, Ort, Datum (date input).
-   - Hinweis: Unterschrift = Mitglieds-Unterschrift aus `SignatureSection`.
-
-4. **Index integrieren** (`src/pages/Index.tsx`)
-   - `getHeaderTitle` / `getHeaderSubtitle`: Fall `big_plusbonus` → "BIG direkt gesund Formular" / "BIG direkt gesund – Plusbonus".
-   - Im Sektionen-Block: bei `selectedKrankenkasse === 'big_plusbonus'` die `MemberSection` (existierend) + neue `BigPlusbonusSection` + `SignatureSection` rendern (keine Ehegatte/Kinder).
-   - Validierung: Vorname, Name, Strasse, Hausnummer, PLZ, Ort, `bigGeschlecht`, alle 6 Bankfelder, Unterschrift.
-   - Export-Branch: `await exportBigPlusbonus(formData)` + Toast.
-
-5. **Export-Utility** `src/utils/bigPlusbonusExport.ts`
-   - Lädt `/big-plusbonus.pdf` via pdf-lib, holt Form, setzt Textfelder & Checkboxen wie im Mapping oben.
-   - Datum in TTMMJJ-Format konvertieren (Helper).
-   - Unterschrift als PNG-Bild via `embedPng` einbetten und positioniert über das `Signatur16`-Widget legen (`x≈301, y≈407, w≈261, h≈12` — Koordinaten aus CSV; pdf-lib Y ist von unten gemessen → `pageHeight - top - height` umrechnen, analog `dakExport.ts`).
-   - `form.flatten()` und Download als `BIG-Plusbonus_<Nachname>_<Vorname>.pdf`.
-
-6. **Header-Label-Memory** aktualisieren falls nötig (Core-Memory bereits abgedeckt durch dynamische Header).
+In `Index.tsx` für `big_plusbonus`:
+- KV-Nummer/Krankenkasse/Familienstand/Telefon/Email NICHT validieren
+- Geburtsdatum bereits ausgeschlossen — bleibt so
+- Optional: keine Pflichtvalidierung für Versicherungsstatus/-art/Mitversicherte (User-Wahl, nicht zwingend laut Aufgabe)
 
 ## Dateien
 
 | Datei | Änderung |
 |---|---|
-| `public/big-plusbonus.pdf` | NEU (Kopie der Vorlage) |
-| `src/types/form.ts` | Typen + Defaults |
-| `src/components/BigPlusbonusSection.tsx` | NEU |
-| `src/utils/bigPlusbonusExport.ts` | NEU |
-| `src/pages/Index.tsx` | Dropdown-Eintrag, Header, Render-Branch, Validierung, Export-Aufruf |
+| `src/types/form.ts` | Neue Felder + Defaults |
+| `src/components/MemberSection.tsx` | `big_plusbonus` zu Hide-Conditions hinzufügen (Geburtsdaten, KV/KK, Familienstand/Tel/Email-Block) |
+| `src/components/BigPlusbonusSection.tsx` | Neue Blöcke: Neuabschluss/bestehend + Euro, 4 Versicherungsart-Checkboxen, Mitversicherte-Liste |
+| `src/utils/bigPlusbonusExport.ts` | Zusätzliche Mappings + Encoding-Fallback-Helper |
+| `src/pages/Index.tsx` | Validierung für BIG bereinigen |
+| `mem/features/big-plusbonus-integration.md` | Memory aktualisieren (neue Felder + ausgeblendete Bereiche) |
 
 ## Hinweise
 
-- Keine PII-Speicherung, keine zusätzlichen Krankenkassen-spezifischen Imports — folgt bestehendem Pattern (VIACTIV/DAK/Novitas).
-- Vorname steht weiterhin vor Name (Core-Memory eingehalten).
-- Pflichtkontakte (Telefon/Email) sind per Core-Memory mandatorisch — werden hier ebenfalls validiert.
+- Adresse, Geschlecht, Bankdaten, Unterschrift bleiben Pflicht (wie bisher).
+- Vorname vor Name bleibt erhalten.
+- Keine PII-Persistenz, keine zusätzlichen API-Calls.

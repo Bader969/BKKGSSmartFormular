@@ -59,7 +59,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
       </div>
       
       {/* Geburtsdatum, Geburtsort, Geburtsland - NICHT für Novitas */}
-      {formData.selectedKrankenkasse !== 'novitas' && (
+      {formData.selectedKrankenkasse !== 'novitas' && formData.selectedKrankenkasse !== 'big_plusbonus' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
           <FormField
             type="date"
@@ -140,6 +140,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
         </div>
       )}
       
+      {formData.selectedKrankenkasse !== 'big_plusbonus' && (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <FormField
           type="text"
@@ -168,7 +169,9 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           validate={validateKrankenkasse}
         />
       </div>
+      )}
       
+      {formData.selectedKrankenkasse !== 'big_plusbonus' && (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
         <FormField
           type="select"
@@ -202,8 +205,10 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           validate={validateEmail}
         />
       </div>
+      )}
       
       {/* Static info display */}
+      {formData.selectedKrankenkasse !== 'big_plusbonus' && (
       <div className="mt-6 p-4 bg-card rounded-lg border">
         <h3 className="font-medium mb-3 text-foreground">Automatisch ausgefüllte Angaben:</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
@@ -225,6 +230,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           </div>
         </div>
       </div>
+      )}
       
       {/* Copy Block für Mitglied-Daten */}
       <CopyBlockButton
