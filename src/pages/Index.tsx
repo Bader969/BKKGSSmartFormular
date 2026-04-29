@@ -379,7 +379,9 @@ const Index = () => {
               </SelectContent>
             </Select>
             <p className="text-sm text-muted-foreground mt-2">
-              {formData.selectedKrankenkasse === 'dak' 
+              {formData.selectedKrankenkasse === 'big_plusbonus'
+                ? 'Es wird der BIG direkt gesund Plusbonus-Antrag erstellt.'
+                : formData.selectedKrankenkasse === 'dak' 
                 ? 'Es wird die DAK Familienversicherung erstellt.'
                 : formData.selectedKrankenkasse === 'novitas' 
                   ? 'Es wird die Novitas BKK Familienversicherung erstellt.'
