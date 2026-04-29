@@ -71,13 +71,14 @@ export interface RundumSicherPaketData {
 export type FormMode = 'familienversicherung_und_rundum' | 'nur_rundum';
 
 // Krankenkassen-Auswahl
-export type Krankenkasse = 'bkk_gs' | 'viactiv' | 'novitas' | 'dak' | '';
+export type Krankenkasse = 'bkk_gs' | 'viactiv' | 'novitas' | 'dak' | 'big_plusbonus' | '';
 
 export const KRANKENKASSEN_OPTIONS = [
   // { value: 'bkk_gs' as Krankenkasse, label: 'BKK GILDEMEISTER SEIDENSTICK' }, // Temporär versteckt
   { value: 'viactiv' as Krankenkasse, label: 'VIACTIV Krankenkasse' },
   { value: 'novitas' as Krankenkasse, label: 'Novitas BKK' },
   { value: 'dak' as Krankenkasse, label: 'DAK Familienversicherung' },
+  { value: 'big_plusbonus' as Krankenkasse, label: 'BIG direkt gesund (Plusbonus)' },
 ] as const;
 
 // VIACTIV-spezifische Typen
@@ -152,6 +153,33 @@ export const createEmptyArbeitgeberDaten = (): ArbeitgeberDaten => ({
   beschaeftigtSeit: '',
 });
 
+// BIG direkt gesund (Plusbonus) Typen
+export type BigGeschlecht = 'maennlich' | 'weiblich' | 'divers' | '';
+
+export const BIG_GESCHLECHT_OPTIONS = [
+  { value: 'maennlich' as BigGeschlecht, label: 'Männlich' },
+  { value: 'weiblich' as BigGeschlecht, label: 'Weiblich' },
+  { value: 'divers' as BigGeschlecht, label: 'Divers' },
+] as const;
+
+export interface BigBankDaten {
+  kontoinhaber: string;
+  kreditinstitut: string;
+  iban: string;
+  bic: string;
+  ort: string;
+  datum: string; // ISO YYYY-MM-DD
+}
+
+export const createEmptyBigBankDaten = (): BigBankDaten => ({
+  kontoinhaber: '',
+  kreditinstitut: '',
+  iban: '',
+  bic: '',
+  ort: '',
+  datum: '',
+});
+
 export interface FormData {
   // Formular-Modus
   mode: FormMode;
@@ -217,6 +245,10 @@ export interface FormData {
   viactivBonusVertragsnummer: string;
   viactivBonusIBAN: string;
   viactivBonusKontoinhaber: string;
+
+  // BIG direkt gesund (Plusbonus) Felder
+  bigGeschlecht: BigGeschlecht;
+  bigBank: BigBankDaten;
 }
 
 export const createEmptyArztDaten = (): ArztDaten => ({
@@ -322,5 +354,12 @@ export const createInitialFormData = (): FormData => {
     viactivBonusVertragsnummer: '',
     viactivBonusIBAN: '',
     viactivBonusKontoinhaber: '',
+
+    // BIG direkt gesund (Plusbonus) Felder
+    bigGeschlecht: '',
+    bigBank: {
+      ...createEmptyBigBankDaten(),
+      datum: formatDateForInput(today),
+    },
   };
 };
