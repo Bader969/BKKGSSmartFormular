@@ -139,6 +139,47 @@ const downloadPDF = (pdfBytes: Uint8Array, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
+/**
+ * Auflösung Arbeitgeber-Felder: Wenn der User keinen Arbeitgeber eingetragen hat,
+ * werden Jobcenter (ALG II) bzw. Agentur für Arbeit (ALG I) als Fallback verwendet.
+ * Wohnort des Mitglieds wird als Adresse herangezogen.
+ */
+const resolveArbeitgeber = (
+  formData: FormData,
+): { data: FormData["viactivArbeitgeber"]; source: string } => {
+  const ag = formData.viactivArbeitgeber;
+  const hasArbeitgeber = !!(ag && (ag.name || ag.strasse || ag.plz || ag.ort));
+  if (hasArbeitgeber) return { data: ag, source: "User" };
+
+  if (formData.viactivBeschaeftigung === "al_geld_2") {
+    return {
+      data: {
+        name: "Jobcenter",
+        strasse: "",
+        hausnummer: "",
+        plz: formData.mitgliedPlz || "",
+        ort: formData.ort || "",
+        beschaeftigtSeit: "",
+      },
+      source: "Fallback Jobcenter (ALG II)",
+    };
+  }
+  if (formData.viactivBeschaeftigung === "al_geld_1") {
+    return {
+      data: {
+        name: "Agentur für Arbeit",
+        strasse: "",
+        hausnummer: "",
+        plz: formData.mitgliedPlz || "",
+        ort: formData.ort || "",
+        beschaeftigtSeit: "",
+      },
+      source: "Fallback Agentur für Arbeit (ALG I)",
+    };
+  }
+  return { data: ag, source: "leer" };
+};
+
 const embedSignature = async (
   pdfDoc: PDFDocument,
   signatureData: string,
