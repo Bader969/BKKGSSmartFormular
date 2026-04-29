@@ -247,7 +247,12 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   
   // Geburtsdatum formatieren und setzen
   const geburtsdatumFormatted = formatInputDate(formData.mitgliedGeburtsdatum);
-  console.log("VIACTIV Setting Geburtsdatum:", geburtsdatumFormatted);
+  console.log(
+    "VIACTIV Geburtsdatum raw:",
+    formData.mitgliedGeburtsdatum,
+    "→ formatted:",
+    geburtsdatumFormatted,
+  );
   setTextField("Geburtsdatum", geburtsdatumFormatted);
   
   setTextField("Geburtsort", formData.mitgliedGeburtsort || "");
@@ -296,13 +301,21 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   setCheckbox("Einkommen über 64.350 Euro-Stand 2022", formData.viactivBeschaeftigung === "einkommen_ueber_grenze");
 
   // === ARBEITGEBER ===
-  const ag = formData.viactivArbeitgeber;
+  const { data: ag, source: agSource } = resolveArbeitgeber(formData);
+  console.log(
+    "VIACTIV Arbeitgeber Quelle:",
+    agSource,
+    "PLZ:",
+    ag?.plz,
+    "Name:",
+    ag?.name,
+  );
   setTextField("Name des Arbeitgebers", ag.name || "");
   setTextField("Arbeitgeber Straße", ag.strasse || "");
   setTextField("Arbeitgeber Hausnummer", ag.hausnummer || "");
   setTextField("Arbeitgeber PLZ", ag.plz || "");
   setTextField("Arbeitgeber Ort", ag.ort || "");
-  setTextField("Beschäftigt seit", formatInputDate(ag.beschaeftigtSeit) || "");
+  setTextField("Beschäftigt seit", formatInputDate(ag.beschaeftigtSeit || ""));
 
   // === BISHERIGE VERSICHERUNGSART ===
   setCheckbox("pflichtversichert", formData.viactivVersicherungsart === "pflichtversichert");
