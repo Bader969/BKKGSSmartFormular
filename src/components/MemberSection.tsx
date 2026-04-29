@@ -208,6 +208,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
       )}
       
       {/* Static info display */}
+      {formData.selectedKrankenkasse !== 'big_plusbonus' && (
       <div className="mt-6 p-4 bg-card rounded-lg border">
         <h3 className="font-medium mb-3 text-foreground">Automatisch ausgefüllte Angaben:</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
@@ -229,6 +230,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           </div>
         </div>
       </div>
+      )}
       
       {/* Copy Block für Mitglied-Daten */}
       <CopyBlockButton
