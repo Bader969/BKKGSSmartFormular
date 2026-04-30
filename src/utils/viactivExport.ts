@@ -36,25 +36,53 @@ const formatDateGerman = (date: Date): string => {
  * Re-Rendern mit pdf-lib zu unsichtbaren Werten führt.
  */
 const stripCombFlags = (form: ReturnType<PDFDocument["getForm"]>, fieldNames: string[]) => {
+  let cleaned = 0;
   for (const name of fieldNames) {
-    try {
-      const field = form.getTextField(name);
-      if (!field) continue;
-      const acro = field.acroField;
-      // MaxLen entfernen
-      acro.dict.delete(PDFName.of("MaxLen"));
-      // Flags lesen, Comb (Bit 25 = 1<<24) + DoNotScroll (Bit 24 = 1<<23) entfernen
-      const ffEntry = acro.dict.lookupMaybe(PDFName.of("Ff"), PDFNumber);
-      if (ffEntry) {
-        const current = ffEntry.asNumber();
-        const cleaned = current & ~((1 << 23) | (1 << 24));
-        acro.dict.set(PDFName.of("Ff"), PDFNumber.of(cleaned));
+    // Try original + common UTF-8 mojibake variants for umlauts
+    const variations = [
+      name,
+      name.replace(/ä/g, "Ã¤").replace(/ö/g, "Ã¶").replace(/ü/g, "Ã¼").replace(/ß/g, "ÃŸ"),
+      name.replace(/Ä/g, "Ã„").replace(/Ö/g, "Ã–").replace(/Ü/g, "Ãœ"),
+    ];
+    for (const variant of variations) {
+      try {
+        const field = form.getTextField(variant);
+        if (!field) continue;
+        const acro = field.acroField;
+        acro.dict.delete(PDFName.of("MaxLen"));
+        const ffEntry = acro.dict.lookupMaybe(PDFName.of("Ff"), PDFNumber);
+        if (ffEntry) {
+          const current = ffEntry.asNumber();
+          const stripped = current & ~((1 << 23) | (1 << 24));
+          acro.dict.set(PDFName.of("Ff"), PDFNumber.of(stripped));
+        }
+        cleaned++;
+        break;
+      } catch {
+        // try next variant
       }
-    } catch (e) {
-      console.log(`VIACTIV stripCombFlags: Field "${name}" not found or skipped`);
     }
   }
+  console.log(`VIACTIV stripCombFlags: cleaned ${cleaned}/${fieldNames.length} fields`);
 };
+
+/**
+ * Alle Textfelder im VIACTIV-Formular, die Comb-Flags tragen und Werte aus
+ * dem UI bekommen. Comb + proportionaler Font (Helvetica) führt sonst dazu,
+ * dass Werte unsichtbar bleiben.
+ */
+const ALL_COMB_FIELDS = [
+  "Name", "Vorname", "Geburtsdatum", "Geburtsort", "Geburtsland", "Geburtsname",
+  "Staatsangehörigkeit",
+  "Straße", "Hausnummer", "PLZ", "Ort",
+  "Telefon", "E-Mail",
+  "Name des Arbeitgebers",
+  "Arbeitgeber Straße", "Arbeitgeber Hausnummer",
+  "Arbeitgeber PLZ", "Arbeitgeber Ort",
+  "Beschäftigt seit",
+  "Datum Mitgliedschaft", "versichert von (Datum)", "versichert bis (Datum)",
+  "Name der letzten KrankenkasseKrankenversicherung",
+];
 
 /**
  * Bettet Helvetica ein und regeneriert alle Field-Appearances,
@@ -312,7 +340,7 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   console.log("=== END VIACTIV PDF Fields ===");
 
   // Comb-Flags der PLZ-Felder entfernen, damit Werte sichtbar gerendert werden
-  stripCombFlags(form, ["PLZ", "Arbeitgeber PLZ"]);
+  stripCombFlags(form, ALL_COMB_FIELDS);
 
   const helpers = createPDFHelpers(form);
   const { setTextField, setCheckbox } = helpers;
@@ -447,7 +475,7 @@ export const createViactivBeitrittserklaerungForSpouse = async (formData: FormDa
   const pdfDoc = await PDFDocument.load(existingPdfBytes);
   const form = pdfDoc.getForm();
 
-  stripCombFlags(form, ["PLZ", "Arbeitgeber PLZ"]);
+  stripCombFlags(form, ALL_COMB_FIELDS);
 
   const helpers = createPDFHelpers(form);
   const { setTextField, setCheckbox } = helpers;
@@ -584,7 +612,7 @@ export const createViactivBeitrittserklaerungForChild = async (
   const pdfDoc = await PDFDocument.load(existingPdfBytes);
   const form = pdfDoc.getForm();
 
-  stripCombFlags(form, ["PLZ", "Arbeitgeber PLZ"]);
+  stripCombFlags(form, ALL_COMB_FIELDS);
 
   const helpers = createPDFHelpers(form);
   const { setTextField, setCheckbox } = helpers;
