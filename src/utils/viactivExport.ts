@@ -1,4 +1,4 @@
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFName, PDFNumber, StandardFonts } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
 import { getNationalityName } from "@/utils/countries";
 
@@ -28,6 +28,48 @@ const formatDateGerman = (date: Date): string => {
   const year = date.getFullYear();
   // Format: TTMMJJJJ (ohne Punkte für Mitgliedschaft/Geburtsdatum/versichert bis)
   return `${day}${month}${year}`;
+};
+
+/**
+ * Bereinigt die Comb/MaxLen-Flags der PLZ-Felder, damit pdf-lib sie korrekt rendert.
+ * Die VIACTIV-PDF nutzt bei "PLZ" und "Arbeitgeber PLZ" Comb-Flags, was beim
+ * Re-Rendern mit pdf-lib zu unsichtbaren Werten führt.
+ */
+const stripCombFlags = (form: ReturnType<PDFDocument["getForm"]>, fieldNames: string[]) => {
+  for (const name of fieldNames) {
+    try {
+      const field = form.getTextField(name);
+      if (!field) continue;
+      const acro = field.acroField;
+      // MaxLen entfernen
+      acro.dict.delete(PDFName.of("MaxLen"));
+      // Flags lesen, Comb (Bit 25 = 1<<24) + DoNotScroll (Bit 24 = 1<<23) entfernen
+      const ffEntry = acro.dict.lookupMaybe(PDFName.of("Ff"), PDFNumber);
+      if (ffEntry) {
+        const current = ffEntry.asNumber();
+        const cleaned = current & ~((1 << 23) | (1 << 24));
+        acro.dict.set(PDFName.of("Ff"), PDFNumber.of(cleaned));
+      }
+    } catch (e) {
+      console.log(`VIACTIV stripCombFlags: Field "${name}" not found or skipped`);
+    }
+  }
+};
+
+/**
+ * Bettet Helvetica ein und regeneriert alle Field-Appearances,
+ * damit gesetzte Werte zuverlässig sichtbar sind.
+ */
+const finalizeAppearances = async (
+  pdfDoc: PDFDocument,
+  form: ReturnType<PDFDocument["getForm"]>,
+) => {
+  try {
+    const helv = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    form.updateFieldAppearances(helv);
+  } catch (e) {
+    console.warn("VIACTIV finalizeAppearances failed:", e);
+  }
 };
 
 const formatDateGermanWithDots = (date: Date): string => {
@@ -148,9 +190,7 @@ const resolveArbeitgeber = (
   formData: FormData,
 ): { data: FormData["viactivArbeitgeber"]; source: string } => {
   const ag = formData.viactivArbeitgeber;
-  const hasArbeitgeber = !!(ag && (ag.name || ag.strasse || ag.plz || ag.ort));
-  if (hasArbeitgeber) return { data: ag, source: "User" };
-
+  // ALG I/II hat IMMER Vorrang vor User-Arbeitgeberdaten (Jobcenter/Agentur überschreibt)
   if (formData.viactivBeschaeftigung === "al_geld_2") {
     return {
       data: {
@@ -177,7 +217,56 @@ const resolveArbeitgeber = (
       source: "Fallback Agentur für Arbeit (ALG I)",
     };
   }
+  const hasArbeitgeber = !!(ag && (ag.name || ag.strasse || ag.plz || ag.ort));
+  if (hasArbeitgeber) return { data: ag, source: "User" };
   return { data: ag, source: "leer" };
+};
+
+/**
+ * Arbeitgeber-Auflösung für den Ehepartner: bezieht sich auf ehegatte.beschaeftigung.
+ * Bei ALG I/II wird Jobcenter/Agentur mit der Mitglied-Adresse als Arbeitgeber gesetzt.
+ */
+const resolveArbeitgeberForSpouse = (
+  formData: FormData,
+): { data: FormData["viactivArbeitgeber"]; source: string } => {
+  const beschaeftigung = formData.ehegatte?.beschaeftigung;
+  if (beschaeftigung === "al_geld_2") {
+    return {
+      data: {
+        name: "Jobcenter",
+        strasse: "",
+        hausnummer: "",
+        plz: formData.mitgliedPlz || "",
+        ort: formData.ort || "",
+        beschaeftigtSeit: "",
+      },
+      source: "Spouse Fallback Jobcenter (ALG II)",
+    };
+  }
+  if (beschaeftigung === "al_geld_1") {
+    return {
+      data: {
+        name: "Agentur für Arbeit",
+        strasse: "",
+        hausnummer: "",
+        plz: formData.mitgliedPlz || "",
+        ort: formData.ort || "",
+        beschaeftigtSeit: "",
+      },
+      source: "Spouse Fallback Agentur für Arbeit (ALG I)",
+    };
+  }
+  return {
+    data: {
+      name: "",
+      strasse: "",
+      hausnummer: "",
+      plz: "",
+      ort: "",
+      beschaeftigtSeit: "",
+    },
+    source: "Spouse leer",
+  };
 };
 
 const embedSignature = async (
@@ -221,7 +310,10 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
     console.log(`Field: "${field.getName()}" - Type: ${field.constructor.name}`);
   });
   console.log("=== END VIACTIV PDF Fields ===");
-  
+
+  // Comb-Flags der PLZ-Felder entfernen, damit Werte sichtbar gerendert werden
+  stripCombFlags(form, ["PLZ", "Arbeitgeber PLZ"]);
+
   const helpers = createPDFHelpers(form);
   const { setTextField, setCheckbox } = helpers;
 
@@ -274,7 +366,7 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   // === ADRESSE ===
   setTextField("Straße", formData.mitgliedStrasse || "");
   setTextField("Hausnummer", formData.mitgliedHausnummer || "");
-  setTextField("PLZ", formData.mitgliedPlz || "");
+  setTextField("PLZ", (formData.mitgliedPlz || "").trim());
   setTextField("Ort", formData.ort || "");
   
   // === KONTAKT ===
@@ -313,7 +405,7 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   setTextField("Name des Arbeitgebers", ag.name || "");
   setTextField("Arbeitgeber Straße", ag.strasse || "");
   setTextField("Arbeitgeber Hausnummer", ag.hausnummer || "");
-  setTextField("Arbeitgeber PLZ", ag.plz || "");
+  setTextField("Arbeitgeber PLZ", (ag.plz || "").trim());
   setTextField("Arbeitgeber Ort", ag.ort || "");
   setTextField("Beschäftigt seit", formatInputDate(ag.beschaeftigtSeit || ""));
 
@@ -342,6 +434,7 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
     await embedSignature(pdfDoc, formData.unterschrift, 180, 735, 0);
   }
 
+  await finalizeAppearances(pdfDoc, form);
   return await pdfDoc.save();
 };
 
@@ -353,7 +446,9 @@ export const createViactivBeitrittserklaerungForSpouse = async (formData: FormDa
   const existingPdfBytes = await fetch(pdfUrl).then((res) => res.arrayBuffer());
   const pdfDoc = await PDFDocument.load(existingPdfBytes);
   const form = pdfDoc.getForm();
-  
+
+  stripCombFlags(form, ["PLZ", "Arbeitgeber PLZ"]);
+
   const helpers = createPDFHelpers(form);
   const { setTextField, setCheckbox } = helpers;
 
@@ -400,7 +495,7 @@ export const createViactivBeitrittserklaerungForSpouse = async (formData: FormDa
   // === ADRESSE (immer vom Hauptmitglied, nur Ort kann abweichen) ===
   setTextField("Straße", formData.mitgliedStrasse || "");
   setTextField("Hausnummer", formData.mitgliedHausnummer || "");
-  setTextField("PLZ", formData.mitgliedPlz || "");
+  setTextField("PLZ", (formData.mitgliedPlz || "").trim());
   
   // Ort: abweichende Anschrift oder vom Hauptmitglied
   if (spouse.abweichendeAnschrift) {
@@ -431,12 +526,21 @@ export const createViactivBeitrittserklaerungForSpouse = async (formData: FormDa
   setCheckbox("ich bin selbstständig", spouse.beschaeftigung === "selbststaendig");
   setCheckbox("Einkommen über 64.350 Euro-Stand 2022", spouse.beschaeftigung === "einkommen_ueber_grenze");
 
-  // === ARBEITGEBER (leer lassen) ===
-  setTextField("Name des Arbeitgebers", "");
-  setTextField("Arbeitgeber Straße", "");
-  setTextField("Arbeitgeber Hausnummer", "");
-  setTextField("Arbeitgeber PLZ", "");
-  setTextField("Arbeitgeber Ort", "");
+  // === ARBEITGEBER (Jobcenter/Agentur bei ALG I/II, sonst leer) ===
+  const { data: spouseAg, source: spouseAgSource } = resolveArbeitgeberForSpouse(formData);
+  console.log(
+    "VIACTIV Ehegatte Arbeitgeber Quelle:",
+    spouseAgSource,
+    "PLZ:",
+    spouseAg?.plz,
+    "Name:",
+    spouseAg?.name,
+  );
+  setTextField("Name des Arbeitgebers", spouseAg.name || "");
+  setTextField("Arbeitgeber Straße", spouseAg.strasse || "");
+  setTextField("Arbeitgeber Hausnummer", spouseAg.hausnummer || "");
+  setTextField("Arbeitgeber PLZ", (spouseAg.plz || "").trim());
+  setTextField("Arbeitgeber Ort", spouseAg.ort || "");
   setTextField("Beschäftigt seit", "");
 
   // === BISHERIGE VERSICHERUNGSART ===
@@ -464,6 +568,7 @@ export const createViactivBeitrittserklaerungForSpouse = async (formData: FormDa
     await embedSignature(pdfDoc, formData.unterschriftFamilie, 180, 735, 0);
   }
 
+  await finalizeAppearances(pdfDoc, form);
   return await pdfDoc.save();
 };
 
@@ -478,7 +583,9 @@ export const createViactivBeitrittserklaerungForChild = async (
   const existingPdfBytes = await fetch(pdfUrl).then((res) => res.arrayBuffer());
   const pdfDoc = await PDFDocument.load(existingPdfBytes);
   const form = pdfDoc.getForm();
-  
+
+  stripCombFlags(form, ["PLZ", "Arbeitgeber PLZ"]);
+
   const helpers = createPDFHelpers(form);
   const { setTextField, setCheckbox } = helpers;
 
@@ -514,7 +621,7 @@ export const createViactivBeitrittserklaerungForChild = async (
   // === ADRESSE (vom Hauptmitglied) ===
   setTextField("Straße", formData.mitgliedStrasse || "");
   setTextField("Hausnummer", formData.mitgliedHausnummer || "");
-  setTextField("PLZ", formData.mitgliedPlz || "");
+  setTextField("PLZ", (formData.mitgliedPlz || "").trim());
   
   if (kind.abweichendeAnschrift) {
     setTextField("Ort", kind.abweichendeAnschrift);
@@ -559,6 +666,7 @@ export const createViactivBeitrittserklaerungForChild = async (
     await embedSignature(pdfDoc, formData.unterschrift, 180, 735, 0);
   }
 
+  await finalizeAppearances(pdfDoc, form);
   return await pdfDoc.save();
 };
 
