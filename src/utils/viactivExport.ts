@@ -190,9 +190,7 @@ const resolveArbeitgeber = (
   formData: FormData,
 ): { data: FormData["viactivArbeitgeber"]; source: string } => {
   const ag = formData.viactivArbeitgeber;
-  const hasArbeitgeber = !!(ag && (ag.name || ag.strasse || ag.plz || ag.ort));
-  if (hasArbeitgeber) return { data: ag, source: "User" };
-
+  // ALG I/II hat IMMER Vorrang vor User-Arbeitgeberdaten (Jobcenter/Agentur überschreibt)
   if (formData.viactivBeschaeftigung === "al_geld_2") {
     return {
       data: {
@@ -219,7 +217,56 @@ const resolveArbeitgeber = (
       source: "Fallback Agentur für Arbeit (ALG I)",
     };
   }
+  const hasArbeitgeber = !!(ag && (ag.name || ag.strasse || ag.plz || ag.ort));
+  if (hasArbeitgeber) return { data: ag, source: "User" };
   return { data: ag, source: "leer" };
+};
+
+/**
+ * Arbeitgeber-Auflösung für den Ehepartner: bezieht sich auf ehegatte.beschaeftigung.
+ * Bei ALG I/II wird Jobcenter/Agentur mit der Mitglied-Adresse als Arbeitgeber gesetzt.
+ */
+const resolveArbeitgeberForSpouse = (
+  formData: FormData,
+): { data: FormData["viactivArbeitgeber"]; source: string } => {
+  const beschaeftigung = formData.ehegatte?.beschaeftigung;
+  if (beschaeftigung === "al_geld_2") {
+    return {
+      data: {
+        name: "Jobcenter",
+        strasse: "",
+        hausnummer: "",
+        plz: formData.mitgliedPlz || "",
+        ort: formData.ort || "",
+        beschaeftigtSeit: "",
+      },
+      source: "Spouse Fallback Jobcenter (ALG II)",
+    };
+  }
+  if (beschaeftigung === "al_geld_1") {
+    return {
+      data: {
+        name: "Agentur für Arbeit",
+        strasse: "",
+        hausnummer: "",
+        plz: formData.mitgliedPlz || "",
+        ort: formData.ort || "",
+        beschaeftigtSeit: "",
+      },
+      source: "Spouse Fallback Agentur für Arbeit (ALG I)",
+    };
+  }
+  return {
+    data: {
+      name: "",
+      strasse: "",
+      hausnummer: "",
+      plz: "",
+      ort: "",
+      beschaeftigtSeit: "",
+    },
+    source: "Spouse leer",
+  };
 };
 
 const embedSignature = async (
