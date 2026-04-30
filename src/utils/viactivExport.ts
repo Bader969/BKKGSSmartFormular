@@ -583,7 +583,9 @@ export const createViactivBeitrittserklaerungForChild = async (
   const existingPdfBytes = await fetch(pdfUrl).then((res) => res.arrayBuffer());
   const pdfDoc = await PDFDocument.load(existingPdfBytes);
   const form = pdfDoc.getForm();
-  
+
+  stripCombFlags(form, ["PLZ", "Arbeitgeber PLZ"]);
+
   const helpers = createPDFHelpers(form);
   const { setTextField, setCheckbox } = helpers;
 
@@ -619,7 +621,7 @@ export const createViactivBeitrittserklaerungForChild = async (
   // === ADRESSE (vom Hauptmitglied) ===
   setTextField("Straße", formData.mitgliedStrasse || "");
   setTextField("Hausnummer", formData.mitgliedHausnummer || "");
-  setTextField("PLZ", formData.mitgliedPlz || "");
+  setTextField("PLZ", (formData.mitgliedPlz || "").trim());
   
   if (kind.abweichendeAnschrift) {
     setTextField("Ort", kind.abweichendeAnschrift);
@@ -664,6 +666,7 @@ export const createViactivBeitrittserklaerungForChild = async (
     await embedSignature(pdfDoc, formData.unterschrift, 180, 735, 0);
   }
 
+  await finalizeAppearances(pdfDoc, form);
   return await pdfDoc.save();
 };
 
