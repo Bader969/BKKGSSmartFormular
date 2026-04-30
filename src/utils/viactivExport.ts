@@ -340,7 +340,7 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   console.log("=== END VIACTIV PDF Fields ===");
 
   // Comb-Flags der PLZ-Felder entfernen, damit Werte sichtbar gerendert werden
-  stripCombFlags(form, ["PLZ", "Arbeitgeber PLZ"]);
+  stripCombFlags(form, ALL_COMB_FIELDS);
 
   const helpers = createPDFHelpers(form);
   const { setTextField, setCheckbox } = helpers;
@@ -475,7 +475,7 @@ export const createViactivBeitrittserklaerungForSpouse = async (formData: FormDa
   const pdfDoc = await PDFDocument.load(existingPdfBytes);
   const form = pdfDoc.getForm();
 
-  stripCombFlags(form, ["PLZ", "Arbeitgeber PLZ"]);
+  stripCombFlags(form, ALL_COMB_FIELDS);
 
   const helpers = createPDFHelpers(form);
   const { setTextField, setCheckbox } = helpers;
@@ -612,7 +612,7 @@ export const createViactivBeitrittserklaerungForChild = async (
   const pdfDoc = await PDFDocument.load(existingPdfBytes);
   const form = pdfDoc.getForm();
 
-  stripCombFlags(form, ["PLZ", "Arbeitgeber PLZ"]);
+  stripCombFlags(form, ALL_COMB_FIELDS);
 
   const helpers = createPDFHelpers(form);
   const { setTextField, setCheckbox } = helpers;
