@@ -134,7 +134,12 @@ const Index = () => {
     }
     
     // VIACTIV-spezifische Validierung
-    if (formData.selectedKrankenkasse === 'viactiv') {
+    if (formData.selectedKrankenkasse === 'big_plusbonus') {
+      // BIG Plusbonus: keine zusätzlichen Pflichtfelder (KV-Nr, Krankenkasse, Familienstand,
+      // Telefon, Email, Geburtsdatum sind nicht erforderlich). Adresse + Bank wurden bereits
+      // weiter oben validiert.
+    }
+    else if (formData.selectedKrankenkasse === 'viactiv') {
       if (!formData.ort) {
         toast.error('Bitte geben Sie den Ort ein.');
         return;
