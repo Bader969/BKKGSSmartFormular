@@ -446,7 +446,9 @@ export const createViactivBeitrittserklaerungForSpouse = async (formData: FormDa
   const existingPdfBytes = await fetch(pdfUrl).then((res) => res.arrayBuffer());
   const pdfDoc = await PDFDocument.load(existingPdfBytes);
   const form = pdfDoc.getForm();
-  
+
+  stripCombFlags(form, ["PLZ", "Arbeitgeber PLZ"]);
+
   const helpers = createPDFHelpers(form);
   const { setTextField, setCheckbox } = helpers;
 
@@ -493,7 +495,7 @@ export const createViactivBeitrittserklaerungForSpouse = async (formData: FormDa
   // === ADRESSE (immer vom Hauptmitglied, nur Ort kann abweichen) ===
   setTextField("Straße", formData.mitgliedStrasse || "");
   setTextField("Hausnummer", formData.mitgliedHausnummer || "");
-  setTextField("PLZ", formData.mitgliedPlz || "");
+  setTextField("PLZ", (formData.mitgliedPlz || "").trim());
   
   // Ort: abweichende Anschrift oder vom Hauptmitglied
   if (spouse.abweichendeAnschrift) {
@@ -524,12 +526,21 @@ export const createViactivBeitrittserklaerungForSpouse = async (formData: FormDa
   setCheckbox("ich bin selbstständig", spouse.beschaeftigung === "selbststaendig");
   setCheckbox("Einkommen über 64.350 Euro-Stand 2022", spouse.beschaeftigung === "einkommen_ueber_grenze");
 
-  // === ARBEITGEBER (leer lassen) ===
-  setTextField("Name des Arbeitgebers", "");
-  setTextField("Arbeitgeber Straße", "");
-  setTextField("Arbeitgeber Hausnummer", "");
-  setTextField("Arbeitgeber PLZ", "");
-  setTextField("Arbeitgeber Ort", "");
+  // === ARBEITGEBER (Jobcenter/Agentur bei ALG I/II, sonst leer) ===
+  const { data: spouseAg, source: spouseAgSource } = resolveArbeitgeberForSpouse(formData);
+  console.log(
+    "VIACTIV Ehegatte Arbeitgeber Quelle:",
+    spouseAgSource,
+    "PLZ:",
+    spouseAg?.plz,
+    "Name:",
+    spouseAg?.name,
+  );
+  setTextField("Name des Arbeitgebers", spouseAg.name || "");
+  setTextField("Arbeitgeber Straße", spouseAg.strasse || "");
+  setTextField("Arbeitgeber Hausnummer", spouseAg.hausnummer || "");
+  setTextField("Arbeitgeber PLZ", (spouseAg.plz || "").trim());
+  setTextField("Arbeitgeber Ort", spouseAg.ort || "");
   setTextField("Beschäftigt seit", "");
 
   // === BISHERIGE VERSICHERUNGSART ===
@@ -557,6 +568,7 @@ export const createViactivBeitrittserklaerungForSpouse = async (formData: FormDa
     await embedSignature(pdfDoc, formData.unterschriftFamilie, 180, 735, 0);
   }
 
+  await finalizeAppearances(pdfDoc, form);
   return await pdfDoc.save();
 };
 
