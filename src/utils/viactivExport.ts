@@ -310,7 +310,10 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
     console.log(`Field: "${field.getName()}" - Type: ${field.constructor.name}`);
   });
   console.log("=== END VIACTIV PDF Fields ===");
-  
+
+  // Comb-Flags der PLZ-Felder entfernen, damit Werte sichtbar gerendert werden
+  stripCombFlags(form, ["PLZ", "Arbeitgeber PLZ"]);
+
   const helpers = createPDFHelpers(form);
   const { setTextField, setCheckbox } = helpers;
 
@@ -363,7 +366,7 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   // === ADRESSE ===
   setTextField("Straße", formData.mitgliedStrasse || "");
   setTextField("Hausnummer", formData.mitgliedHausnummer || "");
-  setTextField("PLZ", formData.mitgliedPlz || "");
+  setTextField("PLZ", (formData.mitgliedPlz || "").trim());
   setTextField("Ort", formData.ort || "");
   
   // === KONTAKT ===
@@ -402,7 +405,7 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   setTextField("Name des Arbeitgebers", ag.name || "");
   setTextField("Arbeitgeber Straße", ag.strasse || "");
   setTextField("Arbeitgeber Hausnummer", ag.hausnummer || "");
-  setTextField("Arbeitgeber PLZ", ag.plz || "");
+  setTextField("Arbeitgeber PLZ", (ag.plz || "").trim());
   setTextField("Arbeitgeber Ort", ag.ort || "");
   setTextField("Beschäftigt seit", formatInputDate(ag.beschaeftigtSeit || ""));
 
@@ -431,6 +434,7 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
     await embedSignature(pdfDoc, formData.unterschrift, 180, 735, 0);
   }
 
+  await finalizeAppearances(pdfDoc, form);
   return await pdfDoc.save();
 };
 
