@@ -1,4 +1,4 @@
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFName, PDFNumber, StandardFonts } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
 import { getNationalityName } from "@/utils/countries";
 
@@ -28,6 +28,48 @@ const formatDateGerman = (date: Date): string => {
   const year = date.getFullYear();
   // Format: TTMMJJJJ (ohne Punkte für Mitgliedschaft/Geburtsdatum/versichert bis)
   return `${day}${month}${year}`;
+};
+
+/**
+ * Bereinigt die Comb/MaxLen-Flags der PLZ-Felder, damit pdf-lib sie korrekt rendert.
+ * Die VIACTIV-PDF nutzt bei "PLZ" und "Arbeitgeber PLZ" Comb-Flags, was beim
+ * Re-Rendern mit pdf-lib zu unsichtbaren Werten führt.
+ */
+const stripCombFlags = (form: ReturnType<PDFDocument["getForm"]>, fieldNames: string[]) => {
+  for (const name of fieldNames) {
+    try {
+      const field = form.getTextField(name);
+      if (!field) continue;
+      const acro = field.acroField;
+      // MaxLen entfernen
+      acro.dict.delete(PDFName.of("MaxLen"));
+      // Flags lesen, Comb (Bit 25 = 1<<24) + DoNotScroll (Bit 24 = 1<<23) entfernen
+      const ffEntry = acro.dict.lookupMaybe(PDFName.of("Ff"), PDFNumber);
+      if (ffEntry) {
+        const current = ffEntry.asNumber();
+        const cleaned = current & ~((1 << 23) | (1 << 24));
+        acro.dict.set(PDFName.of("Ff"), PDFNumber.of(cleaned));
+      }
+    } catch (e) {
+      console.log(`VIACTIV stripCombFlags: Field "${name}" not found or skipped`);
+    }
+  }
+};
+
+/**
+ * Bettet Helvetica ein und regeneriert alle Field-Appearances,
+ * damit gesetzte Werte zuverlässig sichtbar sind.
+ */
+const finalizeAppearances = async (
+  pdfDoc: PDFDocument,
+  form: ReturnType<PDFDocument["getForm"]>,
+) => {
+  try {
+    const helv = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    form.updateFieldAppearances(helv);
+  } catch (e) {
+    console.warn("VIACTIV finalizeAppearances failed:", e);
+  }
 };
 
 const formatDateGermanWithDots = (date: Date): string => {
