@@ -1,93 +1,66 @@
-## Ziel
+## Problem
 
-BIG direkt gesund (Plusbonus) Formular vervollständigen — fehlende UI-Felder ergänzen, irrelevante Felder ausblenden und alle übrigen PDF-AcroFields aus der Vorlage korrekt füllen.
+In der **VIACTIV-Beitrittserklärung** treten drei zusammenhängende Probleme auf:
 
-## Probleme & Korrekturen
+1. **PLZ wird nicht in die PDF übertragen** — weder die PLZ des Antragstellers (`PLZ`) noch die PLZ des Arbeitgebers (`Arbeitgeber PLZ`) erscheinen im exportierten PDF, obwohl die Werte im UI vorhanden und (nach KI‑Validierung) sichtbar sind.
+2. **Jobcenter‑Fallback unvollständig**: Wenn der Antragsteller ALG II (oder ALG I) bezieht und kein Arbeitgeber eingetragen ist, soll automatisch „Jobcenter" bzw. „Agentur für Arbeit" plus Adresse als Arbeitgeberdaten ins PDF geschrieben werden. Aktuell funktioniert die Auflösung zwar im Code, aber die PLZ landet wegen Problem 1 ebenfalls nicht im Feld.
+3. **Ehepartner‑Beitrittserklärung**: Wenn der Ehepartner eine eigene Mitgliedschaft hat und ebenfalls Geld vom Amt bezieht (ALG I/II), müssen seine Arbeitgeberfelder mit denselben Jobcenter‑/Agentur‑Daten gefüllt werden. Aktuell werden die Arbeitgeberfelder beim Ehepartner pauschal leer gelassen.
 
-### 1. Irrelevante Felder bei BIG ausblenden (UI)
+## Ursachenanalyse
 
-Im `MemberSection` werden zurzeit auch bei `big_plusbonus` folgende Felder gerendert, die nicht gebraucht werden:
-- Geburtsdatum, Geburtsort, Geburtsland
-- KV-Nummer, Name der Krankenkasse
-- Familienstand, Telefon, E-Mail
+### Zu 1) PLZ‑Felder bleiben leer
 
-Diese Blöcke werden bei `selectedKrankenkasse === 'big_plusbonus'` ausgeblendet (analog zur bestehenden Novitas-Logik). Validierung in `Index.tsx` für diese Felder bei BIG entfernen (Telefon/Email-Pflicht aus Core-Memory wird hier explizit für BIG aufgehoben, da der Antrag sie nicht enthält).
+Die beiden PLZ‑Felder im PDF‑Template (`PLZ`, `Arbeitgeber PLZ`) sind als **Comb‑Felder** mit speziellen Flags konfiguriert (`/Ff 29360128` bzw. `25165824`, MaxLen 5). pdf‑lib setzt zwar den Wert via `setText(...)`, kann das Appearance‑Stream für Comb‑Felder mit dem Standard‑Font (Courier/Arial im AcroForm) aber nicht zuverlässig regenerieren. Ergebnis: Das Wertfeld ist im PDF gesetzt, wird in Viewern (Preview, Adobe) aber nicht angezeigt.
 
-Adresse (Straße/Hausnr./PLZ/Ort) bleibt sichtbar.
+Lösung: Vor dem Setzen die Comb‑/MaxLen‑Beschränkungen für diese beiden Felder entfernen und nach dem Befüllen `form.updateFieldAppearances()` mit einem eingebetteten Standard‑Font ausführen.
 
-### 2. Fehlende UI-Bereiche in `BigPlusbonusSection`
+### Zu 2 & 3) Jobcenter‑Fallback
 
-Folgende neue Eingabeblöcke hinzufügen:
+Die bestehende `resolveArbeitgeber`-Funktion deckt nur den Antragsteller ab und löst nicht aus, wenn der User „aus Versehen" ein Feld eingetragen hat. Für den Ehepartner existiert gar keine Auflösung — die Arbeitgeberfelder werden hartkodiert leer gelassen.
 
-**a) Versicherungsstatus (Neuabschluss / bestehende Zusatzversicherung)**
-- Radio-Gruppe: Neuabschluss / bestehende Zusatzversicherung
-- Höhe in Euro (Textfeld)
+## Lösung
 
-**b) Versicherungsart (Mehrfachauswahl, 4 Checkboxen)**
-- private Zusatzversicherung im Sinne von §22 sowie §16
-- Berufsunfähigkeitsversicherung
-- Unfallversicherung
-- Grundfähigkeitsversicherung
+### A) PLZ‑Rendering reparieren (`src/utils/viactivExport.ts`)
 
-**c) "Gilt auch für folgende mitversicherte Angehörige" (bis zu 3 Einträge)**
-- Pro Eintrag: Name Vorname + Höhe der Police in Euro
-- Add/Remove-Buttons (max. 3)
+In `createViactivBeitrittserklaerungPDF`, `…ForSpouse`, `…ForChild`:
 
-### 3. Typen erweitern (`src/types/form.ts`)
+- Direkt nach `pdfDoc.getForm()`:
+  - Für die Felder `PLZ` und `Arbeitgeber PLZ` die Comb‑Flag und `MaxLen` aus dem AcroField‑Dictionary entfernen (`field.acroField.dict.delete(PDFName.of('MaxLen'))` und Flags via `setFlags`/Bitmaske bereinigen). Das ändert nur das Aussehen, nicht die Position.
+- Nach allen `setText`/`setCheckbox`-Aufrufen:
+  - Helvetica einbetten (`pdfDoc.embedFont(StandardFonts.Helvetica)`) und `form.updateFieldAppearances(helv)` aufrufen, damit die Werte sicher gerendert werden.
+- PLZ‑Werte beim Setzen mit `.trim()` reinigen, um versehentliche Leerzeichen (häufig nach KI‑Validierung) auszuschließen.
 
-Im `FormData` ergänzen:
-```typescript
-bigVersicherungsstatus: 'neuabschluss' | 'bestehend' | '';
-bigHoeheEuro: string;
-bigVersicherungsarten: {
-  privateZusatz: boolean;
-  berufsunfaehigkeit: boolean;
-  unfall: boolean;
-  grundfaehigkeit: boolean;
-};
-bigMitversicherte: Array<{ nameVorname: string; hoehePolice: string }>; // max 3
-```
-Defaults in `createInitialFormData` setzen (alle leer/false, leeres Array).
+### B) Jobcenter‑Fallback erweitern für Antragsteller
 
-### 4. PDF-Mapping erweitern (`src/utils/bigPlusbonusExport.ts`)
+`resolveArbeitgeber(formData)` so ändern, dass bei `viactivBeschaeftigung === 'al_geld_1' | 'al_geld_2'` **immer** Jobcenter/Agentur als Arbeitgeber gesetzt wird (auch wenn der User noch alte Arbeitgeberdaten stehen hat). Reihenfolge:
 
-Zusätzliche AcroFields aus der CSV mappen:
+1. Ist `beschaeftigung` ALG I/II → Jobcenter / Agentur für Arbeit + Mitglied‑PLZ + Mitglied‑Ort.
+2. Sonst: User‑Arbeitgeberdaten verwenden (wenn vorhanden).
+3. Sonst: leer.
 
-| PDF-Feld | Quelle |
-|---|---|
-| `Neuabschluss` (Checkbox) | `bigVersicherungsstatus === 'neuabschluss'` |
-| `bestehende Zusatzversicherung` (Checkbox) | `bigVersicherungsstatus === 'bestehend'` |
-| `Euro` (Textfeld) | `bigHoeheEuro` |
-| `private Zusatzversicherung im Sinne von  22 sowie  16` (Checkbox) | `bigVersicherungsarten.privateZusatz` |
-| `Berufsunfähigkeitsversicherung` (Checkbox) | `bigVersicherungsarten.berufsunfaehigkeit` |
-| `Unfallversicherung` (Checkbox) | `bigVersicherungsarten.unfall` |
-| `Grundfähigkeitsversicherung` (Checkbox) | `bigVersicherungsarten.grundfaehigkeit` |
-| `Name Vorname` / `Höhe der Police in Euro` | `bigMitversicherte[0]` |
-| `Name Vorname_2` / `Höhe der Police in Euro_2` | `bigMitversicherte[1]` |
-| `Name Vorname_3` / `Höhe der Police in Euro_3` | `bigMitversicherte[2]` |
+### C) Jobcenter‑Fallback für Ehepartner
 
-Hinweis: Feldnamen in der CSV haben Encoding-Eigenheiten (Umlaute, doppelte Spaces "von  22"). Beim `setText`/`setCheck` einen Fallback-Mechanismus einbauen, der mehrere Schreibweisen probiert (mit/ohne Umlaute, einfache vs. doppelte Spaces) — analog zur Encoding-Fallback-Logik in `viactivExport.ts`.
+Neue Helferfunktion `resolveArbeitgeberForSpouse(formData)`:
 
-### 5. Validierung & Index-Anpassung
+- Wenn `formData.ehegatte.beschaeftigung === 'al_geld_2'` → Jobcenter + Mitglied‑PLZ/Ort.
+- Wenn `'al_geld_1'` → Agentur für Arbeit + Mitglied‑PLZ/Ort.
+- Sonst → alle Arbeitgeberfelder leer (wie bisher).
 
-In `Index.tsx` für `big_plusbonus`:
-- KV-Nummer/Krankenkasse/Familienstand/Telefon/Email NICHT validieren
-- Geburtsdatum bereits ausgeschlossen — bleibt so
-- Optional: keine Pflichtvalidierung für Versicherungsstatus/-art/Mitversicherte (User-Wahl, nicht zwingend laut Aufgabe)
+In `createViactivBeitrittserklaerungForSpouse` die hartkodierten Leerwerte durch das Ergebnis dieser Funktion ersetzen (Name, Straße, Hausnummer, PLZ, Ort).
 
-## Dateien
+### D) Logging
 
-| Datei | Änderung |
-|---|---|
-| `src/types/form.ts` | Neue Felder + Defaults |
-| `src/components/MemberSection.tsx` | `big_plusbonus` zu Hide-Conditions hinzufügen (Geburtsdaten, KV/KK, Familienstand/Tel/Email-Block) |
-| `src/components/BigPlusbonusSection.tsx` | Neue Blöcke: Neuabschluss/bestehend + Euro, 4 Versicherungsart-Checkboxen, Mitversicherte-Liste |
-| `src/utils/bigPlusbonusExport.ts` | Zusätzliche Mappings + Encoding-Fallback-Helper |
-| `src/pages/Index.tsx` | Validierung für BIG bereinigen |
-| `mem/features/big-plusbonus-integration.md` | Memory aktualisieren (neue Felder + ausgeblendete Bereiche) |
+Bestehende `console.log`-Zeilen für PLZ und Arbeitgeber‑Quelle behalten, damit nach dem Fix im Browser‑Console nachvollziehbar ist, welche Werte gesetzt werden.
 
-## Hinweise
+## Was bleibt unverändert
 
-- Adresse, Geschlecht, Bankdaten, Unterschrift bleiben Pflicht (wie bisher).
-- Vorname vor Name bleibt erhalten.
-- Keine PII-Persistenz, keine zusätzlichen API-Calls.
+- UI‑Komponenten (`MemberSection`, `ViactivSection`, `SpouseSection`) — die Eingaben sind korrekt, nur der Export muss reparieren.
+- Andere PDF‑Felder (Name, Adresse, Kontakt, Familienstand, Versicherungsart) bleiben wie gehabt.
+- DAK/BIG/Novitas/BKK GS Exporte — nicht betroffen.
+
+## Tests nach Implementation
+
+1. PLZ Antragsteller (z. B. „45356") und PLZ Arbeitgeber (z. B. „44137") eingeben → exportieren → beide PLZ müssen im PDF sichtbar sein.
+2. Beschäftigung „ALG II" wählen, Arbeitgeber leer lassen → PDF zeigt „Jobcenter" + Mitglied‑PLZ/Ort.
+3. Familienversicherung aktivieren, Ehepartner eigene Mitgliedschaft + ALG II → Ehepartner‑PDF zeigt „Jobcenter" + PLZ/Ort.
+4. Beschäftigt mit echtem Arbeitgeber → Werte des Users (nicht Jobcenter) erscheinen.
