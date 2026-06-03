@@ -74,7 +74,7 @@ export type FormMode = 'familienversicherung_und_rundum' | 'nur_rundum';
 export type Krankenkasse = 'bkk_gs' | 'viactiv' | 'novitas' | 'dak' | 'big_plusbonus' | '';
 
 export const KRANKENKASSEN_OPTIONS = [
-  // { value: 'bkk_gs' as Krankenkasse, label: 'BKK GILDEMEISTER SEIDENSTICK' }, // Temporär versteckt
+  { value: 'bkk_gs' as Krankenkasse, label: 'BKK GILDEMEISTER SEIDENSTICK' },
   { value: 'viactiv' as Krankenkasse, label: 'VIACTIV Krankenkasse' },
   { value: 'novitas' as Krankenkasse, label: 'Novitas BKK' },
   { value: 'dak' as Krankenkasse, label: 'DAK Familienversicherung' },
