@@ -8,7 +8,7 @@ import { RundumSicherPaketSection } from '@/components/RundumSicherPaketSection'
 import { ViactivSection } from '@/components/ViactivSection';
 import { BigPlusbonusSection } from '@/components/BigPlusbonusSection';
 import { Button } from '@/components/ui/button';
-import { FileDown, FileText, AlertCircle, Users, User, Building2 } from 'lucide-react';
+import { FileDown, FileText, AlertCircle, Users, User, Building2, LogOut } from 'lucide-react';
 import { exportFilledPDF, exportRundumSicherPaketOnly } from '@/utils/pdfExport';
 import { exportViactivBeitrittserklaerung } from '@/utils/viactivExport';
 import { exportViactivFamilienversicherung } from '@/utils/viactivFamilyExport';
@@ -346,6 +346,15 @@ const Index = () => {
               <DocumentMergeDialog />
               <FreitextImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} selectedKrankenkasse={formData.selectedKrankenkasse} />
               <JsonImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} selectedKrankenkasse={formData.selectedKrankenkasse} />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => supabase.auth.signOut()}
+                className="text-primary-foreground hover:bg-primary-foreground/10"
+                title="Abmelden"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
             </div>
           </div>
           <p className="text-primary-foreground/80 text-sm md:text-base">
