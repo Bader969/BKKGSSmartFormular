@@ -2,29 +2,35 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Lock, User } from 'lucide-react';
+import { Lock, Mail } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface LoginFormProps {
-  onLogin: () => void;
+  onLogin?: () => void;
 }
 
-const VALID_USERNAME = 'TarifyBKKGS';
-const VALID_PASSWORD = '2912TaBGS25';
-
 export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    if (username === VALID_USERNAME && password === VALID_PASSWORD) {
-      sessionStorage.setItem('isAuthenticated', 'true');
-      onLogin();
-    } else {
-      setError('Ungültiger Benutzername oder Passwort');
+    setLoading(true);
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (signInError) {
+        setError('Ungültige E-Mail oder Passwort');
+        return;
+      }
+      onLogin?.();
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -42,17 +48,18 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="username" className="text-slate-700">Benutzername</Label>
+              <Label htmlFor="email" className="text-slate-700">E-Mail</Label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <Input
-                  id="username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
-                  placeholder="Benutzername eingeben"
-                  autoComplete="username"
+                  placeholder="E-Mail eingeben"
+                  autoComplete="email"
+                  required
                 />
               </div>
             </div>
@@ -79,8 +86,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
               </div>
             )}
 
-            <Button type="submit" className="w-full h-11 text-base font-medium">
-              Anmelden
+            <Button type="submit" disabled={loading} className="w-full h-11 text-base font-medium">
+              {loading ? 'Anmelden…' : 'Anmelden'}
             </Button>
           </form>
         </div>

@@ -20,29 +20,36 @@ import { toast } from 'sonner';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { LoginForm } from '@/components/LoginForm';
+import { supabase } from '@/integrations/supabase/client';
+import type { Session } from '@supabase/supabase-js';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { FreitextImportDialog } from '@/components/FreitextImportDialog';
 import { DocumentMergeDialog } from '@/components/DocumentMergeDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const Index = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [formData, setFormData] = useState<FormData>(createInitialFormData);
   const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
-    const authStatus = sessionStorage.getItem('isAuthenticated');
-    if (authStatus === 'true') {
-      setIsAuthenticated(true);
-    }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+    });
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s);
+      setAuthLoading(false);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
-  const handleLogin = () => {
-    setIsAuthenticated(true);
-  };
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center text-slate-500">Lädt…</div>;
+  }
 
-  if (!isAuthenticated) {
-    return <LoginForm onLogin={handleLogin} />;
+  if (!session) {
+    return <LoginForm />;
   }
   
   const updateFormData = (updates: Partial<FormData>) => {
