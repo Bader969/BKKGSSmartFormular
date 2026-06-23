@@ -1,6 +1,19 @@
 import { PDFDocument } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
 import { getAutoSignatures, ensureSignatureFontReady } from "./generateSignature";
+import { generateSignatureDataUrl } from "./generateSignature";
+
+/**
+ * Erzeugt eine Unterschrift aus dem Nachnamen (letztes Wort) des Kontoinhabers
+ * für die VIACTIV Bonus-PDFs. Leerer String, wenn kein Kontoinhaber gesetzt ist.
+ */
+const getKontoinhaberSignature = (formData: FormData): string => {
+  const full = (formData.viactivBonusKontoinhaber ?? '').trim();
+  if (!full) return '';
+  const lastName = full.split(/\s+/).pop() ?? '';
+  if (!lastName) return '';
+  return generateSignatureDataUrl(lastName) ?? '';
+};
 
 /**
  * VIACTIV Bonus-PDF Export
@@ -330,8 +343,9 @@ const generateBonusFilename = (
  */
 export const exportViactivBonusPDFs = async (formData: FormData): Promise<number> => {
   await ensureSignatureFontReady();
-  const _sigs = getAutoSignatures(formData);
-  formData = { ...formData, unterschrift: _sigs.member ?? '', unterschriftFamilie: _sigs.family ?? '' };
+  // VIACTIV Bonus: Unterschrift IMMER vom Kontoinhaber (Nachname), für alle Bonus-PDFs.
+  const kontoSig = getKontoinhaberSignature(formData);
+  formData = { ...formData, unterschrift: kontoSig, unterschriftFamilie: kontoSig };
   let count = 0;
 
   try {
@@ -353,8 +367,12 @@ export const exportViactivBonusPDFs = async (formData: FormData): Promise<number
     downloadPDF(memberPdfBytes, memberFilename);
     count++;
 
-    // 2. Ehegatte (falls vorhanden und Familienversicherung aktiviert)
-    if (formData.viactivFamilienangehoerigeMitversichern && formData.ehegatte.name) {
+    // 2. Ehegatte (nur familienversichert; keine eigene Mitgliedschaft)
+    if (
+      formData.viactivFamilienangehoerigeMitversichern &&
+      formData.ehegatte.name &&
+      !formData.ehegatte.eigeneMitgliedschaft
+    ) {
       const spouse = formData.ehegatte;
       console.log(`VIACTIV Bonus: Erstelle PDF für Ehegatte (Alter: ${calculateAge(spouse.geburtsdatum)})`);
       
