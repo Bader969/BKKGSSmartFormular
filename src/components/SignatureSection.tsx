@@ -1,8 +1,9 @@
 import React from 'react';
 import { FormSection } from './FormSection';
 import { FormField } from './FormField';
-import { SignaturePad } from './SignaturePad';
+import { SignaturePreview } from './SignaturePreview';
 import { FormData } from '@/types/form';
+import { resolveFamilySignatureLastName } from '@/utils/generateSignature';
 
 interface SignatureSectionProps {
   formData: FormData;
@@ -11,6 +12,7 @@ interface SignatureSectionProps {
 
 export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, updateFormData }) => {
   const isNurRundumMode = formData.mode === 'nur_rundum';
+  const familyLastName = resolveFamilySignatureLastName(formData);
   
   return (
     <FormSection title="Ort, Datum und Unterschriften" variant="signature">
@@ -37,10 +39,7 @@ export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, up
           <label className="block text-sm font-medium mb-2">
             Unterschrift des Mitglieds
           </label>
-          <SignaturePad
-            signature={formData.unterschrift}
-            onSignatureChange={(sig) => updateFormData({ unterschrift: sig })}
-          />
+          <SignaturePreview lastName={formData.mitgliedName} />
         </div>
         
         {!isNurRundumMode && (
@@ -48,9 +47,9 @@ export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, up
             <label className="block text-sm font-medium mb-2">
               ggf. Unterschrift der Familienangehörigen
             </label>
-            <SignaturePad
-              signature={formData.unterschriftFamilie}
-              onSignatureChange={(sig) => updateFormData({ unterschriftFamilie: sig })}
+            <SignaturePreview
+              lastName={familyLastName}
+              emptyHint="Ehegatte bzw. Kind ≥ 16 – sonst keine Signatur"
             />
           </div>
         )}

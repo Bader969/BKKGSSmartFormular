@@ -1,5 +1,6 @@
 import { PDFDocument } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
+import { getAutoSignatures, ensureSignatureFontReady } from "./generateSignature";
 
 /**
  * VIACTIV Bonus-PDF Export
@@ -328,6 +329,9 @@ const generateBonusFilename = (
  * Returns the number of PDFs generated
  */
 export const exportViactivBonusPDFs = async (formData: FormData): Promise<number> => {
+  await ensureSignatureFontReady();
+  const _sigs = getAutoSignatures(formData);
+  formData = { ...formData, unterschrift: _sigs.member ?? '', unterschriftFamilie: _sigs.family ?? '' };
   let count = 0;
 
   try {

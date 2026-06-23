@@ -1,5 +1,6 @@
 import { PDFDocument, PDFTextField, PDFCheckBox } from 'pdf-lib';
 import { FormData } from '@/types/form';
+import { getAutoSignatures, ensureSignatureFontReady } from './generateSignature';
 
 // Convert ISO YYYY-MM-DD or DD.MM.YYYY -> DDMMJJ (6-digit, two-digit year)
 const toDDMMJJ = (input: string): string => {
@@ -78,6 +79,9 @@ const downloadPdf = (bytes: Uint8Array, filename: string) => {
 };
 
 export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
+  await ensureSignatureFontReady();
+  const _sigs = getAutoSignatures(formData);
+  formData = { ...formData, unterschrift: _sigs.member ?? '', unterschriftFamilie: _sigs.family ?? '' };
   const res = await fetch('/big-plusbonus.pdf');
   const bytes = await res.arrayBuffer();
   const pdfDoc = await PDFDocument.load(bytes);

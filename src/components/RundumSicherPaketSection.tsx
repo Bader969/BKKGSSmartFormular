@@ -1,7 +1,6 @@
 import React from 'react';
 import { FormSection } from './FormSection';
 import { FormField } from './FormField';
-import { SignaturePad } from './SignaturePad';
 import { FormData, RundumSicherPaketData, ArztDaten, createEmptyArztDaten, ZUSATZVERSICHERUNG_OPTIONS, ZusatzversicherungOption } from '@/types/form';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
