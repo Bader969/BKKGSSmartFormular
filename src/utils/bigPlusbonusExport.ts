@@ -108,6 +108,10 @@ export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
   setText(form, 'Ort_2', formData.bigBank.ort);
   setText(form, 'Datum TTMMJJ', toDDMMJJ(formData.bigBank.datum));
 
+  // Untere Bestätigungs-Felder (Hiermit wird die Richtigkeit der o.a. Daten bestätigt)
+  setText(form, 'Ort_3', formData.ort);
+  setText(form, 'Datum TTMMJJ_2', toDDMMJJ(formData.datum));
+
   // Versicherungsstatus
   setCheck(form, 'Neuabschluss', formData.bigVersicherungsstatus === 'neuabschluss');
   setCheck(form, 'bestehende Zusatzversicherung', formData.bigVersicherungsstatus === 'bestehend');
@@ -135,8 +139,7 @@ export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
   }
 
   // Unterschrift Kontoinhaber als Bild über Signatur16-Widget
-  // CSV: Signatur16 page 1, Left=301, Top=407, Width=261, Height=12
-  // pdf-lib: y from bottom = pageHeight - top - height
+  // Widget-Rect (PDF-Koordinaten, Ursprung unten links): [301, 406, 562, 418]
   if (formData.unterschrift) {
     try {
       const base64 = formData.unterschrift.split(',')[1];
@@ -146,29 +149,29 @@ export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
           ? await pdfDoc.embedPng(sigBytes)
           : await pdfDoc.embedJpg(sigBytes);
         const page = pdfDoc.getPages()[0];
-        const pageHeight = page.getHeight();
-        // Höhe etwas erhöhen für sichtbare Unterschrift (max 30)
-        const targetHeight = 28;
+        // Signatur16: x=301..562 (w=261), y=406..418 (h=12)
+        const widgetX = 301;
+        const widgetY = 406;
+        const widgetW = 261;
+        const widgetH = 12;
         const aspect = img.width / img.height;
-        let height = targetHeight;
+        // Etwas grösser darstellen, damit Caveat-Schrift gut lesbar bleibt
+        let height = 22;
         let width = height * aspect;
-        if (width > 240) {
-          width = 240;
+        if (width > widgetW) {
+          width = widgetW;
           height = width / aspect;
         }
-        const left = 301;
-        const top = 407;
-        const fieldHeight = 12;
-        // Auf der gleichen Ebene wie das Datumsfeld; vertikal so platzieren, dass Unterkante auf Linie sitzt
-        const y = pageHeight - top - fieldHeight;
-        page.drawImage(img, { x: left, y, width, height });
+        const x = widgetX;
+        const y = widgetY + widgetH / 2 - height / 2;
+        page.drawImage(img, { x, y, width, height });
       }
     } catch (e) {
       console.warn('[BIG] Unterschrift konnte nicht eingebettet werden:', e);
     }
   }
 
-  form.flatten();
+  // PDF NICHT flatten – AcroFields sollen bearbeitbar bleiben (wie bei anderen Kassen)
   const out = await pdfDoc.save();
   const fname = `BIG-Plusbonus_${formData.mitgliedName || 'Antrag'}_${formData.mitgliedVorname || ''}.pdf`.replace(/\s+/g, '_');
   downloadPdf(out, fname);

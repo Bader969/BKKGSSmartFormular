@@ -1,76 +1,39 @@
-## Ziel
-Mauszeiger-Unterschriften komplett ersetzen. Beim PDF-Export wird der Nachname automatisch als Unterschrift in Handschrift-Optik (Caveat) an exakt der gleichen Position eingebettet wie bisher die gezeichnete Signatur. Im Formular wird statt SignaturePad eine Live-Vorschau angezeigt.
+## Befunde
 
-## Umfang
-- Alle Unterschriftsfelder, alle Kassen (VIACTIV, Novitas, DAK, BKK GS, BIG Plusbonus, Rundum etc.)
-- Quelle des Nachnamens pro Signaturfeld:
-  - **Mitglied-Unterschrift** → `mitgliedName`
-  - **Familienangehörige-Unterschrift** → priorisiert:
-    1. Nachname **Ehegatte**, falls Ehegatte vorhanden
-    2. sonst Nachname des **ersten Kindes ≥ 16 Jahre** (nach Geburtsdatum berechnet)
-    3. sonst → **leer lassen** (keine Signatur einbetten)
-  - **BIG Plusbonus Kontoinhaber-Signatur** → `mitgliedName`
+**Form:** BIG Plusbonus (`bigPlusbonusExport.ts`). Andere Kassen sind nicht betroffen.
 
-## Umsetzung
+### 1. Unteres „Ort, Datum" bleibt leer
+Die PDF hat zwei separate Felder am unteren Rand:
+- `Ort_3` (rect ≈ [32, 212, 197, 224])
+- `Datum TTMMJJ_2` (rect ≈ [206, 212, 285, 224])
 
-### 1. Font einbinden
-- `bun add @fontsource/caveat`
-- `src/main.tsx`: `import '@fontsource/caveat/700.css'`
-- `tailwind.config.ts`: `fontFamily.signature: ['Caveat', 'cursive']`
+Diese werden im Export aktuell nicht befüllt – nur die oberen Bank-Felder `Ort_2` / `Datum TTMMJJ`. Deshalb erscheinen die unteren Felder leer.
 
-### 2. Neue Utility `src/utils/generateSignature.ts`
-- `generateSignatureDataUrl(lastName: string, opts?): string | null`
-  - Leerer/whitespace Nachname → `null`
-  - Rendert Offscreen-Canvas mit `bold 56px Caveat`, Farbe `#1a365d`, transparenter Hintergrund
-  - Auto-Downscale wenn Text zu breit
-  - Stellt sicher, dass Caveat geladen ist (`await document.fonts.load(...)` einmalig vor erstem Export)
-- `resolveFamilySignatureLastName(formData): string | null`
-  - Wenn `spouseEnabled`/`hasSpouse` und `spouseName` vorhanden → spouseName
-  - Sonst: ältestes Kind mit Alter ≥ 16 (via `dateUtils`) → Nachname des Kindes
-  - Sonst `null`
+### 2. Unterschrift sitzt an der falschen Stelle
+Das Widget `Signatur16` (Unterschrift Kontoinhaber*in) hat in der PDF die Koordinaten `[301, 406, 562, 418]` (PDF-Koordinaten, Ursprung unten links). Aktuell wird mit `y = pageHeight - 407 - 12 = 423` gezeichnet → die Signatur landet eine Zeile höher, nämlich über der BIC-Zeile. Korrekt wäre `y = 406` (= Rect.y des Widgets). Genau das zeigt das Bild.
 
-### 3. Neue Komponente `src/components/SignaturePreview.tsx` (ersetzt SignaturePad-Aufrufe)
-- Props: `lastName: string | null`, `label?: string`
-- Read-only Box gleiche Höhe wie bisher
-- Zeigt Nachname in `font-signature text-4xl text-[#1a365d]` mit Unterlinie
-- Fallback wenn `lastName` leer: gedimmter Hinweis „Wird automatisch aus dem Nachnamen erzeugt"
-- Familie-Variante: zusätzlicher Hinweis „Ehegatte bzw. Kind ≥ 16 – sonst keine Signatur"
+### 3. PDF ist nicht mehr bearbeitbar (keine AcroFields)
+`bigPlusbonusExport.ts` ruft am Ende `form.flatten()` auf. Das brennt alle Formularfelder als statische Grafik ein und entfernt sie als interaktive Felder. **Andere Kassen** (Novitas, DAK, VIACTIV …) **flatten NICHT** – die bleiben bearbeitbar. Das Verhalten ist also nur in BIG so.
 
-### 4. `SignatureSection.tsx` umbauen
-- `SignaturePad` durch `SignaturePreview` ersetzen
-- Mitglied-Feld: `lastName={formData.mitgliedName}`
-- Familie-Feld: `lastName={resolveFamilySignatureLastName(formData)}`
-- `formData.unterschrift*` werden nicht mehr im State befüllt; Felder bleiben im Typ (Abwärtskompatibilität)
+## Plan – nur `src/utils/bigPlusbonusExport.ts`
 
-### 5. Export-Utils anpassen
-Betroffen: `pdfExport.ts`, `viactivExport.ts`, `viactivFamilyExport.ts`, `viactivBonusExport.ts`, `novitasExport.ts`, `dakExport.ts`, `bigPlusbonusExport.ts`
+1. **Untere Ort/Datum-Felder befüllen**
+   - `setText(form, 'Ort_3', formData.ort)`
+   - `setText(form, 'Datum TTMMJJ_2', toDDMMJJ(formData.datum))`
 
-Pro Datei:
-- Mitglieds-Signatur: `generateSignatureDataUrl(formData.mitgliedName)`
-- Familien-Signatur: `generateSignatureDataUrl(resolveFamilySignatureLastName(formData))`
-- BIG Kontoinhaber: `generateSignatureDataUrl(formData.mitgliedName)`
-- Wenn Ergebnis `null` → Signatur weglassen (kein Crash, keine leere Box)
-- **Position, Größe, Seite bleiben exakt identisch** zu den heutigen Werten
+2. **Signatur-Position korrigieren**
+   - `Signatur16`-Rect direkt verwenden:
+     - `left = 301`, `bottom-y = 406`, Zielhöhe `~12 pt` (Widget-Höhe), Breite max `≈ 260 pt`
+   - Image vertikal mittig im Widget platzieren, statt mit `pageHeight - top - fieldHeight` zu rechnen.
+   - Höhe ggf. leicht erhöhen (bis ~18 pt) damit die Caveat-Schrift gut lesbar bleibt, aber bei `y = 406` zentriert.
 
-### 6. Validierung (`src/utils/validation.ts`)
-- Pflichtprüfungen für `unterschrift` / `unterschriftFamilie` entfernen
-- Mitglieds-Nachname ist ohnehin schon Pflicht → ersetzt Unterschriftspflicht
+3. **Optional: zweite Unterschrift am Antragsende** (`Signatur17`, „Stempel oder Unterschrift Vermittler*in"): bleibt **leer**, ist die Vermittler-Signatur (analog zu BKK-Regel „Brokersignatur entfernt"). Keine Änderung.
 
-### 7. Import-Dialoge / JSON
-- `unterschrift*` aus JSON-Import-Beispielen entfernen
-- Typ-Felder bleiben, werden aber ignoriert
-
-### 8. Cleanup
-- `src/components/SignaturePad.tsx` löschen
-- `bun remove react-signature-canvas`
-
-## Technische Hinweise
-- Canvas → PNG-DataURL, damit pdf-lib `embedPng` unverändert funktioniert
-- Farbe `#1a365d` matched bisheriges Penstift-Blau → optisch konsistent
-- Altersberechnung Kinder über vorhandene `dateUtils`
-- Keine PDF-Koordinaten ändern
+4. **`form.flatten()` entfernen**
+   - Zeile `form.flatten();` löschen, damit die exportierte PDF wie bei allen anderen Kassen bearbeitbare AcroFields behält.
+   - Die per `page.drawImage` eingebettete Caveat-Unterschrift bleibt sichtbar (sie ist Teil des Page-Contents, nicht des Widgets).
 
 ## Nicht im Scope
-- Keine Backend-/DB-Änderung
-- Keine Änderung an OCR/AI-Extraction
-- Keine Änderung an PDF-Layouts/Positionen
+- Keine Änderung an anderen Krankenkassen-Exports (alle bereits ohne `flatten()`, AcroFields bleiben dort erhalten).
+- Keine Änderung am UI, an Validierung oder am Daten-Modell.
+- Keine Änderung an der Signatur-Erzeugung selbst (Caveat / `generateSignature.ts`).
