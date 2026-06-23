@@ -1,6 +1,7 @@
 import { PDFDocument } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
 import { calculateDates } from "./dateUtils";
+import { getAutoSignatures, ensureSignatureFontReady } from "./generateSignature";
 
 const formatInputDate = (dateStr: string): string => {
   if (!dateStr) return "";
@@ -448,6 +449,9 @@ const downloadPDF = (pdfBytes: Uint8Array, filename: string) => {
 // Export nur Rundum-Sicher-Paket für Einzelmitglied
 export const exportRundumSicherPaketOnly = async (formData: FormData): Promise<void> => {
   try {
+    await ensureSignatureFontReady();
+    const _sigs = getAutoSignatures(formData);
+    formData = { ...formData, unterschrift: _sigs.member ?? '', unterschriftFamilie: _sigs.family ?? '' };
     // Nur Mitglied
     const mitgliedPerson: PersonInfo = {
       vorname: formData.mitgliedVorname,
@@ -467,6 +471,9 @@ export const exportRundumSicherPaketOnly = async (formData: FormData): Promise<v
 
 export const exportFilledPDF = async (formData: FormData): Promise<void> => {
   try {
+    await ensureSignatureFontReady();
+    const _sigs = getAutoSignatures(formData);
+    formData = { ...formData, unterschrift: _sigs.member ?? '', unterschriftFamilie: _sigs.family ?? '' };
     const memberFullName = `${formData.mitgliedVorname || ''}_${formData.mitgliedName || ''}`.replace(/^_|_$/g, '') || 'Antrag';
     const baseName = `Familienversicherung_${memberFullName}`;
 

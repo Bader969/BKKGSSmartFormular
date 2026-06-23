@@ -1,6 +1,7 @@
 import { PDFDocument, rgb } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
 import { getCountryName, getNationalityName } from "./countries";
+import { getAutoSignatures, ensureSignatureFontReady } from "./generateSignature";
 
 // Helper function to format date from YYYY-MM-DD to DD.MM.YYYY
 const formatInputDate = (dateStr: string): string => {
@@ -369,6 +370,9 @@ const downloadPDF = (pdfBytes: Uint8Array, filename: string) => {
 
 // Main export function with multi-PDF support for >3 children
 export const exportNovitasFamilienversicherung = async (formData: FormData): Promise<void> => {
+  await ensureSignatureFontReady();
+  const _sigs = getAutoSignatures(formData);
+  formData = { ...formData, unterschrift: _sigs.member ?? '', unterschriftFamilie: _sigs.family ?? '' };
   const children = formData.kinder;
   const numberOfPDFs = Math.max(1, Math.ceil(children.length / 3));
   

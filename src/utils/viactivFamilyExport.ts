@@ -1,6 +1,7 @@
 import { PDFDocument } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
 import { getNationalityName, getCountryName } from "@/utils/countries";
+import { getAutoSignatures, ensureSignatureFontReady } from "./generateSignature";
 
 /**
  * VIACTIV Familienversicherung PDF Export
@@ -369,6 +370,9 @@ const createViactivFamilyPDF = async (
  * Kinder mit eigener Mitgliedschaft werden ausgeschlossen
  */
 export const exportViactivFamilienversicherung = async (formData: FormData): Promise<void> => {
+  await ensureSignatureFontReady();
+  const _sigs = getAutoSignatures(formData);
+  formData = { ...formData, unterschrift: _sigs.member ?? '', unterschriftFamilie: _sigs.family ?? '' };
   if (!formData.viactivFamilienangehoerigeMitversichern) {
     console.log("Familienversicherung nicht aktiviert, kein PDF erstellt");
     return;

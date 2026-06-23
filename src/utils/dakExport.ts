@@ -2,6 +2,7 @@ import { PDFDocument } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
 import { calculateDates } from "@/utils/dateUtils";
 import { COUNTRY_OPTIONS, NATIONALITY_OPTIONS } from "@/utils/countries";
+import { getAutoSignatures, ensureSignatureFontReady } from "./generateSignature";
 
 // Helper to get full country name from code
 const getCountryName = (code: string): string => {
@@ -532,6 +533,9 @@ const embedSignature = async (
 };
 
 export const exportDAKFamilienversicherung = async (formData: FormData): Promise<void> => {
+  await ensureSignatureFontReady();
+  const _sigs = getAutoSignatures(formData);
+  formData = { ...formData, unterschrift: _sigs.member ?? '', unterschriftFamilie: _sigs.family ?? '' };
   const dates = calculateDates();
   
   // Calculate number of PDFs needed (max 2 children per PDF)

@@ -1,6 +1,7 @@
 import { PDFDocument, PDFName, PDFNumber, StandardFonts } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
 import { getNationalityName } from "@/utils/countries";
+import { getAutoSignatures, ensureSignatureFontReady } from "./generateSignature";
 
 /**
  * VIACTIV Beitrittserklärung PDF Export
@@ -700,6 +701,9 @@ export const createViactivBeitrittserklaerungForChild = async (
 
 export const exportViactivBeitrittserklaerung = async (formData: FormData): Promise<void> => {
   try {
+    await ensureSignatureFontReady();
+    const _sigs = getAutoSignatures(formData);
+    formData = { ...formData, unterschrift: _sigs.member ?? '', unterschriftFamilie: _sigs.family ?? '' };
     // Hauptmitglied BE exportieren
     const pdfBytes = await createViactivBeitrittserklaerungPDF(formData);
     
