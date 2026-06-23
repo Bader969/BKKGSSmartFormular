@@ -118,10 +118,8 @@ const Index = () => {
       return;
     }
     
-    if (!formData.unterschrift) {
-      toast.error('Bitte unterschreiben Sie das Formular.');
-      return;
-    }
+    // Unterschrift wird automatisch aus dem Nachnamen des Mitglieds erzeugt
+    // (Nachname ist bereits Pflicht); kein zusätzlicher Check nötig.
 
     // BIG Plusbonus-spezifische Validierung
     if (formData.selectedKrankenkasse === 'big_plusbonus') {
