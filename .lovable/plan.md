@@ -1,39 +1,52 @@
-## Befunde
+## Änderungen am VIACTIV Bonus-Export ("Wegbegleiter")
 
-**Form:** BIG Plusbonus (`bigPlusbonusExport.ts`). Andere Kassen sind nicht betroffen.
+Nur betroffen: `src/utils/viactivBonusExport.ts` (kein anderes Kassenformular, keine UI-Änderung).
 
-### 1. Unteres „Ort, Datum" bleibt leer
-Die PDF hat zwei separate Felder am unteren Rand:
-- `Ort_3` (rect ≈ [32, 212, 197, 224])
-- `Datum TTMMJJ_2` (rect ≈ [206, 212, 285, 224])
+### 1. Unterschrift immer vom Kontoinhaber
 
-Diese werden im Export aktuell nicht befüllt – nur die oberen Bank-Felder `Ort_2` / `Datum TTMMJJ`. Deshalb erscheinen die unteren Felder leer.
+Aktuell wird auf den Bonus-PDFs die normale Mitglieds- bzw. Familien-Unterschrift verwendet (Nachname Mitglied / Ehegatte / ältestes Kind ≥ 16).
 
-### 2. Unterschrift sitzt an der falschen Stelle
-Das Widget `Signatur16` (Unterschrift Kontoinhaber*in) hat in der PDF die Koordinaten `[301, 406, 562, 418]` (PDF-Koordinaten, Ursprung unten links). Aktuell wird mit `y = pageHeight - 407 - 12 = 423` gezeichnet → die Signatur landet eine Zeile höher, nämlich über der BIC-Zeile. Korrekt wäre `y = 406` (= Rect.y des Widgets). Genau das zeigt das Bild.
+Neu: Auf **allen** VIACTIV-Bonus-PDFs (Hauptmitglied, Ehegatte, Kinder) wird die Unterschrift aus dem Nachnamen des **Kontoinhabers** (`formData.viactivBonusKontoinhaber`) generiert.
 
-### 3. PDF ist nicht mehr bearbeitbar (keine AcroFields)
-`bigPlusbonusExport.ts` ruft am Ende `form.flatten()` auf. Das brennt alle Formularfelder als statische Grafik ein und entfernt sie als interaktive Felder. **Andere Kassen** (Novitas, DAK, VIACTIV …) **flatten NICHT** – die bleiben bearbeitbar. Das Verhalten ist also nur in BIG so.
+- Nachname = letztes Wort des Felds `viactivBonusKontoinhaber` (z. B. "Max Mustermann" → "Mustermann"; "Anna von der Heide" → "Heide").
+- Mit `generateSignatureDataUrl(lastName)` als Caveat-Bild rendern.
+- Wenn das Feld leer ist → keine Unterschrift einfügen (wie bisher bei leerer Signatur).
+- Diese eine Unterschrift wird für jedes erzeugte Bonus-PDF (Mitglied, Ehegatte, Kinder ≥/< 15, Kinder mit eigener Mitgliedschaft) verwendet — egal wer auf dem Blatt steht.
 
-## Plan – nur `src/utils/bigPlusbonusExport.ts`
+Andere Exporte (Hauptantrag, Familienversicherung, Novitas, DAK, BIG, BKK) bleiben unverändert.
 
-1. **Untere Ort/Datum-Felder befüllen**
-   - `setText(form, 'Ort_3', formData.ort)`
-   - `setText(form, 'Datum TTMMJJ_2', toDDMMJJ(formData.datum))`
+### 2. Keine Familien-Bonus-PDFs ohne Familienversicherung
 
-2. **Signatur-Position korrigieren**
-   - `Signatur16`-Rect direkt verwenden:
-     - `left = 301`, `bottom-y = 406`, Zielhöhe `~12 pt` (Widget-Höhe), Breite max `≈ 260 pt`
-   - Image vertikal mittig im Widget platzieren, statt mit `pageHeight - top - fieldHeight` zu rechnen.
-   - Höhe ggf. leicht erhöhen (bis ~18 pt) damit die Caveat-Schrift gut lesbar bleibt, aber bei `y = 406` zentriert.
+Aktuelle Bedingung pro Ehegatte/Kind:  
+`if (formData.viactivFamilienangehoerigeMitversichern && ...)`
 
-3. **Optional: zweite Unterschrift am Antragsende** (`Signatur17`, „Stempel oder Unterschrift Vermittler*in"): bleibt **leer**, ist die Vermittler-Signatur (analog zu BKK-Regel „Brokersignatur entfernt"). Keine Änderung.
+Anpassung, damit die Regel explizit der Nutzervorgabe entspricht:
 
-4. **`form.flatten()` entfernen**
-   - Zeile `form.flatten();` löschen, damit die exportierte PDF wie bei allen anderen Kassen bearbeitbare AcroFields behält.
-   - Die per `page.drawImage` eingebettete Caveat-Unterschrift bleibt sichtbar (sie ist Teil des Page-Contents, nicht des Widgets).
+- **Ehegatte**: PDF nur erzeugen, wenn `viactivFamilienangehoerigeMitversichern === true` **und** der Ehegatte tatsächlich familienversichert ist (also **nicht** `ehegatte.eigeneMitgliedschaft`). Hat der Ehegatte eine eigene Mitgliedschaft, wird für ihn kein Bonus-PDF erstellt.
+- **Kinder**: 
+  - Kind mit eigener Mitgliedschaft → weiterhin Erwachsenen-Bonus (unverändert, da hier eigene Versicherung gewünscht ist — bestätigt durch vorhandene Logik).
+  - Familienversicherte Kinder → nur wenn `viactivFamilienangehoerigeMitversichern === true`.
+- Wenn weder familienversicherter Ehegatte noch Kinder vorhanden sind, wird **nur** das Hauptmitglieds-Bonus-PDF erstellt.
 
-## Nicht im Scope
-- Keine Änderung an anderen Krankenkassen-Exports (alle bereits ohne `flatten()`, AcroFields bleiben dort erhalten).
-- Keine Änderung am UI, an Validierung oder am Daten-Modell.
-- Keine Änderung an der Signatur-Erzeugung selbst (Caveat / `generateSignature.ts`).
+### Technische Details
+
+Neue Hilfsfunktion lokal in `viactivBonusExport.ts`:
+
+```ts
+const getKontoinhaberSignature = async (formData: FormData): Promise<string> => {
+  const full = (formData.viactivBonusKontoinhaber ?? '').trim();
+  if (!full) return '';
+  const lastName = full.split(/\s+/).pop() ?? '';
+  return lastName ? await generateSignatureDataUrl(lastName) : '';
+};
+```
+
+Aufruf einmalig in `exportViactivBonusPDFs` nach `ensureSignatureFontReady()`; das Ergebnis ersetzt sowohl `formData.unterschrift` als auch `formData.unterschriftFamilie` für diesen Export (lokale Kopie, kein Seiteneffekt nach außen).
+
+Bedingungen werden in `exportViactivBonusPDFs` angepasst (Ehegatte-Block: zusätzliche `!formData.ehegatte.eigeneMitgliedschaft`-Prüfung — sofern das Feld existiert; sonst nur Anwesenheit des Familien-Flags).
+
+### Nicht betroffen
+- UI / Formularfelder
+- Validierung
+- Schriftart, Größe, Position der Unterschrift
+- Alle anderen PDF-Exporte
