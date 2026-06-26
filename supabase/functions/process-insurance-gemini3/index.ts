@@ -483,7 +483,9 @@ Wichtig:
       throw new Error('Keine Antwort von der KI erhalten');
     }
 
-    console.log('Raw AI response:', content);
+    // Note: AI response content contains PII (names, addresses, KV-Nummern, IBAN, etc.)
+    // and is intentionally NOT logged to avoid persisting personal data in function logs.
+    console.log('AI response received, length:', content.length);
 
     // Try to extract JSON from the response
     let extractedJson;
@@ -500,7 +502,7 @@ Wichtig:
       }
     }
 
-    console.log('Extracted JSON:', JSON.stringify(extractedJson, null, 2));
+    console.log('Extraction complete, top-level fields:', Object.keys(extractedJson).length);
 
     // Images/PDFs are processed in memory only - no storage
     // This ensures PII data is never persisted
