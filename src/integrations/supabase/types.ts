@@ -14,6 +14,92 @@ export type Database = {
   }
   public: {
     Tables: {
+      application_events: {
+        Row: {
+          application_id: string
+          created_at: string
+          event_type: string
+          id: string
+          ip_hash: string | null
+          meta: Json
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          event_type: string
+          id?: string
+          ip_hash?: string | null
+          meta?: Json
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          ip_hash?: string | null
+          meta?: Json
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_events_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      applications: {
+        Row: {
+          created_at: string
+          exported_at: string | null
+          id: string
+          krankenkasse: string
+          last_opened_at: string | null
+          payload_encrypted: string
+          payload_hash: string
+          payload_iv: string
+          pdf_count: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          exported_at?: string | null
+          id?: string
+          krankenkasse: string
+          last_opened_at?: string | null
+          payload_encrypted: string
+          payload_hash: string
+          payload_iv: string
+          pdf_count?: number
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          exported_at?: string | null
+          id?: string
+          krankenkasse?: string
+          last_opened_at?: string | null
+          payload_encrypted?: string
+          payload_hash?: string
+          payload_iv?: string
+          pdf_count?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

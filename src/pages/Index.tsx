@@ -8,7 +8,7 @@ import { RundumSicherPaketSection } from '@/components/RundumSicherPaketSection'
 import { ViactivSection } from '@/components/ViactivSection';
 import { BigPlusbonusSection } from '@/components/BigPlusbonusSection';
 import { Button } from '@/components/ui/button';
-import { FileDown, FileText, AlertCircle, Users, User, Building2, LogOut, ShieldCheck, Sparkles, ChevronRight } from 'lucide-react';
+import { FileDown, FileText, AlertCircle, Users, User, Building2, LogOut, ShieldCheck, Sparkles, ChevronRight, Save, Archive, Settings } from 'lucide-react';
 import { exportFilledPDF, exportRundumSicherPaketOnly } from '@/utils/pdfExport';
 import { exportViactivBeitrittserklaerung } from '@/utils/viactivExport';
 import { exportViactivFamilienversicherung } from '@/utils/viactivFamilyExport';
@@ -26,12 +26,19 @@ import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { FreitextImportDialog } from '@/components/FreitextImportDialog';
 import { DocumentMergeDialog } from '@/components/DocumentMergeDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { Link } from 'react-router-dom';
+import { useApplicationPersistence } from '@/hooks/useApplicationPersistence';
+import { useUserRole } from '@/hooks/useUserRole';
 
 const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [formData, setFormData] = useState<FormData>(createInitialFormData);
   const [isExporting, setIsExporting] = useState(false);
+  const [applicationId, setApplicationId] = useState<string | null>(null);
+  const { save, saving, markExported } = useApplicationPersistence();
+  const { isAdmin } = useUserRole();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
@@ -44,6 +51,21 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Hydrate from a previously decrypted application (loaded via /antraege)
+  useEffect(() => {
+    const raw = sessionStorage.getItem('loadedApplication');
+    if (!raw) return;
+    try {
+      const { id, payload } = JSON.parse(raw) as { id: string; payload: FormData };
+      setFormData(payload);
+      setApplicationId(id);
+      sessionStorage.removeItem('loadedApplication');
+      toast.success('Antrag geladen.');
+    } catch {
+      sessionStorage.removeItem('loadedApplication');
+    }
+  }, []);
+
   if (authLoading) {
     return <div className="min-h-screen flex items-center justify-center text-slate-500">Lädt…</div>;
   }
@@ -51,6 +73,16 @@ const Index = () => {
   if (!session) {
     return <LoginForm />;
   }
+
+  const handleSaveDraft = async () => {
+    try {
+      const app = await save({ applicationId, formData });
+      setApplicationId(app.id);
+      toast.success('Entwurf gespeichert.');
+    } catch {
+      toast.error('Konnte Entwurf nicht speichern.');
+    }
+  };
   
   const updateFormData = (updates: Partial<FormData>) => {
     setFormData(prev => {
@@ -260,11 +292,22 @@ const Index = () => {
     }
     
     setIsExporting(true);
+    let savedAppId = applicationId;
+    let pdfCount = 0;
     try {
+      // Auto-save before exporting so every export is tracked
+      try {
+        const app = await save({ applicationId, formData });
+        savedAppId = app.id;
+        if (!applicationId) setApplicationId(app.id);
+      } catch {
+        // Saving failure shouldn't block the PDF export
+      }
       // BIG Plusbonus Export
       if (formData.selectedKrankenkasse === 'big_plusbonus') {
         toast.info('BIG direkt gesund Plusbonus PDF wird erstellt...');
         await exportBigPlusbonus(formData);
+        pdfCount = 1;
         toast.success('BIG Plusbonus PDF erfolgreich exportiert!');
       }
       // VIACTIV Export
@@ -286,10 +329,12 @@ const Index = () => {
           await exportViactivBeitrittserklaerung(formData);
           await exportViactivFamilienversicherung(formData);
           await exportViactivBonusPDFs(formData);
+          pdfCount = numberOfBEs + numberOfFamilyPDFs + numberOfBonusPDFs;
         } else {
           toast.info('VIACTIV Beitrittserklärung und Bonus-PDF werden erstellt...');
           await exportViactivBeitrittserklaerung(formData);
           await exportViactivBonusPDFs(formData);
+          pdfCount = 2;
         }
         toast.success('VIACTIV PDF(s) erfolgreich exportiert!');
       }
@@ -298,6 +343,7 @@ const Index = () => {
         const numberOfPDFs = Math.max(1, Math.ceil(formData.kinder.length / 3));
         toast.info(`Es werden ${numberOfPDFs} Novitas Familienversicherungs-PDF(s) erstellt...`);
         await exportNovitasFamilienversicherung(formData);
+        pdfCount = numberOfPDFs;
         toast.success('Novitas BKK Familienversicherung erfolgreich exportiert!');
       }
       // DAK Export
@@ -305,6 +351,7 @@ const Index = () => {
         const numberOfPDFs = Math.max(1, Math.ceil(formData.kinder.length / 2)); // Nur 2 Kinder pro PDF!
         toast.info(`Es werden ${numberOfPDFs} DAK Familienversicherungs-PDF(s) erstellt...`);
         await exportDAKFamilienversicherung(formData);
+        pdfCount = numberOfPDFs;
         toast.success('DAK Familienversicherung erfolgreich exportiert!');
       }
       // BKK GS Export
@@ -312,13 +359,18 @@ const Index = () => {
         if (formData.mode === 'nur_rundum') {
           toast.info('Es wird 1 Rundum-Sicher-Paket-PDF erstellt.');
           await exportRundumSicherPaketOnly(formData);
+          pdfCount = 1;
         } else {
           const numberOfPDFs = Math.max(1, Math.ceil(formData.kinder.length / 3));
           const numberOfRundumPDFs = 1 + (formData.ehegatte.name ? 1 : 0) + formData.kinder.length;
           toast.info(`Es werden ${numberOfPDFs} Familienversicherungs-PDF(s) und ${numberOfRundumPDFs} Rundum-Sicher-Paket-PDF(s) erstellt.`);
           await exportFilledPDF(formData);
+          pdfCount = numberOfPDFs + numberOfRundumPDFs;
         }
         toast.success('PDF erfolgreich exportiert!');
+      }
+      if (savedAppId) {
+        try { await markExported(savedAppId, pdfCount); } catch { /* non-blocking */ }
       }
     } catch (error) {
       console.error('Export error:', error);
@@ -351,6 +403,15 @@ const Index = () => {
             <FreitextImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} selectedKrankenkasse={formData.selectedKrankenkasse} />
             <JsonImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} selectedKrankenkasse={formData.selectedKrankenkasse} />
             <div className="w-px h-6 bg-border/70 mx-1 hidden md:block" />
+            <Button asChild variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" title="Meine Anträge">
+              <Link to="/antraege"><Archive className="h-4 w-4" /><span className="hidden md:inline ml-1">Anträge</span></Link>
+            </Button>
+            {isAdmin && (
+              <Button asChild variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" title="Admin">
+                <Link to="/admin"><Settings className="h-4 w-4" /><span className="hidden md:inline ml-1">Admin</span></Link>
+              </Button>
+            )}
+            <ThemeToggle />
             <Button
               variant="ghost"
               size="sm"
@@ -583,20 +644,37 @@ const Index = () => {
                       <FileDown className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="font-medium text-foreground">Bereit zum Exportieren?</p>
-                      <p className="text-sm text-muted-foreground">Das ausgefüllte PDF wird heruntergeladen.</p>
+                      <p className="font-medium text-foreground">
+                        {applicationId ? 'Antrag wird aktualisiert' : 'Bereit zum Exportieren?'}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Jeder Export wird verschlüsselt gespeichert und im Audit-Log erfasst.
+                      </p>
                     </div>
                   </div>
-                  <Button
-                    type="button"
-                    size="lg"
-                    onClick={handleExport}
-                    disabled={isExporting}
-                    className="w-full md:w-auto gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8 shadow-card"
-                  >
-                    <FileDown className="h-5 w-5" />
-                    {isExporting ? 'Exportiere...' : 'PDF Exportieren'}
-                  </Button>
+                  <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                    <Button
+                      type="button"
+                      size="lg"
+                      variant="outline"
+                      onClick={handleSaveDraft}
+                      disabled={saving || isExporting}
+                      className="gap-2"
+                    >
+                      <Save className="h-4 w-4" />
+                      {saving ? 'Speichere…' : applicationId ? 'Aktualisieren' : 'Entwurf speichern'}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="lg"
+                      onClick={handleExport}
+                      disabled={isExporting}
+                      className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8 shadow-card"
+                    >
+                      <FileDown className="h-5 w-5" />
+                      {isExporting ? 'Exportiere…' : 'PDF Exportieren'}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </>

@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Lock, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface LoginFormProps {
   onLogin?: () => void;
@@ -14,6 +15,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,6 +33,22 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
       onLogin?.();
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReset = async () => {
+    if (!email.trim()) { toast.error('Bitte E-Mail oben eingeben.'); return; }
+    setResetting(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      toast.success('Reset-E-Mail gesendet (sofern ein Konto existiert).');
+    } catch {
+      toast.error('Konnte E-Mail nicht senden.');
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -97,6 +115,14 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
             <Button type="submit" disabled={loading} className="w-full h-11 text-base font-medium">
               {loading ? 'Anmelden…' : 'Anmelden'}
             </Button>
+            <button
+              type="button"
+              onClick={handleReset}
+              disabled={resetting}
+              className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {resetting ? 'Sende…' : 'Passwort vergessen?'}
+            </button>
           </form>
         </div>
       </div>

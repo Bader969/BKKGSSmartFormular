@@ -3,6 +3,7 @@
 ## Core
 - Krankenkasse-first workflow: UI, validation, and export depend on selected provider (VIACTIV, Novitas, DAK, BIG Plusbonus). Hide sections until selected.
 - No PII persistence: AI extraction uses ephemeral in-memory processing. Never persist documents to storage or databases.
+- Application records ARE persisted, but ONLY AES-GCM-encrypted via the `applications-api` edge function. Key lives only in `APPLICATIONS_ENCRYPTION_KEY` secret. `application_events.meta` must never contain PII.
 - Image integrity: Never apply auto-cropping or image enhancement in document merging or processing.
 - Mandatory contacts: Phone and Email are strictly mandatory for all applications; validate prior to submit.
 - UI Layout: "Vorname" must always appear before "Name" across all UI sections.
@@ -10,6 +11,7 @@
 
 ## Memories
 - [Architecture Provider Support](mem://architecture/multi-provider-support) — Dynamic Krankenkasse-first form adaptation
+- [Encrypted Applications Storage](mem://features/encrypted-applications-storage) — AES-GCM encrypted records, per-user + admin RLS, append-only audit log
 - [PDF Naming Conventions](mem://constraints/pdf-naming-conventions) — Provider-specific filename formats and multi-part splitting
 - [Address Validation](mem://constraints/address-validation-and-export) — Required address fields and BKK GS city extraction
 - [Import Dialogs](mem://auth/import-protection) — Unprotected access and setup for JSON/Freitext imports
