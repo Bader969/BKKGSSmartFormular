@@ -24,6 +24,10 @@ interface MemberSectionProps {
 }
 
 export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFormData }) => {
+  // BIG direkt: Plusbonus alleine = abgespecktes Formular.
+  // Sobald die Familienversicherung mitbeantragt wird, voller Datensatz wie bei BKK GS.
+  const bigFull = formData.selectedKrankenkasse === 'big_plusbonus' && formData.bigFamilienversicherung;
+  const isBigMinimal = formData.selectedKrankenkasse === 'big_plusbonus' && !bigFull;
   const familienstandOptions = [
     { value: 'ledig', label: 'Ledig' },
     { value: 'verheiratet', label: 'Verheiratet' },
@@ -59,7 +63,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
       </div>
       
       {/* Geburtsdatum, Geburtsort, Geburtsland - NICHT für Novitas */}
-      {formData.selectedKrankenkasse !== 'novitas' && formData.selectedKrankenkasse !== 'big_plusbonus' && (
+      {formData.selectedKrankenkasse !== 'novitas' && !isBigMinimal && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
           <FormField
             type="date"
@@ -77,7 +81,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
             value={formData.mitgliedGeburtsort}
             onChange={(value) => updateFormData({ mitgliedGeburtsort: value })}
             placeholder="z.B. Berlin"
-            required={formData.selectedKrankenkasse === 'viactiv'}
+            required={formData.selectedKrankenkasse === 'viactiv' || bigFull}
             validate={validateOrt}
           />
           <FormField
@@ -88,8 +92,8 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
             onChange={(value) => updateFormData({ mitgliedGeburtsland: value })}
             options={countries.map(c => ({ value: c.code, label: c.name }))}
             placeholder="Land auswählen"
-            required={formData.selectedKrankenkasse === 'viactiv'}
-            validate={formData.selectedKrankenkasse === 'viactiv' ? validateSelect : undefined}
+            required={formData.selectedKrankenkasse === 'viactiv' || bigFull}
+            validate={formData.selectedKrankenkasse === 'viactiv' || bigFull ? validateSelect : undefined}
           />
         </div>
       )}
@@ -140,7 +144,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
         </div>
       )}
       
-      {formData.selectedKrankenkasse !== 'big_plusbonus' && (
+      {!isBigMinimal && (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <FormField
           type="text"
@@ -171,7 +175,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
       </div>
       )}
       
-      {formData.selectedKrankenkasse !== 'big_plusbonus' && (
+      {!isBigMinimal && (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
         <FormField
           type="select"
@@ -208,7 +212,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
       )}
       
       {/* Static info display */}
-      {formData.selectedKrankenkasse !== 'big_plusbonus' && (
+      {!isBigMinimal && (
       <div className="mt-6 p-4 bg-card rounded-lg border">
         <h3 className="font-medium mb-3 text-foreground">Automatisch ausgefüllte Angaben:</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
