@@ -8,7 +8,7 @@ import { RundumSicherPaketSection } from '@/components/RundumSicherPaketSection'
 import { ViactivSection } from '@/components/ViactivSection';
 import { BigPlusbonusSection } from '@/components/BigPlusbonusSection';
 import { Button } from '@/components/ui/button';
-import { FileDown, FileText, AlertCircle, Users, User, Building2, LogOut } from 'lucide-react';
+import { FileDown, FileText, AlertCircle, Users, User, Building2, LogOut, ShieldCheck, Sparkles, ChevronRight } from 'lucide-react';
 import { exportFilledPDF, exportRundumSicherPaketOnly } from '@/utils/pdfExport';
 import { exportViactivBeitrittserklaerung } from '@/utils/viactivExport';
 import { exportViactivFamilienversicherung } from '@/utils/viactivFamilyExport';
@@ -329,59 +329,124 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-primary text-primary-foreground py-6 px-4 shadow-lg">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-3">
-              <FileText className="h-8 w-8" />
-              <h1 className="text-2xl md:text-3xl font-bold">
-                {getHeaderTitle()}
-              </h1>
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Sticky glass top bar */}
+      <header className="sticky top-0 z-40 border-b border-border/60 glass-bar">
+        <div className="max-w-6xl mx-auto px-4 lg:px-6 h-16 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-9 w-9 rounded-xl bg-gradient-hero text-primary-foreground flex items-center justify-center shadow-card shrink-0">
+              <ShieldCheck className="h-5 w-5" />
             </div>
-            <div className="flex items-center gap-2">
-              <DocumentMergeDialog />
-              <FreitextImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} selectedKrankenkasse={formData.selectedKrankenkasse} />
-              <JsonImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} selectedKrankenkasse={formData.selectedKrankenkasse} />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => supabase.auth.signOut()}
-                className="text-primary-foreground hover:bg-primary-foreground/10"
-                title="Abmelden"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
+            <div className="min-w-0">
+              <div className="font-display text-base md:text-lg font-semibold leading-tight truncate">
+                {getHeaderTitle()}
+              </div>
+              <div className="text-xs text-muted-foreground truncate hidden sm:block">
+                {getHeaderSubtitle()}
+              </div>
             </div>
           </div>
-          <p className="text-primary-foreground/80 text-sm md:text-base">
-            {getHeaderSubtitle()}
-          </p>
+          <div className="flex items-center gap-1 md:gap-2">
+            <DocumentMergeDialog />
+            <FreitextImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} selectedKrankenkasse={formData.selectedKrankenkasse} />
+            <JsonImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} selectedKrankenkasse={formData.selectedKrankenkasse} />
+            <div className="w-px h-6 bg-border/70 mx-1 hidden md:block" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => supabase.auth.signOut()}
+              className="text-muted-foreground hover:text-foreground"
+              title="Abmelden"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden md:inline ml-1">Abmelden</span>
+            </Button>
+          </div>
         </div>
       </header>
-      
-      {/* Info Banner */}
-      <div className="bg-secondary/10 border-b border-secondary/20 py-3 px-4">
-        <div className="max-w-5xl mx-auto flex items-start gap-3 text-sm">
-          <AlertCircle className="h-5 w-5 text-secondary shrink-0 mt-0.5" />
-          <div className="text-foreground/80">
-            <strong className="text-foreground">Automatisch ausgefüllt:</strong>{' '}
-            Bisherige Versicherung (eigene Mitgliedschaft), Anlass (Beginn Mitgliedschaft), 
-            Beginn (+3 Monate), Informationsblatt (Ja), Versicherung besteht weiter (bei BKK GS).
+
+      {/* Hero / context strip */}
+      <div className="bg-gradient-surface border-b border-border/60">
+        <div className="max-w-6xl mx-auto px-4 lg:px-6 py-6 md:py-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 text-xs font-medium text-accent bg-accent/10 px-2.5 py-1 rounded-full mb-3">
+              <Sparkles className="h-3.5 w-3.5" /> Smart-Antrag
+            </div>
+            <h1 className="font-display text-2xl md:text-3xl font-semibold tracking-tight text-foreground">
+              {formData.selectedKrankenkasse ? getHeaderSubtitle() : 'Bitte wählen Sie eine Krankenkasse'}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
+              <AlertCircle className="inline h-4 w-4 mr-1 -mt-0.5 text-accent" />
+              Automatisch ausgefüllt: bisherige Versicherung, Anlass, Beginn (+3 Monate), Informationsblatt — und vieles mehr.
+            </p>
           </div>
         </div>
       </div>
-      
+
       {/* Main Form */}
-      <main className="max-w-5xl mx-auto px-4 py-8">
+      <main className="max-w-6xl mx-auto px-4 lg:px-6 py-8 grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-8">
+        {/* Side TOC (desktop only) */}
+        <aside className="hidden lg:block">
+          <nav className="sticky top-24 space-y-1 text-sm">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 px-3">
+              Abschnitte
+            </div>
+            {[
+              { id: 'sec-krankenkasse', label: 'Krankenkasse' },
+              ...(formData.selectedKrankenkasse ? [{ id: 'sec-mitglied', label: 'Mitglied' }] : []),
+              ...(formData.selectedKrankenkasse && formData.selectedKrankenkasse !== 'big_plusbonus' && !(formData.selectedKrankenkasse === 'bkk_gs' && formData.mode === 'nur_rundum') ? [
+                { id: 'sec-ehegatte', label: 'Ehegatte' },
+                { id: 'sec-kinder', label: 'Kinder' },
+              ] : []),
+              ...(formData.selectedKrankenkasse === 'bkk_gs' ? [{ id: 'sec-rundum', label: 'Rundum-Sicher' }] : []),
+              ...(formData.selectedKrankenkasse === 'big_plusbonus' ? [{ id: 'sec-bigplus', label: 'Plusbonus' }] : []),
+              ...(formData.selectedKrankenkasse ? [{ id: 'sec-signature', label: 'Unterschrift' }] : []),
+            ].map((item) => (
+              <a
+                key={item.id}
+                href={`#${item.id}`}
+                className="flex items-center justify-between px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors group"
+              >
+                <span>{item.label}</span>
+                <ChevronRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </a>
+            ))}
+          </nav>
+        </aside>
+
+        <div>
         <form onSubmit={(e) => e.preventDefault()} className="space-y-2">
           {/* Krankenkassen-Auswahl */}
-          <div className="bg-card rounded-xl shadow-sm border p-6 mb-4">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary" />
-              Krankenkasse auswählen
-            </h2>
+          <div id="sec-krankenkasse" className="bg-card rounded-2xl shadow-card border border-border/60 p-6 mb-4 scroll-mt-24 animate-fade-in-up">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-9 w-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <Building2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="font-display text-lg font-semibold leading-tight">Krankenkasse auswählen</h2>
+                <p className="text-xs text-muted-foreground">Das Formular passt sich automatisch an.</p>
+              </div>
+            </div>
+            {/* Quick-pick chips */}
+            <div className="flex flex-wrap gap-2 mb-3">
+              {KRANKENKASSEN_OPTIONS.map((opt) => {
+                const active = formData.selectedKrankenkasse === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => updateFormData({ selectedKrankenkasse: opt.value as Krankenkasse })}
+                    className={`px-3 py-1.5 rounded-full text-sm border transition-all ${
+                      active
+                        ? 'bg-primary text-primary-foreground border-primary shadow-card'
+                        : 'bg-card text-foreground border-border hover:border-accent hover:text-accent'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
             <Select
               value={formData.selectedKrankenkasse}
               onValueChange={(value) => updateFormData({ selectedKrankenkasse: value as Krankenkasse })}
@@ -397,7 +462,7 @@ const Index = () => {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-sm text-muted-foreground mt-2">
+            <p className="text-sm text-muted-foreground mt-3">
               {formData.selectedKrankenkasse === 'big_plusbonus'
                 ? 'Es wird der BIG direkt gesund Plusbonus-Antrag erstellt.'
                 : formData.selectedKrankenkasse === 'dak' 
@@ -415,7 +480,7 @@ const Index = () => {
             <>
               {/* Modus-Auswahl (nur für BKK GS) */}
               {formData.selectedKrankenkasse === 'bkk_gs' && (
-                <div className="bg-card rounded-xl shadow-sm border p-6 mb-4">
+                <div className="bg-card rounded-2xl shadow-card border border-border/60 p-6 mb-4 animate-fade-in-up">
                   <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <FileText className="h-5 w-5 text-primary" />
                     Formular-Modus auswählen
@@ -427,10 +492,10 @@ const Index = () => {
                   >
                     <Label
                       htmlFor="mode-family"
-                      className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                      className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
                         formData.mode === 'familienversicherung_und_rundum'
-                          ? 'border-primary bg-primary/5'
-                          : 'border-muted hover:border-primary/50'
+                          ? 'border-primary bg-primary/5 shadow-card'
+                          : 'border-border hover:border-accent/60'
                       }`}
                     >
                       <RadioGroupItem value="familienversicherung_und_rundum" id="mode-family" className="mt-1" />
@@ -446,10 +511,10 @@ const Index = () => {
                     </Label>
                     <Label
                       htmlFor="mode-single"
-                      className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                      className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
                         formData.mode === 'nur_rundum'
-                          ? 'border-primary bg-primary/5'
-                          : 'border-muted hover:border-primary/50'
+                          ? 'border-primary bg-primary/5 shadow-card'
+                          : 'border-border hover:border-accent/60'
                       }`}
                     >
                       <RadioGroupItem value="nur_rundum" id="mode-single" className="mt-1" />
@@ -467,64 +532,67 @@ const Index = () => {
                 </div>
               )}
               
-              <MemberSection formData={formData} updateFormData={updateFormData} />
+              <div id="sec-mitglied"><MemberSection formData={formData} updateFormData={updateFormData} /></div>
               
               {/* BKK GS spezifische Sektionen */}
               {formData.selectedKrankenkasse === 'bkk_gs' && (
                 <>
                   {formData.mode === 'familienversicherung_und_rundum' && (
                     <>
-                      <SpouseSection formData={formData} updateFormData={updateFormData} />
-                      <ChildrenSection formData={formData} updateFormData={updateFormData} />
+                      <div id="sec-ehegatte"><SpouseSection formData={formData} updateFormData={updateFormData} /></div>
+                      <div id="sec-kinder"><ChildrenSection formData={formData} updateFormData={updateFormData} /></div>
                     </>
                   )}
-                  <RundumSicherPaketSection formData={formData} updateFormData={updateFormData} />
+                  <div id="sec-rundum"><RundumSicherPaketSection formData={formData} updateFormData={updateFormData} /></div>
                 </>
               )}
               
               {/* VIACTIV-spezifische Sektionen */}
               {formData.selectedKrankenkasse === 'viactiv' && (
-                <ViactivSection formData={formData} updateFormData={updateFormData} />
+                <div id="sec-ehegatte"><ViactivSection formData={formData} updateFormData={updateFormData} /></div>
               )}
               
               {/* Novitas BKK spezifische Sektionen */}
               {formData.selectedKrankenkasse === 'novitas' && (
                 <>
-                  <SpouseSection formData={formData} updateFormData={updateFormData} />
-                  <ChildrenSection formData={formData} updateFormData={updateFormData} />
+                  <div id="sec-ehegatte"><SpouseSection formData={formData} updateFormData={updateFormData} /></div>
+                  <div id="sec-kinder"><ChildrenSection formData={formData} updateFormData={updateFormData} /></div>
                 </>
               )}
               
               {/* DAK spezifische Sektionen */}
               {formData.selectedKrankenkasse === 'dak' && (
                 <>
-                  <SpouseSection formData={formData} updateFormData={updateFormData} />
-                  <ChildrenSection formData={formData} updateFormData={updateFormData} />
+                  <div id="sec-ehegatte"><SpouseSection formData={formData} updateFormData={updateFormData} /></div>
+                  <div id="sec-kinder"><ChildrenSection formData={formData} updateFormData={updateFormData} /></div>
                 </>
               )}
               
               {/* BIG direkt gesund (Plusbonus) spezifische Sektionen */}
               {formData.selectedKrankenkasse === 'big_plusbonus' && (
-                <BigPlusbonusSection formData={formData} updateFormData={updateFormData} />
+                <div id="sec-bigplus"><BigPlusbonusSection formData={formData} updateFormData={updateFormData} /></div>
               )}
 
-              <SignatureSection formData={formData} updateFormData={updateFormData} />
+              <div id="sec-signature"><SignatureSection formData={formData} updateFormData={updateFormData} /></div>
               
               {/* Export Button */}
-              <div className="sticky bottom-4 pt-4">
-                <div className="bg-card rounded-xl shadow-2xl border p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-                  <div className="text-center md:text-left">
-                    <p className="font-medium text-foreground">Bereit zum Exportieren?</p>
-                    <p className="text-sm text-muted-foreground">
-                      Das ausgefüllte PDF wird heruntergeladen.
-                    </p>
+              <div className="sticky bottom-4 pt-4 z-30">
+                <div className="glass-bar rounded-2xl shadow-elevated border border-border/70 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div className="text-center md:text-left flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                      <FileDown className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">Bereit zum Exportieren?</p>
+                      <p className="text-sm text-muted-foreground">Das ausgefüllte PDF wird heruntergeladen.</p>
+                    </div>
                   </div>
                   <Button
                     type="button"
                     size="lg"
                     onClick={handleExport}
                     disabled={isExporting}
-                    className="w-full md:w-auto gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8"
+                    className="w-full md:w-auto gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8 shadow-card"
                   >
                     <FileDown className="h-5 w-5" />
                     {isExporting ? 'Exportiere...' : 'PDF Exportieren'}
@@ -534,15 +602,13 @@ const Index = () => {
             </>
           )}
         </form>
+        </div>
       </main>
       
       {/* Footer */}
-      <footer className="bg-muted py-6 px-4 mt-8 border-t">
-        <div className="max-w-5xl mx-auto text-center text-sm text-muted-foreground">
-          <p>
-            Dieses Online-Formular dient zur Unterstützung beim Ausfüllen des Fragebogens 
-            für die Familienversicherung der BKK GILDEMEISTER SEIDENSTICK.
-          </p>
+      <footer className="border-t border-border/60 py-6 px-4 mt-8">
+        <div className="max-w-6xl mx-auto text-center text-xs text-muted-foreground">
+          Smart-Formular · Unterstützt das Ausfüllen von Krankenkassen-Anträgen.
         </div>
       </footer>
     </div>
