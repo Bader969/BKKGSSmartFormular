@@ -169,6 +169,13 @@ const Index = () => {
         toast.error('Bitte alle Bankdaten (Kontoinhaber, Kreditinstitut, IBAN, BIC, Ort, Datum) ausfüllen.');
         return;
       }
+      if (formData.bigFamilienversicherung) {
+        if (!formData.mitgliedKvNummer) { toast.error('Bitte KV-Nummer eingeben.'); return; }
+        if (!formData.mitgliedKrankenkasse) { toast.error('Bitte Name der bisherigen Krankenkasse eingeben.'); return; }
+        if (!formData.familienstand) { toast.error('Bitte Familienstand auswählen.'); return; }
+        if (!formData.telefon || !formData.email) { toast.error('Telefon und E-Mail sind Pflicht.'); return; }
+        if (!formData.mitgliedGeburtsdatum) { toast.error('Bitte Geburtsdatum des Mitglieds eingeben.'); return; }
+      }
     }
     
     // VIACTIV-spezifische Validierung
@@ -306,10 +313,18 @@ const Index = () => {
       }
       // BIG Plusbonus Export
       if (formData.selectedKrankenkasse === 'big_plusbonus') {
-        toast.info('BIG direkt gesund Plusbonus PDF wird erstellt...');
-        await exportBigPlusbonus(formData);
-        pdfCount = 1;
-        toast.success('BIG Plusbonus PDF erfolgreich exportiert!');
+        if (formData.bigFamilienversicherung) {
+          toast.info('BIG Familienversicherung + Plusbonus PDFs werden erstellt...');
+          await exportBigFamilienversicherung(formData);
+          await exportBigPlusbonus(formData);
+          pdfCount = 2 + Math.max(0, Math.ceil(Math.max(0, formData.kinder.length - 3) / 3));
+          toast.success('BIG PDFs erfolgreich exportiert!');
+        } else {
+          toast.info('BIG direkt gesund Plusbonus PDF wird erstellt...');
+          await exportBigPlusbonus(formData);
+          pdfCount = 1;
+          toast.success('BIG Plusbonus PDF erfolgreich exportiert!');
+        }
       }
       // VIACTIV Export
       else if (formData.selectedKrankenkasse === 'viactiv') {
