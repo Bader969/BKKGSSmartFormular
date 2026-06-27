@@ -267,6 +267,9 @@ export interface FormData {
   bigHoeheEuro: string;
   bigVersicherungsarten: BigVersicherungsarten;
   bigMitversicherte: BigMitversicherte[];
+
+  // BIG direkt — zusätzlich Familienversicherung beantragen?
+  bigFamilienversicherung: boolean;
 }
 
 export const createEmptyArztDaten = (): ArztDaten => ({
@@ -388,5 +391,6 @@ export const createInitialFormData = (): FormData => {
       grundfaehigkeit: false,
     },
     bigMitversicherte: [],
+    bigFamilienversicherung: false,
   };
 };
