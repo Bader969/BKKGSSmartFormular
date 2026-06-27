@@ -1,120 +1,110 @@
 
-# Plan: Modernes Formular-Redesign ("Navy Trust") + Roadmap
+# Phase 2 — Backend, Records, Login-Tracking + Dark-Mode-Toggle
 
-Fokus jetzt: **UI/UX-Redesign**. Backend-Features (Antrags-Records, Login-Tracking, weitere Ideen) sind als Phase 2 skizziert und werden in einem späteren Plan umgesetzt — keine Datenbankänderungen in dieser Iteration. Das bestehende Verhalten (PDF-Export, AI-Capture, Validierung, alle KK-Provider-Regeln) bleibt **unverändert**.
-
----
-
-## Phase 1 — Redesign (jetzt)
-
-### Design-System "Navy Trust"
-
-Tokens werden in `src/index.css` und `tailwind.config.ts` als HSL-Variablen gesetzt (keine hardcoded Farben in Components, keine Verletzung der Memory-Regeln):
-
-- `--background` Off-White `#f8fafc`
-- `--foreground` Deep Navy `#0f1b3d`
-- `--primary` `#1e3a5f` / `--primary-foreground` `#e8edf3`
-- `--accent` `#3b6fa0` (Fokus, aktive Schritte, Links)
-- `--surface` / `--surface-elevated` für Karten in zwei Tiefenstufen
-- `--success` ruhiges Teal, `--warning` Bernstein, `--destructive` gedämpftes Rot — alle passend zur Navy-Palette
-- Schatten: `--shadow-card`, `--shadow-elevated`, `--shadow-focus-ring` (Navy-getönt)
-- Radius-Skala 8/12/16, konsistente Spacing-Skala
-- Typografie: **Inter Tight** (Headings) + **Inter** (Body) via `@fontsource` — seriös, sehr lesbar für lange Formulare
-- Dark Mode vorbereitet (Tokens gespiegelt), default bleibt Light
-
-`FormSection.tsx` wird auf semantische Tokens umgestellt — die jetzigen hardcoded Hex-Farben (`#f0f4f8`, `#4a6fa5` …) verschwinden, die fünf Varianten (`member` / `spouse` / `child` / `signature` / `info`) bleiben erhalten, werden aber zu Token-Mappings.
-
-### Layout-Shell
-
-- Sticky **Top-Bar** mit App-Titel (dynamisches Header-Label je KK bleibt), Krankenkassen-Picker, User-Menü-Platzhalter, Dark-Mode-Toggle
-- Zweispaltiges Desktop-Layout:
-  - **Links**: schmale Sidebar mit Schritt-Navigation (Mitglied → Ehegatte → Kinder → Zusatzmodule → Unterschrift → Export). Aktiver Schritt highlighted, erledigte Schritte mit Check, Fehler mit rotem Dot.
-  - **Rechts**: aktueller Abschnitt als großzügige Karte mit max. ~720px Lesebreite
-- Mobile: Sidebar wird zu einem horizontalen Progress-Stepper oben, Sheet-Drawer für Sprungnavigation
-- **Sticky Bottom Action Bar** auf mobile (Speichern/Weiter/Export), auf Desktop dezent rechts unten
-
-### Interaktive Form-Patterns
-
-- **Floating Labels** + animierte Fokus-States (Border-Glow in `--accent`)
-- Inline-Validierung mit ruhigem Fade-in der Fehlermeldung, Erfolgs-Checkmark rechts im Feld
-- Section-Cards mit subtilem Hover-Lift und Tastatur-Fokus-Ring
-- **Auto-Save-Indicator** ("Entwurf gespeichert vor 3 s") — rein lokal (localStorage), kein Backend
-- **Smart Disclosure**: optionale Blöcke (z. B. Ehegatte, Kinder, VIACTIV-Familienversicherung) klappen mit Motion-Animation auf/zu, Provider-abhängige Sichtbarkeit bleibt 1:1 erhalten
-- **Command-Palette (⌘K)**: schnelles Springen zu Abschnitten, "Antrag exportieren", "JSON-Import öffnen"
-- Verbesserte Datei-Upload-Zonen (Drag & Drop, Vorschau-Thumbnails) für Document-Merge & AI-Capture
-- Toast-Stack (Sonner) mit konsistenter Navy-Optik
-- Reduced-Motion respektieren (`prefers-reduced-motion`)
-
-### Accessibility & Responsiveness
-
-- Tastatur-Navigation durch alle Schritte, sichtbare Fokus-Ringe
-- ARIA-Live-Region für Validierungs- und Auto-Save-Meldungen
-- Kontrast WCAG AA gegen alle Tokens geprüft
-- Breakpoints: 360 / 768 / 1024 / 1440; Formularfelder einspaltig <768, zweispaltig ≥1024
-- Touch-Targets ≥ 44 px
-
-### Betroffene Dateien (nur Frontend/Presentation)
-
-- `src/index.css` — neue Token-Schicht
-- `tailwind.config.ts` — Token-Mapping, Schatten, Radius
-- `src/main.tsx` — `@fontsource/inter`, `@fontsource/inter-tight`
-- `src/App.tsx` / `src/pages/Index.tsx` — neue Shell mit Sidebar + Top-Bar
-- `src/components/FormSection.tsx` — Token-basiert
-- `src/components/FormField.tsx` — Floating Label + Inline-Validation-Style
-- `src/components/MemberSection.tsx`, `SpouseSection.tsx`, `ChildrenSection.tsx`, `ViactivSection.tsx`, `BigPlusbonusSection.tsx`, `RundumSicherPaketSection.tsx`, `SignatureSection.tsx` — Layout-/Spacing-Refresh, keine Logik-Änderungen
-- `src/components/DocumentMergeDialog.tsx`, `JsonImportDialog.tsx`, `FreitextImportDialog.tsx` — Dialog-Refresh
-- `src/components/LoginForm.tsx` — visuell an Navy Trust angepasst
-- Neu: `src/components/AppShell.tsx`, `src/components/StepSidebar.tsx`, `src/components/CommandPalette.tsx`, `src/components/AutoSaveIndicator.tsx`
-
-**Nicht angefasst**: alle `src/utils/*Export.ts`, `krankenkassenMapping.ts`, `validation.ts`, `generateSignature.ts`, Edge Function, alle KK-spezifischen Regeln, JSON/Freitext-Import-Logik.
+Bestehende Geschäftslogik (PDF-Export, KK-Mapping, Validierung, AI-Capture, Signaturen) bleibt **unverändert**. Memory-Regel "No PII persistence" wird durch eine neue Regel ersetzt: *PII nur AES-GCM-verschlüsselt, RLS pro Bearbeiter + Admin, Audit-Log Pflicht, Klartext nie in DB-Spalten*.
 
 ---
 
-## Phase 2 — Backend & Records (späterer Plan)
+## 1. Dark-Mode-Toggle (klein, sofort)
 
-Nur als Skizze, **wird nicht jetzt umgesetzt** — braucht eigene Freigabe, besonders wegen PII.
-
-### Antrags-Records ("Vollständige Daten verschlüsselt speichern")
-
-- Neue Tabelle `public.applications`: `id`, `user_id`, `krankenkasse`, `status` (draft/exported), `payload_encrypted` (bytea, AES-GCM via pgsodium oder Vault), `payload_iv`, `pdf_count`, `exported_at`, `created_at`, `updated_at`
-- RLS: Bearbeiter sieht nur eigene (`auth.uid() = user_id`), Admin sieht alle via `private.has_role(auth.uid(),'admin')`
-- Neue Tabelle `public.application_events`: Audit-Log (created/updated/exported/imported) mit `user_id`, `application_id`, `event_type`, `meta`, `created_at` — append-only
-- Edge Function für Encrypt/Decrypt, damit Schlüssel nie im Client liegt
-- **Wichtig**: bestehende Memory-Regel "No PII persistence" muss ausdrücklich aufgehoben und durch eine neue Regel ("PII nur verschlüsselt, RLS pro Bearbeiter + Admin, Audit-Log Pflicht") ersetzt werden
-
-### UI für Records
-
-- Neue Route `/antraege`: Tabelle mit Filter (KK, Status, Datum, Bearbeiter für Admin), Detail-Drawer mit Entschlüsselung on-demand, Re-Export-Button, Audit-Timeline
-
-### Login & Rollen
-
-- Bestehender Login bleibt, ergänzt um Self-Service Passwort-Reset (`/reset-password`)
-- Optional Google-Sign-in (Lovable Cloud managed)
-- Admin-Bereich `/admin`: Nutzer-Liste, Rollen-Zuweisung (`user_roles` ist bereits da)
-
-### Kreative Zusatzvorschläge
-
-- **Entwurfs-Versionierung**: jeder Speicherstand als Snapshot, "Vorherige Version wiederherstellen"
-- **Vorlagen**: häufige Familienkonstellationen als Template speichern (ohne PII, nur Struktur)
-- **Duplikat-Erkennung**: Hash auf KV-Nummer + Geburtsdatum, warnt vor doppeltem Antrag
-- **Bearbeiter-Übergabe**: Antrag einem Kollegen zuweisen, mit Kommentar-Thread
-- **Statistik-Dashboard** für Admin: Anträge pro KK/Monat, durchschnittliche Bearbeitungszeit
-- **Bulk-Export**: alle Anträge einer Woche als ZIP
-- **Webhook/Email-Benachrichtigung** bei abgeschlossenem Antrag
-- **Mehrsprachigkeit** (DE/EN) vorbereiten
-- **PWA-Modus** mit Offline-Entwürfen
-- **Audit-Export** als CSV für Compliance
+- Neuer Hook `src/hooks/useTheme.ts`: liest `localStorage.theme` ("light" | "dark" | "system"), respektiert `prefers-color-scheme`, setzt `class="dark"` auf `<html>`.
+- Neue Komponente `src/components/ThemeToggle.tsx`: Sun/Moon-Icon-Button (lucide), Dropdown mit Light / Dark / System.
+- Einbindung in die sticky Top-Bar in `src/pages/Index.tsx` (rechts neben User-Menü-Platzhalter).
+- Tokens sind bereits in `src/index.css` für `.dark` definiert — keine weiteren Style-Änderungen nötig.
 
 ---
 
-## Reihenfolge der Umsetzung (Phase 1)
+## 2. Datenbank (Migration)
 
-1. Token-Schicht + Fonts + Tailwind-Config
-2. App-Shell (Top-Bar, Sidebar, Bottom-Action-Bar, Responsive)
-3. `FormSection` + `FormField` auf neue Tokens
-4. Section-Komponenten visuell refreshen (keine Logik)
-5. Dialoge & Login-Screen anpassen
-6. Command-Palette + Auto-Save-Indicator
-7. Accessibility-/Responsive-Pass + Smoke-Test im Preview
+### Tabelle `public.applications`
+Felder (Domain): `user_id`, `krankenkasse`, `status` (`draft` / `exported`), `payload_encrypted` (bytea), `payload_iv` (bytea), `payload_hash` (text, SHA-256 für Duplikat-Erkennung), `pdf_count`, `exported_at`, `last_opened_at`.
+- RLS: SELECT/UPDATE/DELETE wenn `auth.uid() = user_id` ODER `private.has_role(auth.uid(),'admin')`; INSERT nur eigene.
+- Standard-GRANTs für `authenticated` + `service_role`, kein `anon`.
+- `updated_at`-Trigger.
 
-Nach Freigabe starte ich mit Schritt 1.
+### Tabelle `public.application_events` (Audit-Log, append-only)
+Felder: `application_id`, `user_id`, `event_type` (`created` / `updated` / `exported` / `opened` / `decrypted` / `deleted`), `meta` (jsonb, **keine PII**), `ip_hash`, `user_agent`.
+- RLS: SELECT eigene + Admin; INSERT nur via Edge Function (service_role).
+- Kein UPDATE/DELETE — Trigger blockiert.
+
+### Verschlüsselungsschlüssel
+Master-Key als neuer Secret `APPLICATIONS_ENCRYPTION_KEY` (32-Byte base64). Wird beim Anlegen der Edge Function angefragt (`add_secret`-Tool). Nie im Client, nie in DB-Spalten, nie geloggt.
+
+---
+
+## 3. Edge Functions
+
+- `applications-save` — nimmt JSON-Payload + `krankenkasse` + optional `application_id` entgegen, verifiziert User-Session, verschlüsselt mit AES-GCM-256 (Web Crypto), schreibt Row, schreibt `created`/`updated`-Event.
+- `applications-load` — gibt **Liste** ohne Klartext zurück (nur Metadaten).
+- `applications-decrypt` — entschlüsselt eine einzelne Row on-demand, schreibt `decrypted`-Event, gibt Klartext nur in der Response zurück (nie in DB).
+- `applications-mark-exported` — nach erfolgreichem PDF-Export Status setzen + `exported`-Event + `pdf_count`.
+- Alle: `verify_jwt = true` in `supabase/config.toml`, Logs schreiben **keine** PII (Lehre aus `pii_logged_edge_fn`).
+
+---
+
+## 4. Frontend — neue Route `/antraege`
+
+- `src/pages/Applications.tsx`: Tabelle (TanStack-frei, native `<table>` + shadcn `Table`), Spalten *KK · Status · Erstellt · Zuletzt geöffnet · PDFs · Bearbeiter (nur Admin)*, Filter (KK / Status / Datum / Suche), Pagination.
+- `src/components/ApplicationDetailDrawer.tsx`: shadcn Sheet, "Entschlüsseln & öffnen"-Button → ruft `applications-decrypt`, lädt Formular im read-only-Vorschau-Mode oder "In Editor laden" (füllt Index-Page-State).
+- `src/components/ApplicationAuditTimeline.tsx`: vertikale Timeline aus `application_events`.
+- Admin-only Spalte "Bearbeiter" + Filter, gesteuert via `useUserRole`-Hook.
+
+### Integration in bestehende Formular-Seite (`src/pages/Index.tsx`)
+- Neuer "Speichern"-Button in der sticky Bottom-Bar → ruft `applications-save` (Draft).
+- Bestehender Export-Flow ruft nach erfolgreichem PDF zusätzlich `applications-mark-exported` (kein Eingriff in Export-Utils selbst, nur ein neuer Wrapper-Hook `useApplicationPersistence`).
+- Auto-Save-Indicator (aus Phase 1) wird optional auf Cloud-Save umgeschaltet, sobald eingeloggt.
+
+---
+
+## 5. Login & Rollen
+
+- `src/pages/ResetPassword.tsx` (öffentliche Route) + "Passwort vergessen"-Link in `LoginForm`.
+- Optional Google-Sign-in einschalten (`configure_social_auth`).
+- `src/pages/Admin.tsx` (nur Admin): Nutzerliste aus `profiles`, Rollen-Toggle via `user_roles`, Audit-Übersicht aller Anträge, CSV-Export-Button.
+- `src/hooks/useUserRole.ts` für UI-Gating.
+
+---
+
+## 6. Navigation / Shell
+
+- Top-Bar bekommt: Logo · Formular · Anträge · (Admin) · ThemeToggle · User-Menü (Email, Logout).
+- `App.tsx`: neue Routen `/antraege`, `/antraege/:id`, `/admin`, `/reset-password`. Geschützte Routen via Wrapper `<RequireAuth>`.
+
+---
+
+## 7. Technische Details (für Review)
+
+- Krypto: WebCrypto `AES-GCM`, 256 Bit, 12-Byte IV pro Row, Key aus Secret (`crypto.subtle.importKey`).
+- `payload_hash` = SHA-256 über kanonisches JSON → Duplikat-Warnung im UI ("Ähnlicher Antrag existiert bereits").
+- `application_events.meta` darf nur enthalten: `krankenkasse`, `pdf_count`, `field_count_changed`, niemals Namen/Daten.
+- Edge-Function-Logs nur `application_id`, `event_type`, `status_code` — keine Body-Inhalte, keine User-Eingaben.
+- Memory-Update: `mem://constraints/pii-no-persistence` entfernen, neu anlegen `mem://features/encrypted-applications-storage` mit den oben genannten Regeln.
+
+---
+
+## 8. Reihenfolge der Umsetzung
+
+1. Dark-Mode-Toggle (Hook + Komponente + Top-Bar-Slot)
+2. Migration `applications` + `application_events` + Trigger + RLS + GRANTs
+3. Secret `APPLICATIONS_ENCRYPTION_KEY` anlegen (über add_secret-Tool)
+4. Edge Functions `applications-save` / `-load` / `-decrypt` / `-mark-exported`
+5. `useApplicationPersistence`-Hook + Save-Button + Mark-Exported-Wrapper
+6. Route `/antraege` + Detail-Drawer + Audit-Timeline
+7. `ResetPassword` + Google-Sign-in optional
+8. Admin-Bereich + Rollen-Verwaltung
+9. Memory-Update + DB-Linter-Check + Smoke-Test im Preview
+
+---
+
+## Kreative Zusatzideen (optional, Freigabe pro Punkt)
+
+- **Entwurfs-Versionierung**: jeder Save als Snapshot in `application_versions` (verschlüsselt), Restore-Button.
+- **Vorlagen** (strukturbasiert, keine PII): Familienkonstellation speichern.
+- **Bearbeiter-Übergabe** mit Kommentar-Thread.
+- **Statistik-Dashboard** Admin: Anträge pro KK/Monat, Ø Bearbeitungsdauer.
+- **Bulk-Export** als ZIP, **CSV-Audit-Export** für Compliance.
+- **PWA + Offline-Entwürfe** (IndexedDB, später beim nächsten Online-Sync verschlüsseln).
+- **Webhook/E-Mail** bei abgeschlossenem Antrag.
+- **i18n** DE/EN vorbereiten.
+
+Nach Freigabe starte ich mit Schritt 1 (Dark-Mode-Toggle), dann Schritt 2 (Migration).
