@@ -97,6 +97,16 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
+    const checkAdmin = async (): Promise<boolean> => {
+      const { data } = await admin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+      return !!data;
+    };
+
     const body = (await req.json().catch(() => ({}))) as { action?: Action; [k: string]: unknown };
     const action = body.action;
     const ipHash = await hashIp(req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null);
@@ -167,7 +177,7 @@ Deno.serve(async (req) => {
         .limit(500);
       if (error) return json(500, { error: "db_list_failed" });
       // Apply role-based filter manually since we're on service_role
-      const { data: isAdminData } = await admin.rpc("has_role", { _user_id: user.id, _role: "admin" });
+      const isAdminData = await checkAdmin();
       const filtered = isAdminData ? data : (data ?? []).filter((r) => r.user_id === user.id);
       // Attach emails for admin view
       let userEmails: Record<string, string> = {};
@@ -188,7 +198,7 @@ Deno.serve(async (req) => {
         .eq("id", application_id)
         .maybeSingle();
       if (error || !data) return json(404, { error: "not_found" });
-      const { data: isAdminData } = await admin.rpc("has_role", { _user_id: user.id, _role: "admin" });
+      const isAdminData = await checkAdmin();
       if (data.user_id !== user.id && !isAdminData) return json(403, { error: "forbidden" });
       const payload = await decryptPayload(data.payload_encrypted as unknown as string, data.payload_iv as unknown as string);
       await admin.from("applications").update({ last_opened_at: new Date().toISOString() }).eq("id", application_id);
@@ -218,7 +228,7 @@ Deno.serve(async (req) => {
     if (action === "delete") {
       const { application_id } = body as { application_id?: string };
       if (!application_id) return json(400, { error: "application_id_required" });
-      const { data: isAdminData } = await admin.rpc("has_role", { _user_id: user.id, _role: "admin" });
+      const isAdminData = await checkAdmin();
       const q = admin.from("applications").delete().eq("id", application_id);
       const { error } = isAdminData ? await q : await q.eq("user_id", user.id);
       if (error) return json(500, { error: "db_delete_failed" });
