@@ -11,15 +11,35 @@ export default function ResetPassword() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
-  const [hasRecovery, setHasRecovery] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [checking, setChecking] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash.includes("type=recovery")) setHasRecovery(true);
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") setHasRecovery(true);
+    const hash = window.location.hash || "";
+    const search = window.location.search || "";
+    const looksLikeRecovery =
+      hash.includes("type=recovery") ||
+      hash.includes("access_token=") ||
+      search.includes("code=");
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && looksLikeRecovery)) {
+        setReady(true);
+        setChecking(false);
+      }
+      if (session && looksLikeRecovery) {
+        setReady(true);
+        setChecking(false);
+      }
     });
+
+    // Fallback: if a session already exists (recovery link was processed), allow update.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session && looksLikeRecovery) setReady(true);
+      setChecking(false);
+    });
+
     return () => subscription.unsubscribe();
   }, []);
 
@@ -48,9 +68,10 @@ export default function ResetPassword() {
           <Lock className="w-7 h-7 text-primary" />
         </div>
         <h1 className="font-display text-2xl font-semibold text-center">Neues Passwort setzen</h1>
-        {!hasRecovery && (
+        {!ready && !checking && (
           <p className="text-sm text-muted-foreground mt-2 text-center">
-            Öffnen Sie diesen Link aus Ihrer Passwort-Reset-E-Mail.
+            Bitte öffnen Sie diese Seite über den Link aus Ihrer Passwort-Reset-E-Mail.
+            Falls der Link bereits einmal geöffnet wurde, fordern Sie einen neuen an.
           </p>
         )}
         <form onSubmit={submit} className="space-y-4 mt-6">
@@ -62,7 +83,7 @@ export default function ResetPassword() {
             <Label htmlFor="pw2">Passwort bestätigen</Label>
             <Input id="pw2" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={8} />
           </div>
-          <Button type="submit" disabled={loading || !hasRecovery} className="w-full h-11">
+          <Button type="submit" disabled={loading || !ready} className="w-full h-11">
             {loading ? "Speichern…" : "Passwort aktualisieren"}
           </Button>
         </form>
