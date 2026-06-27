@@ -8,7 +8,7 @@ import { RundumSicherPaketSection } from '@/components/RundumSicherPaketSection'
 import { ViactivSection } from '@/components/ViactivSection';
 import { BigPlusbonusSection } from '@/components/BigPlusbonusSection';
 import { Button } from '@/components/ui/button';
-import { FileDown, FileText, AlertCircle, Users, User, Building2, LogOut, ShieldCheck, Sparkles, ChevronRight } from 'lucide-react';
+import { FileDown, FileText, AlertCircle, Users, User, Building2, LogOut, ShieldCheck, Sparkles, ChevronRight, Save, Archive, Settings } from 'lucide-react';
 import { exportFilledPDF, exportRundumSicherPaketOnly } from '@/utils/pdfExport';
 import { exportViactivBeitrittserklaerung } from '@/utils/viactivExport';
 import { exportViactivFamilienversicherung } from '@/utils/viactivFamilyExport';
@@ -27,12 +27,18 @@ import { FreitextImportDialog } from '@/components/FreitextImportDialog';
 import { DocumentMergeDialog } from '@/components/DocumentMergeDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { Link } from 'react-router-dom';
+import { useApplicationPersistence } from '@/hooks/useApplicationPersistence';
+import { useUserRole } from '@/hooks/useUserRole';
 
 const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [formData, setFormData] = useState<FormData>(createInitialFormData);
   const [isExporting, setIsExporting] = useState(false);
+  const [applicationId, setApplicationId] = useState<string | null>(null);
+  const { save, saving, markExported } = useApplicationPersistence();
+  const { isAdmin } = useUserRole();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
@@ -45,6 +51,21 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Hydrate from a previously decrypted application (loaded via /antraege)
+  useEffect(() => {
+    const raw = sessionStorage.getItem('loadedApplication');
+    if (!raw) return;
+    try {
+      const { id, payload } = JSON.parse(raw) as { id: string; payload: FormData };
+      setFormData(payload);
+      setApplicationId(id);
+      sessionStorage.removeItem('loadedApplication');
+      toast.success('Antrag geladen.');
+    } catch {
+      sessionStorage.removeItem('loadedApplication');
+    }
+  }, []);
+
   if (authLoading) {
     return <div className="min-h-screen flex items-center justify-center text-slate-500">Lädt…</div>;
   }
@@ -52,6 +73,16 @@ const Index = () => {
   if (!session) {
     return <LoginForm />;
   }
+
+  const handleSaveDraft = async () => {
+    try {
+      const app = await save({ applicationId, formData });
+      setApplicationId(app.id);
+      toast.success('Entwurf gespeichert.');
+    } catch {
+      toast.error('Konnte Entwurf nicht speichern.');
+    }
+  };
   
   const updateFormData = (updates: Partial<FormData>) => {
     setFormData(prev => {
@@ -352,6 +383,14 @@ const Index = () => {
             <FreitextImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} selectedKrankenkasse={formData.selectedKrankenkasse} />
             <JsonImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} selectedKrankenkasse={formData.selectedKrankenkasse} />
             <div className="w-px h-6 bg-border/70 mx-1 hidden md:block" />
+            <Button asChild variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" title="Meine Anträge">
+              <Link to="/antraege"><Archive className="h-4 w-4" /><span className="hidden md:inline ml-1">Anträge</span></Link>
+            </Button>
+            {isAdmin && (
+              <Button asChild variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" title="Admin">
+                <Link to="/admin"><Settings className="h-4 w-4" /><span className="hidden md:inline ml-1">Admin</span></Link>
+              </Button>
+            )}
             <ThemeToggle />
             <Button
               variant="ghost"
