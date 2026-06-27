@@ -16,6 +16,7 @@ import { exportViactivBonusPDFs } from '@/utils/viactivBonusExport';
 import { exportNovitasFamilienversicherung } from '@/utils/novitasExport';
 import { exportDAKFamilienversicherung } from '@/utils/dakExport';
 import { exportBigPlusbonus } from '@/utils/bigPlusbonusExport';
+import { exportBigFamilienversicherung } from '@/utils/bigFamversExport';
 import { toast } from 'sonner';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -132,7 +133,9 @@ const Index = () => {
       case 'novitas': return 'Novitas BKK - Familienversicherung';
       case 'dak': return 'DAK - Familienversicherung';
       case 'bkk_gs': return 'BKK GILDEMEISTER SEIDENSTICK - Online-Formular';
-      case 'big_plusbonus': return 'BIG direkt gesund - Plusbonus Antrag';
+      case 'big_plusbonus': return formData.bigFamilienversicherung
+        ? 'BIG direkt gesund - Familienversicherung + Plusbonus'
+        : 'BIG direkt gesund - Plusbonus Antrag';
       default: return 'Bitte wählen Sie eine Krankenkasse aus';
     }
   };
@@ -167,6 +170,13 @@ const Index = () => {
       if (!b.kontoinhaber || !b.kreditinstitut || !b.iban || !b.bic || !b.ort || !b.datum) {
         toast.error('Bitte alle Bankdaten (Kontoinhaber, Kreditinstitut, IBAN, BIC, Ort, Datum) ausfüllen.');
         return;
+      }
+      if (formData.bigFamilienversicherung) {
+        if (!formData.mitgliedKvNummer) { toast.error('Bitte KV-Nummer eingeben.'); return; }
+        if (!formData.mitgliedKrankenkasse) { toast.error('Bitte Name der bisherigen Krankenkasse eingeben.'); return; }
+        if (!formData.familienstand) { toast.error('Bitte Familienstand auswählen.'); return; }
+        if (!formData.telefon || !formData.email) { toast.error('Telefon und E-Mail sind Pflicht.'); return; }
+        if (!formData.mitgliedGeburtsdatum) { toast.error('Bitte Geburtsdatum des Mitglieds eingeben.'); return; }
       }
     }
     
@@ -305,10 +315,18 @@ const Index = () => {
       }
       // BIG Plusbonus Export
       if (formData.selectedKrankenkasse === 'big_plusbonus') {
-        toast.info('BIG direkt gesund Plusbonus PDF wird erstellt...');
-        await exportBigPlusbonus(formData);
-        pdfCount = 1;
-        toast.success('BIG Plusbonus PDF erfolgreich exportiert!');
+        if (formData.bigFamilienversicherung) {
+          toast.info('BIG Familienversicherung + Plusbonus PDFs werden erstellt...');
+          await exportBigFamilienversicherung(formData);
+          await exportBigPlusbonus(formData);
+          pdfCount = 2 + Math.max(0, Math.ceil(Math.max(0, formData.kinder.length - 3) / 3));
+          toast.success('BIG PDFs erfolgreich exportiert!');
+        } else {
+          toast.info('BIG direkt gesund Plusbonus PDF wird erstellt...');
+          await exportBigPlusbonus(formData);
+          pdfCount = 1;
+          toast.success('BIG Plusbonus PDF erfolgreich exportiert!');
+        }
       }
       // VIACTIV Export
       else if (formData.selectedKrankenkasse === 'viactiv') {
@@ -455,7 +473,7 @@ const Index = () => {
             {[
               { id: 'sec-krankenkasse', label: 'Krankenkasse' },
               ...(formData.selectedKrankenkasse ? [{ id: 'sec-mitglied', label: 'Mitglied' }] : []),
-              ...(formData.selectedKrankenkasse && formData.selectedKrankenkasse !== 'big_plusbonus' && !(formData.selectedKrankenkasse === 'bkk_gs' && formData.mode === 'nur_rundum') ? [
+              ...(formData.selectedKrankenkasse && !(formData.selectedKrankenkasse === 'big_plusbonus' && !formData.bigFamilienversicherung) && !(formData.selectedKrankenkasse === 'bkk_gs' && formData.mode === 'nur_rundum') ? [
                 { id: 'sec-ehegatte', label: 'Ehegatte' },
                 { id: 'sec-kinder', label: 'Kinder' },
               ] : []),
@@ -525,7 +543,9 @@ const Index = () => {
             </Select>
             <p className="text-sm text-muted-foreground mt-3">
               {formData.selectedKrankenkasse === 'big_plusbonus'
-                ? 'Es wird der BIG direkt gesund Plusbonus-Antrag erstellt.'
+                ? (formData.bigFamilienversicherung
+                    ? 'Es werden BIG Familienversicherung + Plusbonus-Antrag erstellt.'
+                    : 'Es wird der BIG direkt gesund Plusbonus-Antrag erstellt.')
                 : formData.selectedKrankenkasse === 'dak' 
                 ? 'Es wird die DAK Familienversicherung erstellt.'
                 : formData.selectedKrankenkasse === 'novitas' 
@@ -631,7 +651,15 @@ const Index = () => {
               
               {/* BIG direkt gesund (Plusbonus) spezifische Sektionen */}
               {formData.selectedKrankenkasse === 'big_plusbonus' && (
-                <div id="sec-bigplus"><BigPlusbonusSection formData={formData} updateFormData={updateFormData} /></div>
+                <>
+                  <div id="sec-bigplus"><BigPlusbonusSection formData={formData} updateFormData={updateFormData} /></div>
+                  {formData.bigFamilienversicherung && (
+                    <>
+                      <div id="sec-ehegatte"><SpouseSection formData={formData} updateFormData={updateFormData} /></div>
+                      <div id="sec-kinder"><ChildrenSection formData={formData} updateFormData={updateFormData} /></div>
+                    </>
+                  )}
+                </>
               )}
 
               <div id="sec-signature"><SignatureSection formData={formData} updateFormData={updateFormData} /></div>

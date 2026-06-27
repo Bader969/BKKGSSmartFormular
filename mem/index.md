@@ -1,7 +1,7 @@
 # Project Memory
 
 ## Core
-- Krankenkasse-first workflow: UI, validation, and export depend on selected provider (VIACTIV, Novitas, DAK, BIG Plusbonus). Hide sections until selected.
+- Krankenkasse-first workflow: UI, validation, and export depend on selected provider (VIACTIV, Novitas, DAK, BIG direkt). Hide sections until selected.
 - No PII persistence: AI extraction uses ephemeral in-memory processing. Never persist documents to storage or databases.
 - Application records ARE persisted, but ONLY AES-GCM-encrypted via the `applications-api` edge function. Key lives only in `APPLICATIONS_ENCRYPTION_KEY` secret. `application_events.meta` must never contain PII.
 - Image integrity: Never apply auto-cropping or image enhancement in document merging or processing.
@@ -50,5 +50,5 @@
 - [VIACTIV Spouse Split](mem://features/viactiv-integration/spouse-separate-application) — Own membership auto-generates BE
 - [VIACTIV Child Logic](mem://features/viactiv-integration/child-membership-logic-v2) — Own membership rules and Bonus PDFs
 
-### BIG Plusbonus Specific
-- [BIG Plusbonus Integration](mem://features/big-plusbonus-integration) — Provider value, mapping, signature placement, validation rules
+### BIG direkt Specific
+- [BIG direkt Integration](mem://features/big-direkt-integration) — Single provider key, toggle between Plusbonus-only and Plusbonus + Familienversicherung; field maps & signature placement for both PDFs

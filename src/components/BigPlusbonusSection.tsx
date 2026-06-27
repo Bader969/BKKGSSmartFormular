@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 interface Props {
   formData: FormData;
@@ -39,6 +40,28 @@ export const BigPlusbonusSection: React.FC<Props> = ({ formData, updateFormData 
 
   return (
     <>
+      <FormSection title="Antrags-Variante" variant="info">
+        <Label
+          htmlFor="big-famvers-toggle"
+          className="flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer hover:border-primary transition-colors"
+        >
+          <Switch
+            id="big-famvers-toggle"
+            checked={formData.bigFamilienversicherung}
+            onCheckedChange={(c) => updateFormData({ bigFamilienversicherung: !!c })}
+            className="mt-1"
+          />
+          <div>
+            <div className="font-medium">Auch Familienversicherung beantragen</div>
+            <p className="text-sm text-muted-foreground mt-1">
+              Aktivieren, um zusätzlich den Antrag <em>Zusammenfassung_Familienversicherung</em> zu
+              erzeugen (für Ehegatte/-in und/oder Kinder). Die zugehörigen Felder erscheinen dann
+              automatisch.
+            </p>
+          </div>
+        </Label>
+      </FormSection>
+
       <FormSection title="Geschlecht" variant="member">
         <RadioGroup
           value={formData.bigGeschlecht}

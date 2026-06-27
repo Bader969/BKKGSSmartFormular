@@ -78,7 +78,7 @@ export const KRANKENKASSEN_OPTIONS = [
   { value: 'viactiv' as Krankenkasse, label: 'VIACTIV Krankenkasse' },
   { value: 'novitas' as Krankenkasse, label: 'Novitas BKK' },
   { value: 'dak' as Krankenkasse, label: 'DAK Familienversicherung' },
-  { value: 'big_plusbonus' as Krankenkasse, label: 'BIG direkt gesund (Plusbonus)' },
+  { value: 'big_plusbonus' as Krankenkasse, label: 'BIG direkt gesund' },
 ] as const;
 
 // VIACTIV-spezifische Typen
@@ -267,6 +267,9 @@ export interface FormData {
   bigHoeheEuro: string;
   bigVersicherungsarten: BigVersicherungsarten;
   bigMitversicherte: BigMitversicherte[];
+
+  // BIG direkt — zusätzlich Familienversicherung beantragen?
+  bigFamilienversicherung: boolean;
 }
 
 export const createEmptyArztDaten = (): ArztDaten => ({
@@ -388,5 +391,6 @@ export const createInitialFormData = (): FormData => {
       grundfaehigkeit: false,
     },
     bigMitversicherte: [],
+    bigFamilienversicherung: false,
   };
 };
