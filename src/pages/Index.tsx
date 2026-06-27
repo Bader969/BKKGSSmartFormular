@@ -16,6 +16,7 @@ import { exportViactivBonusPDFs } from '@/utils/viactivBonusExport';
 import { exportNovitasFamilienversicherung } from '@/utils/novitasExport';
 import { exportDAKFamilienversicherung } from '@/utils/dakExport';
 import { exportBigPlusbonus } from '@/utils/bigPlusbonusExport';
+import { exportBigFamilienversicherung } from '@/utils/bigFamversExport';
 import { toast } from 'sonner';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
