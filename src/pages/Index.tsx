@@ -133,7 +133,9 @@ const Index = () => {
       case 'novitas': return 'Novitas BKK - Familienversicherung';
       case 'dak': return 'DAK - Familienversicherung';
       case 'bkk_gs': return 'BKK GILDEMEISTER SEIDENSTICK - Online-Formular';
-      case 'big_plusbonus': return 'BIG direkt gesund - Plusbonus Antrag';
+      case 'big_plusbonus': return formData.bigFamilienversicherung
+        ? 'BIG direkt gesund - Familienversicherung + Plusbonus'
+        : 'BIG direkt gesund - Plusbonus Antrag';
       default: return 'Bitte wählen Sie eine Krankenkasse aus';
     }
   };
@@ -541,7 +543,9 @@ const Index = () => {
             </Select>
             <p className="text-sm text-muted-foreground mt-3">
               {formData.selectedKrankenkasse === 'big_plusbonus'
-                ? 'Es wird der BIG direkt gesund Plusbonus-Antrag erstellt.'
+                ? (formData.bigFamilienversicherung
+                    ? 'Es werden BIG Familienversicherung + Plusbonus-Antrag erstellt.'
+                    : 'Es wird der BIG direkt gesund Plusbonus-Antrag erstellt.')
                 : formData.selectedKrankenkasse === 'dak' 
                 ? 'Es wird die DAK Familienversicherung erstellt.'
                 : formData.selectedKrankenkasse === 'novitas' 
