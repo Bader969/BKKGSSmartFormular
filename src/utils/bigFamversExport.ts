@@ -218,7 +218,7 @@ const fillColumn = (
   dates: ReturnType<typeof calcDates>,
 ) => {
   if (!m.name && !m.vorname) return;
-  setText(form, cols.beginn, toDE(m.geburtsdatum) ? dates.begin : dates.begin);
+  setText(form, cols.beginn, dates.begin);
   setText(form, cols.name, m.name);
   setText(form, cols.vorname, m.vorname);
   setText(form, cols.geburtsdatum, toDE(m.geburtsdatum));
