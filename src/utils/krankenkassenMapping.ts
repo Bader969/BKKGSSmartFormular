@@ -21,6 +21,34 @@ export const applyKrankenkassenMapping = (
   };
 
   switch (selectedKrankenkasse) {
+    case 'big_plusbonus':
+      return {
+        ...baseMapping,
+        mitgliedGeburtsdatum: extractedData.mitgliedGeburtsdatum || currentFormData.mitgliedGeburtsdatum,
+        mitgliedGeburtsort: extractedData.mitgliedGeburtsort || currentFormData.mitgliedGeburtsort,
+        mitgliedGeburtsland: extractedData.mitgliedGeburtsland || currentFormData.mitgliedGeburtsland,
+        mitgliedStrasse: extractedData.mitgliedStrasse || currentFormData.mitgliedStrasse,
+        mitgliedHausnummer: extractedData.mitgliedHausnummer || currentFormData.mitgliedHausnummer,
+        mitgliedPlz: extractedData.mitgliedPlz || currentFormData.mitgliedPlz,
+        ort: extractedData.ort || currentFormData.ort,
+        ehegatte: extractedData.ehegatte
+          ? {
+              ...currentFormData.ehegatte,
+              ...extractedData.ehegatte,
+              bisherigBestehtWeiter: true,
+              bisherigBestehtWeiterBei: 'BIG direkt gesund',
+            }
+          : currentFormData.ehegatte,
+        kinder: extractedData.kinder?.length > 0
+          ? extractedData.kinder.map((kind: Partial<FamilyMember>) => ({
+              ...createEmptyFamilyMember(),
+              ...kind,
+              bisherigBestehtWeiter: true,
+              bisherigBestehtWeiterBei: 'BIG direkt gesund',
+            }))
+          : currentFormData.kinder,
+      };
+
     case 'viactiv':
       return {
         ...baseMapping,
