@@ -471,7 +471,7 @@ const Index = () => {
             {[
               { id: 'sec-krankenkasse', label: 'Krankenkasse' },
               ...(formData.selectedKrankenkasse ? [{ id: 'sec-mitglied', label: 'Mitglied' }] : []),
-              ...(formData.selectedKrankenkasse && formData.selectedKrankenkasse !== 'big_plusbonus' && !(formData.selectedKrankenkasse === 'bkk_gs' && formData.mode === 'nur_rundum') ? [
+              ...(formData.selectedKrankenkasse && !(formData.selectedKrankenkasse === 'big_plusbonus' && !formData.bigFamilienversicherung) && !(formData.selectedKrankenkasse === 'bkk_gs' && formData.mode === 'nur_rundum') ? [
                 { id: 'sec-ehegatte', label: 'Ehegatte' },
                 { id: 'sec-kinder', label: 'Kinder' },
               ] : []),
@@ -647,7 +647,15 @@ const Index = () => {
               
               {/* BIG direkt gesund (Plusbonus) spezifische Sektionen */}
               {formData.selectedKrankenkasse === 'big_plusbonus' && (
-                <div id="sec-bigplus"><BigPlusbonusSection formData={formData} updateFormData={updateFormData} /></div>
+                <>
+                  <div id="sec-bigplus"><BigPlusbonusSection formData={formData} updateFormData={updateFormData} /></div>
+                  {formData.bigFamilienversicherung && (
+                    <>
+                      <div id="sec-ehegatte"><SpouseSection formData={formData} updateFormData={updateFormData} /></div>
+                      <div id="sec-kinder"><ChildrenSection formData={formData} updateFormData={updateFormData} /></div>
+                    </>
+                  )}
+                </>
               )}
 
               <div id="sec-signature"><SignatureSection formData={formData} updateFormData={updateFormData} /></div>
