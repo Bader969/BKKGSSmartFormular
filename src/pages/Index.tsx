@@ -292,11 +292,22 @@ const Index = () => {
     }
     
     setIsExporting(true);
+    let savedAppId = applicationId;
+    let pdfCount = 0;
     try {
+      // Auto-save before exporting so every export is tracked
+      try {
+        const app = await save({ applicationId, formData });
+        savedAppId = app.id;
+        if (!applicationId) setApplicationId(app.id);
+      } catch {
+        // Saving failure shouldn't block the PDF export
+      }
       // BIG Plusbonus Export
       if (formData.selectedKrankenkasse === 'big_plusbonus') {
         toast.info('BIG direkt gesund Plusbonus PDF wird erstellt...');
         await exportBigPlusbonus(formData);
+        pdfCount = 1;
         toast.success('BIG Plusbonus PDF erfolgreich exportiert!');
       }
       // VIACTIV Export
@@ -318,10 +329,12 @@ const Index = () => {
           await exportViactivBeitrittserklaerung(formData);
           await exportViactivFamilienversicherung(formData);
           await exportViactivBonusPDFs(formData);
+          pdfCount = numberOfBEs + numberOfFamilyPDFs + numberOfBonusPDFs;
         } else {
           toast.info('VIACTIV Beitrittserklärung und Bonus-PDF werden erstellt...');
           await exportViactivBeitrittserklaerung(formData);
           await exportViactivBonusPDFs(formData);
+          pdfCount = 2;
         }
         toast.success('VIACTIV PDF(s) erfolgreich exportiert!');
       }
@@ -330,6 +343,7 @@ const Index = () => {
         const numberOfPDFs = Math.max(1, Math.ceil(formData.kinder.length / 3));
         toast.info(`Es werden ${numberOfPDFs} Novitas Familienversicherungs-PDF(s) erstellt...`);
         await exportNovitasFamilienversicherung(formData);
+        pdfCount = numberOfPDFs;
         toast.success('Novitas BKK Familienversicherung erfolgreich exportiert!');
       }
       // DAK Export
@@ -337,6 +351,7 @@ const Index = () => {
         const numberOfPDFs = Math.max(1, Math.ceil(formData.kinder.length / 2)); // Nur 2 Kinder pro PDF!
         toast.info(`Es werden ${numberOfPDFs} DAK Familienversicherungs-PDF(s) erstellt...`);
         await exportDAKFamilienversicherung(formData);
+        pdfCount = numberOfPDFs;
         toast.success('DAK Familienversicherung erfolgreich exportiert!');
       }
       // BKK GS Export
@@ -344,13 +359,18 @@ const Index = () => {
         if (formData.mode === 'nur_rundum') {
           toast.info('Es wird 1 Rundum-Sicher-Paket-PDF erstellt.');
           await exportRundumSicherPaketOnly(formData);
+          pdfCount = 1;
         } else {
           const numberOfPDFs = Math.max(1, Math.ceil(formData.kinder.length / 3));
           const numberOfRundumPDFs = 1 + (formData.ehegatte.name ? 1 : 0) + formData.kinder.length;
           toast.info(`Es werden ${numberOfPDFs} Familienversicherungs-PDF(s) und ${numberOfRundumPDFs} Rundum-Sicher-Paket-PDF(s) erstellt.`);
           await exportFilledPDF(formData);
+          pdfCount = numberOfPDFs + numberOfRundumPDFs;
         }
         toast.success('PDF erfolgreich exportiert!');
+      }
+      if (savedAppId) {
+        try { await markExported(savedAppId, pdfCount); } catch { /* non-blocking */ }
       }
     } catch (error) {
       console.error('Export error:', error);
@@ -624,20 +644,37 @@ const Index = () => {
                       <FileDown className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="font-medium text-foreground">Bereit zum Exportieren?</p>
-                      <p className="text-sm text-muted-foreground">Das ausgefüllte PDF wird heruntergeladen.</p>
+                      <p className="font-medium text-foreground">
+                        {applicationId ? 'Antrag wird aktualisiert' : 'Bereit zum Exportieren?'}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Jeder Export wird verschlüsselt gespeichert und im Audit-Log erfasst.
+                      </p>
                     </div>
                   </div>
-                  <Button
-                    type="button"
-                    size="lg"
-                    onClick={handleExport}
-                    disabled={isExporting}
-                    className="w-full md:w-auto gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8 shadow-card"
-                  >
-                    <FileDown className="h-5 w-5" />
-                    {isExporting ? 'Exportiere...' : 'PDF Exportieren'}
-                  </Button>
+                  <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                    <Button
+                      type="button"
+                      size="lg"
+                      variant="outline"
+                      onClick={handleSaveDraft}
+                      disabled={saving || isExporting}
+                      className="gap-2"
+                    >
+                      <Save className="h-4 w-4" />
+                      {saving ? 'Speichere…' : applicationId ? 'Aktualisieren' : 'Entwurf speichern'}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="lg"
+                      onClick={handleExport}
+                      disabled={isExporting}
+                      className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8 shadow-card"
+                    >
+                      <FileDown className="h-5 w-5" />
+                      {isExporting ? 'Exportiere…' : 'PDF Exportieren'}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </>
