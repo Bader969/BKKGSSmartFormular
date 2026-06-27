@@ -26,6 +26,7 @@ import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { FreitextImportDialog } from '@/components/FreitextImportDialog';
 import { DocumentMergeDialog } from '@/components/DocumentMergeDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
@@ -351,6 +352,7 @@ const Index = () => {
             <FreitextImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} selectedKrankenkasse={formData.selectedKrankenkasse} />
             <JsonImportDialog formData={formData} setFormData={setFormData} currentMode={formData.mode} selectedKrankenkasse={formData.selectedKrankenkasse} />
             <div className="w-px h-6 bg-border/70 mx-1 hidden md:block" />
+            <ThemeToggle />
             <Button
               variant="ghost"
               size="sm"
