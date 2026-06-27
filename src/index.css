@@ -1,113 +1,141 @@
-/* ZUERST der Import */
-@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&display=swap');
-
-/* DANN die Tailwind-Direktiven */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 220 20% 15%;
+    /* Navy Trust palette — base anchors:
+       #f8fafc bg · #0f1b3d ink · #1e3a5f primary · #3b6fa0 accent · #e8edf3 surface */
+    --background: 210 40% 98%;
+    --foreground: 222 60% 14%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 20% 15%;
+    --card-foreground: 222 60% 14%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 15%;
+    --popover-foreground: 222 60% 14%;
 
-    --primary: 210 80% 45%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 215 52% 25%;
+    --primary-foreground: 215 35% 95%;
+    --primary-glow: 211 46% 43%;
 
-    --secondary: 145 60% 40%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 213 30% 94%;
+    --secondary-foreground: 215 52% 25%;
 
-    --muted: 210 15% 92%;
-    --muted-foreground: 220 10% 45%;
+    --muted: 214 32% 94%;
+    --muted-foreground: 215 16% 42%;
 
-    --accent: 35 90% 55%;
+    --accent: 211 46% 43%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    --success: 168 55% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 35 85% 50%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 0 70% 48%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 210 20% 85%;
-    --input: 210 20% 85%;
-    --ring: 210 80% 45%;
+    --border: 215 25% 88%;
+    --input: 215 25% 88%;
+    --ring: 211 46% 43%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    /* Section Colors - Harmonisches Farbschema mit stärkerem Kontrast */
-    --section-member: 217 70% 45%;
-    --section-member-bg: 217 55% 93%;
-    --section-spouse: 173 55% 38%;
-    --section-spouse-bg: 173 45% 92%;
-    --section-child: 43 85% 48%;
-    --section-child-bg: 43 65% 92%;
-    --section-signature: 262 50% 52%;
-    --section-signature-bg: 262 40% 93%;
-    --section-info: 200 65% 42%;
-    --section-info-bg: 200 50% 92%;
+    /* Surface elevations */
+    --surface: 213 35% 96%;
+    --surface-elevated: 0 0% 100%;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Section accents (kept as 5 variants, re-tuned to Navy Trust family) */
+    --section-member: 215 52% 32%;
+    --section-member-bg: 213 45% 96%;
+    --section-spouse: 188 55% 32%;
+    --section-spouse-bg: 190 45% 96%;
+    --section-child: 32 70% 45%;
+    --section-child-bg: 36 70% 96%;
+    --section-signature: 244 40% 45%;
+    --section-signature-bg: 240 45% 97%;
+    --section-info: 211 46% 43%;
+    --section-info-bg: 211 50% 96%;
+
+    /* Gradients & shadows */
+    --gradient-hero: linear-gradient(135deg, hsl(215 52% 18%), hsl(215 52% 30%) 55%, hsl(211 46% 43%));
+    --gradient-surface: linear-gradient(180deg, hsl(213 35% 98%), hsl(213 30% 94%));
+    --shadow-card: 0 1px 2px hsl(215 50% 20% / 0.04), 0 8px 24px -12px hsl(215 50% 20% / 0.12);
+    --shadow-elevated: 0 4px 12px -2px hsl(215 50% 20% / 0.08), 0 24px 48px -24px hsl(215 50% 20% / 0.25);
+    --shadow-focus: 0 0 0 4px hsl(211 46% 43% / 0.18);
+
+    --sidebar-background: 215 52% 14%;
+    --sidebar-foreground: 215 30% 80%;
+    --sidebar-primary: 211 46% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 48% 22%;
+    --sidebar-accent-foreground: 215 35% 95%;
+    --sidebar-border: 215 48% 22%;
+    --sidebar-ring: 211 46% 55%;
   }
 
   .dark {
-    --background: 220 20% 10%;
-    --foreground: 210 20% 95%;
+    --background: 215 45% 8%;
+    --foreground: 213 30% 92%;
 
-    --card: 220 20% 13%;
-    --card-foreground: 210 20% 95%;
+    --card: 215 42% 12%;
+    --card-foreground: 213 30% 92%;
 
-    --popover: 220 20% 13%;
-    --popover-foreground: 210 20% 95%;
+    --popover: 215 42% 12%;
+    --popover-foreground: 213 30% 92%;
 
-    --primary: 210 80% 55%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 211 60% 60%;
+    --primary-foreground: 215 52% 12%;
+    --primary-glow: 211 60% 50%;
 
-    --secondary: 145 60% 45%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 215 38% 18%;
+    --secondary-foreground: 213 30% 92%;
 
-    --muted: 220 15% 20%;
-    --muted-foreground: 210 10% 60%;
+    --muted: 215 35% 16%;
+    --muted-foreground: 215 18% 65%;
 
-    --accent: 35 90% 55%;
+    --accent: 211 60% 55%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --success: 168 55% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 35 85% 55%;
+    --warning-foreground: 0 0% 0%;
+    --destructive: 0 65% 55%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 25%;
-    --input: 220 15% 25%;
-    --ring: 210 80% 55%;
+    --border: 215 35% 22%;
+    --input: 215 35% 22%;
+    --ring: 211 60% 55%;
 
-    --section-member: 217 70% 55%;
-    --section-member-bg: 217 40% 18%;
-    --section-spouse: 173 55% 45%;
-    --section-spouse-bg: 173 35% 16%;
-    --section-child: 43 85% 55%;
-    --section-child-bg: 43 50% 16%;
-    --section-signature: 262 50% 58%;
-    --section-signature-bg: 262 35% 17%;
-    --section-info: 200 65% 50%;
-    --section-info-bg: 200 40% 16%;
+    --surface: 215 42% 12%;
+    --surface-elevated: 215 38% 16%;
 
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --section-member: 211 60% 60%;
+    --section-member-bg: 215 40% 14%;
+    --section-spouse: 188 55% 50%;
+    --section-spouse-bg: 190 38% 14%;
+    --section-child: 32 70% 60%;
+    --section-child-bg: 36 30% 16%;
+    --section-signature: 244 50% 65%;
+    --section-signature-bg: 240 30% 16%;
+    --section-info: 211 60% 55%;
+    --section-info-bg: 211 40% 14%;
+
+    --gradient-hero: linear-gradient(135deg, hsl(215 50% 10%), hsl(215 45% 16%) 55%, hsl(211 50% 25%));
+    --gradient-surface: linear-gradient(180deg, hsl(215 42% 12%), hsl(215 38% 10%));
+    --shadow-card: 0 1px 2px hsl(0 0% 0% / 0.4), 0 8px 24px -12px hsl(0 0% 0% / 0.5);
+    --shadow-elevated: 0 4px 12px -2px hsl(0 0% 0% / 0.5), 0 24px 48px -24px hsl(0 0% 0% / 0.7);
+    --shadow-focus: 0 0 0 4px hsl(211 60% 55% / 0.25);
+
+    --sidebar-background: 215 50% 9%;
+    --sidebar-foreground: 215 25% 78%;
+    --sidebar-primary: 211 60% 60%;
+    --sidebar-primary-foreground: 215 52% 12%;
+    --sidebar-accent: 215 45% 16%;
+    --sidebar-accent-foreground: 213 30% 92%;
+    --sidebar-border: 215 45% 18%;
+    --sidebar-ring: 211 60% 55%;
   }
 }
 
@@ -118,67 +146,21 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Source Sans 3', sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  h1, h2, h3, h4, h5 {
+    font-family: 'Inter Tight', 'Inter', system-ui, sans-serif;
+    letter-spacing: -0.01em;
   }
 }
 
 @layer components {
   .section-card {
-    @apply rounded-xl border-l-4 p-6 mb-6 shadow-md transition-all duration-200;
-  }
-  
-  .section-member {
-    border-left-color: hsl(var(--section-member));
-    background: linear-gradient(135deg, hsl(217 55% 93%) 0%, hsl(217 50% 96%) 100%);
-  }
-  
-  .section-spouse {
-    border-left-color: hsl(var(--section-spouse));
-    background: linear-gradient(135deg, hsl(173 45% 92%) 0%, hsl(173 40% 95%) 100%);
-  }
-  
-  .section-child {
-    border-left-color: hsl(var(--section-child));
-    background: linear-gradient(135deg, hsl(43 65% 92%) 0%, hsl(43 55% 95%) 100%);
-  }
-  
-  .section-signature {
-    border-left-color: hsl(var(--section-signature));
-    background: linear-gradient(135deg, hsl(262 40% 93%) 0%, hsl(262 35% 96%) 100%);
-  }
-  
-  .section-info {
-    border-left-color: hsl(var(--section-info));
-    background: linear-gradient(135deg, hsl(200 50% 92%) 0%, hsl(200 45% 95%) 100%);
-  }
-  
-  .section-title {
-    @apply text-lg font-semibold mb-4 pb-2 border-b;
-  }
-  
-  .section-title-member {
-    color: hsl(var(--section-member));
-    border-color: hsl(var(--section-member) / 0.3);
-  }
-  
-  .section-title-spouse {
-    color: hsl(var(--section-spouse));
-    border-color: hsl(var(--section-spouse) / 0.3);
-  }
-  
-  .section-title-child {
-    color: hsl(var(--section-child));
-    border-color: hsl(var(--section-child) / 0.3);
-  }
-  
-  .section-title-signature {
-    color: hsl(var(--section-signature));
-    border-color: hsl(var(--section-signature) / 0.3);
-  }
-  
-  .section-title-info {
-    color: hsl(var(--section-info));
-    border-color: hsl(var(--section-info) / 0.3);
+    @apply rounded-2xl border p-6 mb-6 transition-all duration-200;
+    background: hsl(var(--card));
+    box-shadow: var(--shadow-card);
   }
 
   .form-grid {
@@ -188,5 +170,18 @@
   .signature-canvas {
     @apply border-2 border-dashed rounded-lg cursor-crosshair;
     border-color: hsl(var(--section-signature));
+  }
+
+  .glass-bar {
+    background: hsl(var(--background) / 0.85);
+    backdrop-filter: saturate(180%) blur(12px);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+  }
+
+  /* Subtle focus ring upgrade for form controls */
+  .focus-elegant:focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus);
+    border-color: hsl(var(--accent));
   }
 }
