@@ -4,7 +4,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Lock, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
 interface LoginFormProps {
   onLogin?: () => void;
@@ -15,7 +14,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [resetting, setResetting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,25 +28,16 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
         setError('Ungültige E-Mail oder Passwort');
         return;
       }
+      // Allow-list enforcement
+      const { data: allow } = await supabase.functions.invoke('auth-check-allowlist');
+      if (!allow?.allowed) {
+        await supabase.auth.signOut();
+        setError('Dieses Konto ist nicht für den Zugriff freigegeben.');
+        return;
+      }
       onLogin?.();
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleReset = async () => {
-    if (!email.trim()) { toast.error('Bitte E-Mail oben eingeben.'); return; }
-    setResetting(true);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      if (error) throw error;
-      toast.success('Reset-E-Mail gesendet (sofern ein Konto existiert).');
-    } catch {
-      toast.error('Konnte E-Mail nicht senden.');
-    } finally {
-      setResetting(false);
     }
   };
 
@@ -69,7 +58,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
               <Lock className="w-7 h-7 text-primary" />
             </div>
             <h1 className="font-display text-2xl font-semibold text-foreground tracking-tight">Smart Formular</h1>
-            <p className="text-muted-foreground mt-2 text-sm">Bitte melden Sie sich an, um fortzufahren</p>
+            <p className="text-muted-foreground mt-2 text-sm">Internes Tool — Zugang nur für freigegebene Konten</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -115,14 +104,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
             <Button type="submit" disabled={loading} className="w-full h-11 text-base font-medium">
               {loading ? 'Anmelden…' : 'Anmelden'}
             </Button>
-            <button
-              type="button"
-              onClick={handleReset}
-              disabled={resetting}
-              className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {resetting ? 'Sende…' : 'Passwort vergessen?'}
-            </button>
+            <p className="text-xs text-muted-foreground text-center pt-1">
+              Passwort vergessen? Bitte an einen Administrator wenden.
+            </p>
           </form>
         </div>
       </div>
