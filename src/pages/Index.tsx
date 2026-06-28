@@ -648,6 +648,13 @@ const Index = () => {
                 </div>
               )}
               
+              {/* BIG: Antrags-Variante zuerst abfragen */}
+              {formData.selectedKrankenkasse === 'big_plusbonus' && (
+                <div id="sec-big-variante">
+                  <BigPlusbonusSection formData={formData} updateFormData={updateFormData} mode="variante" />
+                </div>
+              )}
+
               <div id="sec-mitglied"><MemberSection formData={formData} updateFormData={updateFormData} /></div>
               
               {/* BKK GS spezifische Sektionen */}
@@ -687,13 +694,13 @@ const Index = () => {
               {/* BIG direkt gesund (Plusbonus) spezifische Sektionen */}
               {formData.selectedKrankenkasse === 'big_plusbonus' && (
                 <>
-                  <div id="sec-bigplus"><BigPlusbonusSection formData={formData} updateFormData={updateFormData} /></div>
                   {formData.bigFamilienversicherung && (
                     <>
                       <div id="sec-ehegatte"><SpouseSection formData={formData} updateFormData={updateFormData} /></div>
                       <div id="sec-kinder"><ChildrenSection formData={formData} updateFormData={updateFormData} /></div>
                     </>
                   )}
+                  <div id="sec-bigplus"><BigPlusbonusSection formData={formData} updateFormData={updateFormData} mode="main" /></div>
                 </>
               )}
 
