@@ -167,8 +167,8 @@ const Index = () => {
         return;
       }
       const b = formData.bigBank;
-      if (!b.kontoinhaber || !b.kreditinstitut || !b.iban || !b.bic || !b.ort || !b.datum) {
-        toast.error('Bitte alle Bankdaten (Kontoinhaber, Kreditinstitut, IBAN, BIC, Ort, Datum) ausfüllen.');
+      if (!b.kontoinhaber || !b.iban || !b.ort || !b.datum) {
+        toast.error('Bitte Bankdaten (Kontoinhaber, IBAN, Ort, Datum) ausfüllen.');
         return;
       }
       if (formData.bigFamilienversicherung) {
