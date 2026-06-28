@@ -67,6 +67,41 @@ const Index = () => {
     }
   }, []);
 
+  // Auto-Fill der BIG-„Mitversicherten Angehörigen" aus Ehegatte + Kindern,
+  // sobald die Familienversicherungs-Variante aktiv ist.
+  // Reihenfolge: Ehegatte zuerst (falls Name vorhanden), dann Kinder 1..N.
+  // Format pro Eintrag: "Nachname, Vorname". `hoehePolice` wird pro Position
+  // aus dem bisherigen State übernommen.
+  useEffect(() => {
+    if (formData.selectedKrankenkasse !== 'big_plusbonus') return;
+    if (!formData.bigFamilienversicherung) return;
+    const entries: { name: string; vorname: string }[] = [];
+    if (formData.ehegatte && (formData.ehegatte.name || formData.ehegatte.vorname)) {
+      entries.push({ name: formData.ehegatte.name, vorname: formData.ehegatte.vorname });
+    }
+    for (const k of formData.kinder) {
+      if (k.name || k.vorname) entries.push({ name: k.name, vorname: k.vorname });
+    }
+    const next = entries.map((e, i) => ({
+      nameVorname: [e.name, e.vorname].filter(Boolean).join(', '),
+      hoehePolice: formData.bigMitversicherte[i]?.hoehePolice ?? '',
+    }));
+    const prev = formData.bigMitversicherte;
+    const changed =
+      prev.length !== next.length ||
+      next.some((n, i) => n.nameVorname !== prev[i]?.nameVorname);
+    if (changed) {
+      setFormData(p => ({ ...p, bigMitversicherte: next }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    formData.selectedKrankenkasse,
+    formData.bigFamilienversicherung,
+    formData.ehegatte?.name,
+    formData.ehegatte?.vorname,
+    JSON.stringify(formData.kinder.map(k => [k.name, k.vorname])),
+  ]);
+
   if (authLoading) {
     return <div className="min-h-screen flex items-center justify-center text-slate-500">Lädt…</div>;
   }
