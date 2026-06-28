@@ -67,6 +67,41 @@ const Index = () => {
     }
   }, []);
 
+  // Auto-Fill der BIG-„Mitversicherten Angehörigen" aus Ehegatte + Kindern,
+  // sobald die Familienversicherungs-Variante aktiv ist.
+  // Reihenfolge: Ehegatte zuerst (falls Name vorhanden), dann Kinder 1..N.
+  // Format pro Eintrag: "Nachname, Vorname". `hoehePolice` wird pro Position
+  // aus dem bisherigen State übernommen.
+  useEffect(() => {
+    if (formData.selectedKrankenkasse !== 'big_plusbonus') return;
+    if (!formData.bigFamilienversicherung) return;
+    const entries: { name: string; vorname: string }[] = [];
+    if (formData.ehegatte && (formData.ehegatte.name || formData.ehegatte.vorname)) {
+      entries.push({ name: formData.ehegatte.name, vorname: formData.ehegatte.vorname });
+    }
+    for (const k of formData.kinder) {
+      if (k.name || k.vorname) entries.push({ name: k.name, vorname: k.vorname });
+    }
+    const next = entries.map((e, i) => ({
+      nameVorname: [e.name, e.vorname].filter(Boolean).join(', '),
+      hoehePolice: formData.bigMitversicherte[i]?.hoehePolice ?? '',
+    }));
+    const prev = formData.bigMitversicherte;
+    const changed =
+      prev.length !== next.length ||
+      next.some((n, i) => n.nameVorname !== prev[i]?.nameVorname);
+    if (changed) {
+      setFormData(p => ({ ...p, bigMitversicherte: next }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    formData.selectedKrankenkasse,
+    formData.bigFamilienversicherung,
+    formData.ehegatte?.name,
+    formData.ehegatte?.vorname,
+    JSON.stringify(formData.kinder.map(k => [k.name, k.vorname])),
+  ]);
+
   if (authLoading) {
     return <div className="min-h-screen flex items-center justify-center text-slate-500">Lädt…</div>;
   }
@@ -167,8 +202,8 @@ const Index = () => {
         return;
       }
       const b = formData.bigBank;
-      if (!b.kontoinhaber || !b.kreditinstitut || !b.iban || !b.bic || !b.ort || !b.datum) {
-        toast.error('Bitte alle Bankdaten (Kontoinhaber, Kreditinstitut, IBAN, BIC, Ort, Datum) ausfüllen.');
+      if (!b.kontoinhaber || !b.iban || !b.ort || !b.datum) {
+        toast.error('Bitte Bankdaten (Kontoinhaber, IBAN, Ort, Datum) ausfüllen.');
         return;
       }
       if (formData.bigFamilienversicherung) {
@@ -315,16 +350,18 @@ const Index = () => {
       }
       // BIG Plusbonus Export
       if (formData.selectedKrankenkasse === 'big_plusbonus') {
+        const plusbonusParts = Math.max(1, Math.ceil(formData.bigMitversicherte.length / 3));
         if (formData.bigFamilienversicherung) {
           toast.info('BIG Familienversicherung + Plusbonus PDFs werden erstellt...');
           await exportBigFamilienversicherung(formData);
           await exportBigPlusbonus(formData);
-          pdfCount = 2 + Math.max(0, Math.ceil(Math.max(0, formData.kinder.length - 3) / 3));
+          const famversParts = Math.max(1, Math.ceil(Math.max(1, formData.kinder.length) / 3));
+          pdfCount = famversParts + plusbonusParts;
           toast.success('BIG PDFs erfolgreich exportiert!');
         } else {
           toast.info('BIG direkt gesund Plusbonus PDF wird erstellt...');
           await exportBigPlusbonus(formData);
-          pdfCount = 1;
+          pdfCount = plusbonusParts;
           toast.success('BIG Plusbonus PDF erfolgreich exportiert!');
         }
       }
@@ -613,6 +650,13 @@ const Index = () => {
                 </div>
               )}
               
+              {/* BIG: Antrags-Variante zuerst abfragen */}
+              {formData.selectedKrankenkasse === 'big_plusbonus' && (
+                <div id="sec-big-variante">
+                  <BigPlusbonusSection formData={formData} updateFormData={updateFormData} mode="variante" />
+                </div>
+              )}
+
               <div id="sec-mitglied"><MemberSection formData={formData} updateFormData={updateFormData} /></div>
               
               {/* BKK GS spezifische Sektionen */}
@@ -652,13 +696,13 @@ const Index = () => {
               {/* BIG direkt gesund (Plusbonus) spezifische Sektionen */}
               {formData.selectedKrankenkasse === 'big_plusbonus' && (
                 <>
-                  <div id="sec-bigplus"><BigPlusbonusSection formData={formData} updateFormData={updateFormData} /></div>
                   {formData.bigFamilienversicherung && (
                     <>
                       <div id="sec-ehegatte"><SpouseSection formData={formData} updateFormData={updateFormData} /></div>
                       <div id="sec-kinder"><ChildrenSection formData={formData} updateFormData={updateFormData} /></div>
                     </>
                   )}
+                  <div id="sec-bigplus"><BigPlusbonusSection formData={formData} updateFormData={updateFormData} mode="main" /></div>
                 </>
               )}
 

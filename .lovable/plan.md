@@ -1,57 +1,34 @@
+## BIG direkt — UI/Logic Anpassungen
 
-# BIG direkt — Familienversicherung (Zusammenfassung_Familienversicherung)
+### 1. Reihenfolge der Abschnitte (Variante zuerst)
+- In `src/pages/Index.tsx` für Provider `big_plusbonus` den Abschnitt **„Antrags-Variante"** (Toggle `bigFamilienversicherung`) als **ersten** Block rendern — vor `MemberSection`, `SpouseSection`, `ChildrenSection`, `BigPlusbonusSection`, `SignatureSection`.
+- Dazu `BigPlusbonusSection` aufsplitten: ein neuer kleiner Block **`BigVarianteSection`** (nur der Toggle) wird ganz oben gerendert; der Rest von `BigPlusbonusSection` (Geschlecht, Versicherungsstatus, Versicherungsart, Mitversicherte, Bank) bleibt an seiner aktuellen Position unten.
+- Variante A (Toggle aus): Reihenfolge → Variante → Member → BigPlusbonus → Signatur (Spouse/Children ausgeblendet, wie heute).
+- Variante B (Toggle an): Variante → Member (volle Felder) → Spouse → Children → BigPlusbonus → Signatur.
 
-Leeres Template liegt jetzt vor. Implementierung kann komplett ausgeführt werden.
+### 2. „Mitversicherte Angehörige" — unbegrenzt + Multi-PDF Split
+- Limit von 3 in `BigPlusbonusSection` entfernen (Button immer sichtbar, keine `>= 3` Sperre, keine „max. 3" im Titel).
+- In `src/utils/bigPlusbonusExport.ts`: Wenn mehr als 3 Mitversicherte vorhanden → **mehrere Plusbonus-PDFs** generieren, jeweils mit max. 3 Mitversicherten (Felder `Name Vorname` / `_2` / `_3` und `Höhe der Police in Euro` / `_2` / `_3`). Alle anderen Mitglieds-/Bank-/Versicherungsdaten in jedem Teil identisch.
+- Dateiname-Schema analog Novitas/BIG-FamVers: `BIG-Plusbonus_Name_Vorname (Teil 1).pdf`, `(Teil 2).pdf`, … nur wenn >3; bei ≤3 unverändert ohne Suffix.
 
-## Konzept
+### 3. Auto-Fill der Mitversicherten bei Variante B
+- Wenn `bigFamilienversicherung === true`, werden die Namenfelder automatisch aus Ehegatte + Kindern befüllt (in der Reihenfolge: Ehegatte zuerst, dann Kinder 1..N). Fehlt der Ehegatte (kein Name/Vorname vorhanden) → Liste besteht nur aus Kindern.
+- Format pro Eintrag: `"Nachname, Vorname"` (leere Einträge übersprungen).
+- Verhalten: Die Auto-Fill-Liste **überschreibt** das `bigMitversicherte`-Array, solange Variante B aktiv ist und sich Ehegatte/Kinder-Namen ändern; `hoehePolice` bleibt manuell editierbar und wird beim Sync für vorhandene Einträge an gleicher Position beibehalten.
+- Implementiert via `useEffect` in `Index.tsx` (oder in `BigPlusbonusSection`) mit Abhängigkeiten auf Ehegatten-/Kindernamen und `bigFamilienversicherung`.
+- Wenn der Toggle wieder auf A wechselt, bleibt der zuletzt gesyncte Stand stehen (manuell editierbar).
 
-BIG direkt arbeitet ab jetzt – analog zu BKK GS – mit **einem einzigen UI-Formular** und zwei Export-Varianten:
+### 4. SEPA — Kreditinstitut & BIC optional
+- In `BigPlusbonusSection`: `required` von `Kreditinstitut` und `BIC` entfernen.
+- In `src/utils/validation.ts` (BIG-Block) die Pflichtprüfung für `bigBank.kreditinstitut` und `bigBank.bic` entfernen. `kontoinhaber`, `iban`, `ort`, `datum` bleiben Pflicht.
 
-- **Variante A — Plusbonus allein** (Einzelperson): nur die heutige Plusbonus-PDF.
-- **Variante B — Familienantrag + Plusbonus**: zusätzlich `Zusammenfassung_Familienversicherung.pdf`.
+### 5. Memory-Update
+- `mem/features/big-direkt-integration.md`: Reihenfolge der Abschnitte, „Mitversicherte unbegrenzt + Multi-PDF Split (>3 → Teil 1/2/…)", Auto-Fill-Regel aus Familie (Ehegatte zuerst, dann Kinder), neue Pflichtfeld-Liste SEPA (ohne Kreditinstitut/BIC) ergänzen. Alte „max. 3"-Aussage entfernen.
 
-Provider-Key `big_plusbonus` bleibt der einzige Eintrag für BIG. Im BIG-Bereich gibt es einen Toggle „Auch Familienversicherung beantragen“, der die zusätzlichen Felder/Sektionen aktiviert. Alle vorhandenen Sync- und Auto-Fill-Mechaniken (Mitglied → Ehegatte/Kinder, KK-Name, Adresse, Datum) wirken in beiden Varianten.
-
-## UI (Variante B aktiv)
-
-- Neuer Schalter `bigFamilienversicherung` im BIG-Bereich.
-- `MemberSection` blendet die heute für `big_plusbonus` versteckten Felder wieder ein: Geburtsdatum, Geburtsort, Geburtsland, KV-Nummer, Name bisherige KK, Familienstand, Telefon, E-Mail.
-- `SpouseSection` und `ChildrenSection` werden eingeblendet (Logik wie Novitas/DAK).
-- Globaler Sync (KV-Nr, Adresse, KK-Name → Familie) greift.
-
-## Pflichtfelder (Variante B)
-
-- **Mitglied**: Vorname, Name, Adresse, Telefon, E-Mail, KV-Nummer, Familienstand, Name bisherige KK.
-- **Ehegatte** (wenn angelegt): Beginn FamVers, Geburtsdatum, Geschlecht (m/w/x/d), Versichertennr., Enddatum bisherige Vers., Art der bisherigen Vers.
-- **Kinder** (je Kind): Beginn FamVers, Geburtsdatum, Geschlecht, Verwandtschaft (leiblich/Stief/Pflege/Enkel), Versichertennr.
-- **Angehörige ohne Rentenversicherungsnr.**: Geburtsname, Geburtsort, Geburtsland, Staatsangehörigkeit.
-- Plusbonus-Felder bleiben wie heute Pflicht.
-
-## Auto-Fill
-
-- „Bisherige Versicherung besteht weiter bei: **BIG direkt gesund**“ für alle Angehörigen voreingetragen.
-- „Name + Vorname Mitglied (Ableitung der FamVers)“ für Kinder = Vorname + Name des Mitglieds.
-- Ort + Datum der Mitglied-Unterschrift aus Adresse / Heute.
-- Geburtsland aus Geburtsort (bestehende Logik).
-
-## PDF-Naming
-
-`Zusammenfassung_Familienversicherung <Vorname> <Nachname>, <TT.MM.JJJJ>.pdf` (Geburtsdatum des Mitglieds). Plusbonus-PDF behält seinen aktuellen Namen.
-
-## Validierung & Export
-
-- `validation.ts`: zusätzlicher Block, der nur bei `bigFamilienversicherung === true` greift.
-- Neue Util `src/utils/bigFamversExport.ts` mit komplettem AcroField-Mapping aus der CSV:
-  - Seite 1: Mitglied (066/067/068/070-074/078/080), Familienstand-Radio, „bisher selbst/familienversichert/nicht“-Radio, Anlass-Radio, Ehegatte+3 Kinder-Spalten (082-130 Block) mit Beginn/Name/Vorname/Geburtsdatum/Geschlecht-Radio/Verwandtschaft-Radio/„nicht verwandt“-Checkbox/bisher-Enddatum/Art-Radio/abgeleitet-von-Name/weiter-bei.
-  - Seite 2: sonstige Angaben (131-177 Block), Versichertennummern + Rentenvers.-Nr. + Geburtsname/-ort/-land/Staatsang. (183-206), Ort/Datum (207/208) + Unterschriften-Widgets (208/209/210).
-- Encoding-/Whitespace-Fallback (Umlaute, doppelte Leerzeichen, kaputtes UTF-8) wie bei `bigPlusbonusExport`.
-- Signatur-Widgets: Mitglied → `208_Unterschriftsfeld 2`, Ehegatte → `210_Unterschriftsfeld 2`, Kind ≥15 → `209_Unterschriftsfeld 2` (Koordinaten aus CSV).
-- Beim Export werden in Variante B beide PDFs nacheinander erzeugt und in den bestehenden Download-/Merge-Flow gegeben.
-
-## Technical Details
-
-- Template: leeres PDF wird nach `public/big-familienversicherung.pdf` kopiert und per `fetch` geladen (wie andere Templates).
-- Neuer Flag im `FormData`: `bigFamilienversicherung: boolean` (default false).
-- `applyKrankenkassenMapping` für `big_plusbonus` so erweitern, dass bei aktiver Familienvers. auch `ehegatte`, `kinder`, Geburtsdaten, KV-Nr gemappt werden.
-- Memory: bestehende Datei `mem/features/big-plusbonus-integration.md` umbenennen/erweitern zu `mem/features/big-direkt-integration.md` mit beiden Varianten, Naming, Pflichtfeldern und AcroField-Mapping; Index aktualisieren.
-- JSON-Import & Freitext-Import-Beispiele für BIG entsprechend ergänzen (Familienfelder).
+### Betroffene Dateien
+- `src/components/BigPlusbonusSection.tsx` (Split + Limit weg + required weg)
+- neu: kleiner `BigVarianteSection` (oder Export des Toggle-Blocks aus obiger Datei)
+- `src/pages/Index.tsx` (Render-Reihenfolge + Auto-Fill-Effect)
+- `src/utils/bigPlusbonusExport.ts` (Multi-PDF Chunking + Filename-Suffix)
+- `src/utils/validation.ts` (SEPA-Pflichtfelder anpassen)
+- `mem/features/big-direkt-integration.md`

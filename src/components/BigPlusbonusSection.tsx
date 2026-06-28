@@ -12,9 +12,11 @@ import { Switch } from '@/components/ui/switch';
 interface Props {
   formData: FormData;
   updateFormData: (updates: Partial<FormData>) => void;
+  /** 'variante' = nur der Antrags-Varianten-Toggle, 'main' = alles außer dem Toggle, undefined = alles */
+  mode?: 'variante' | 'main';
 }
 
-export const BigPlusbonusSection: React.FC<Props> = ({ formData, updateFormData }) => {
+export const BigPlusbonusSection: React.FC<Props> = ({ formData, updateFormData, mode }) => {
   const updateBank = (updates: Partial<BigBankDaten>) => {
     updateFormData({ bigBank: { ...formData.bigBank, ...updates } });
   };
@@ -30,7 +32,6 @@ export const BigPlusbonusSection: React.FC<Props> = ({ formData, updateFormData 
   };
 
   const addMitversichert = () => {
-    if (formData.bigMitversicherte.length >= 3) return;
     updateFormData({ bigMitversicherte: [...formData.bigMitversicherte, { nameVorname: '', hoehePolice: '' }] });
   };
 
@@ -38,9 +39,8 @@ export const BigPlusbonusSection: React.FC<Props> = ({ formData, updateFormData 
     updateFormData({ bigMitversicherte: formData.bigMitversicherte.filter((_, i) => i !== idx) });
   };
 
-  return (
-    <>
-      <FormSection title="Antrags-Variante" variant="info">
+  const varianteBlock = (
+    <FormSection title="Antrags-Variante" variant="info">
         <Label
           htmlFor="big-famvers-toggle"
           className="flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer hover:border-primary transition-colors"
@@ -61,7 +61,10 @@ export const BigPlusbonusSection: React.FC<Props> = ({ formData, updateFormData 
           </div>
         </Label>
       </FormSection>
+  );
 
+  const mainBlock = (
+    <>
       <FormSection title="Geschlecht" variant="member">
         <RadioGroup
           value={formData.bigGeschlecht}
@@ -133,7 +136,7 @@ export const BigPlusbonusSection: React.FC<Props> = ({ formData, updateFormData 
         </div>
       </FormSection>
 
-      <FormSection title="Gilt auch für folgende mitversicherte Angehörige (max. 3)" variant="info">
+      <FormSection title="Gilt auch für folgende mitversicherte Angehörige" variant="info">
         <div className="space-y-3">
           {formData.bigMitversicherte.map((m, idx) => (
             <div key={idx} className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-3 items-end">
@@ -156,10 +159,13 @@ export const BigPlusbonusSection: React.FC<Props> = ({ formData, updateFormData 
               </Button>
             </div>
           ))}
-          {formData.bigMitversicherte.length < 3 && (
-            <Button type="button" variant="outline" onClick={addMitversichert} className="gap-2">
-              <Plus className="h-4 w-4" /> Angehörige hinzufügen
-            </Button>
+          <Button type="button" variant="outline" onClick={addMitversichert} className="gap-2">
+            <Plus className="h-4 w-4" /> Angehörige hinzufügen
+          </Button>
+          {formData.bigMitversicherte.length > 3 && (
+            <p className="text-xs text-muted-foreground">
+              Mehr als 3 Angehörige → es werden automatisch mehrere Plusbonus-PDFs erzeugt (Teil 1, Teil 2, …).
+            </p>
           )}
         </div>
       </FormSection>
@@ -180,7 +186,6 @@ export const BigPlusbonusSection: React.FC<Props> = ({ formData, updateFormData 
             label="Kreditinstitut"
             value={formData.bigBank.kreditinstitut}
             onChange={(v) => updateBank({ kreditinstitut: v })}
-            required
           />
           <FormField
             type="text"
@@ -196,7 +201,6 @@ export const BigPlusbonusSection: React.FC<Props> = ({ formData, updateFormData 
             label="BIC"
             value={formData.bigBank.bic}
             onChange={(v) => updateBank({ bic: v.toUpperCase() })}
-            required
           />
           <FormField
             type="text"
@@ -221,4 +225,8 @@ export const BigPlusbonusSection: React.FC<Props> = ({ formData, updateFormData 
       </FormSection>
     </>
   );
+
+  if (mode === 'variante') return varianteBlock;
+  if (mode === 'main') return mainBlock;
+  return <>{varianteBlock}{mainBlock}</>;
 };
