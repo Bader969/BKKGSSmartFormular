@@ -350,16 +350,18 @@ const Index = () => {
       }
       // BIG Plusbonus Export
       if (formData.selectedKrankenkasse === 'big_plusbonus') {
+        const plusbonusParts = Math.max(1, Math.ceil(formData.bigMitversicherte.length / 3));
         if (formData.bigFamilienversicherung) {
           toast.info('BIG Familienversicherung + Plusbonus PDFs werden erstellt...');
           await exportBigFamilienversicherung(formData);
           await exportBigPlusbonus(formData);
-          pdfCount = 2 + Math.max(0, Math.ceil(Math.max(0, formData.kinder.length - 3) / 3));
+          const famversParts = Math.max(1, Math.ceil(Math.max(1, formData.kinder.length) / 3));
+          pdfCount = famversParts + plusbonusParts;
           toast.success('BIG PDFs erfolgreich exportiert!');
         } else {
           toast.info('BIG direkt gesund Plusbonus PDF wird erstellt...');
           await exportBigPlusbonus(formData);
-          pdfCount = 1;
+          pdfCount = plusbonusParts;
           toast.success('BIG Plusbonus PDF erfolgreich exportiert!');
         }
       }
