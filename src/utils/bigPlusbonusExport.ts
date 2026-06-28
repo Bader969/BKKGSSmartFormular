@@ -83,9 +83,22 @@ export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
   const _sigs = getAutoSignatures(formData);
   formData = { ...formData, unterschrift: _sigs.member ?? '', unterschriftFamilie: _sigs.family ?? '' };
   const res = await fetch('/big-plusbonus.pdf');
-  const bytes = await res.arrayBuffer();
-  const pdfDoc = await PDFDocument.load(bytes);
-  const form = pdfDoc.getForm();
+  const templateBytes = await res.arrayBuffer();
+
+  // Mitversicherte in Chunks à 3 → ggf. mehrere PDFs ("Teil 1", "Teil 2", …)
+  const mv = formData.bigMitversicherte;
+  const chunkSize = 3;
+  const chunks: typeof mv[] = mv.length > 0
+    ? Array.from({ length: Math.ceil(mv.length / chunkSize) }, (_, i) =>
+        mv.slice(i * chunkSize, i * chunkSize + chunkSize)
+      )
+    : [[]];
+  const multi = chunks.length > 1;
+
+  for (let partIdx = 0; partIdx < chunks.length; partIdx++) {
+    const chunk = chunks[partIdx];
+    const pdfDoc = await PDFDocument.load(templateBytes);
+    const form = pdfDoc.getForm();
 
   // Personendaten
   setText(form, 'Name', formData.mitgliedName);
@@ -123,19 +136,18 @@ export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
   setCheck(form, 'Unfallversicherung', formData.bigVersicherungsarten.unfall);
   setCheck(form, 'Grundfähigkeitsversicherung', formData.bigVersicherungsarten.grundfaehigkeit);
 
-  // Mitversicherte Angehörige (bis zu 3)
-  const mv = formData.bigMitversicherte;
-  if (mv[0]) {
-    setText(form, 'Name Vorname', mv[0].nameVorname);
-    setText(form, 'Höhe der Police in Euro', mv[0].hoehePolice);
+  // Mitversicherte Angehörige – bis zu 3 pro PDF (aktueller Chunk)
+  if (chunk[0]) {
+    setText(form, 'Name Vorname', chunk[0].nameVorname);
+    setText(form, 'Höhe der Police in Euro', chunk[0].hoehePolice);
   }
-  if (mv[1]) {
-    setText(form, 'Name Vorname_2', mv[1].nameVorname);
-    setText(form, 'Höhe der Police in Euro_2', mv[1].hoehePolice);
+  if (chunk[1]) {
+    setText(form, 'Name Vorname_2', chunk[1].nameVorname);
+    setText(form, 'Höhe der Police in Euro_2', chunk[1].hoehePolice);
   }
-  if (mv[2]) {
-    setText(form, 'Name Vorname_3', mv[2].nameVorname);
-    setText(form, 'Höhe der Police in Euro_3', mv[2].hoehePolice);
+  if (chunk[2]) {
+    setText(form, 'Name Vorname_3', chunk[2].nameVorname);
+    setText(form, 'Höhe der Police in Euro_3', chunk[2].hoehePolice);
   }
 
   // Unterschrift Kontoinhaber als Bild über Signatur16-Widget
@@ -171,8 +183,11 @@ export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
     }
   }
 
-  // PDF NICHT flatten – AcroFields sollen bearbeitbar bleiben (wie bei anderen Kassen)
-  const out = await pdfDoc.save();
-  const fname = `BIG-Plusbonus_${formData.mitgliedName || 'Antrag'}_${formData.mitgliedVorname || ''}.pdf`.replace(/\s+/g, '_');
-  downloadPdf(out, fname);
+    // PDF NICHT flatten – AcroFields sollen bearbeitbar bleiben (wie bei anderen Kassen)
+    const out = await pdfDoc.save();
+    const suffix = multi ? ` (Teil ${partIdx + 1})` : '';
+    const base = `BIG-Plusbonus_${formData.mitgliedName || 'Antrag'}_${formData.mitgliedVorname || ''}`.replace(/\s+/g, '_');
+    const fname = `${base}${suffix}.pdf`;
+    downloadPdf(out, fname);
+  }
 };
