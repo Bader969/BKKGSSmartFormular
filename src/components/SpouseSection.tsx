@@ -185,26 +185,6 @@ export const SpouseSection: React.FC<SpouseSectionProps> = ({ formData, updateFo
           </div>
           
           {/* Copy Block für Ehegatte-Daten */}
-          {formData.selectedKrankenkasse === 'big_plusbonus' && formData.bigFamilienversicherung && (
-            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <Checkbox
-                  id="big-ehegatte-eigene-mitgliedschaft"
-                  checked={!!formData.ehegatte.eigeneMitgliedschaft}
-                  onCheckedChange={(checked) =>
-                    updateEhegatte({ eigeneMitgliedschaft: checked === true })
-                  }
-                />
-                <Label
-                  htmlFor="big-ehegatte-eigene-mitgliedschaft"
-                  className="text-sm font-medium cursor-pointer"
-                >
-                  Ehegatte hat eigene Mitgliedschaft (nicht familienversichert) → eigener Plusbonus-Antrag
-                </Label>
-              </div>
-            </div>
-          )}
-
           <CopyBlockButton
             label="Ehegatte-Daten"
             data={{
