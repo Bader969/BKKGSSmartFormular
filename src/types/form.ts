@@ -270,6 +270,9 @@ export interface FormData {
 
   // BIG direkt — zusätzlich Familienversicherung beantragen?
   bigFamilienversicherung: boolean;
+
+  // Vertriebspartner (intern, für Antragsliste — wird nicht in PDFs gerendert)
+  vertriebspartner: string;
 }
 
 export const createEmptyArztDaten = (): ArztDaten => ({
@@ -392,5 +395,6 @@ export const createInitialFormData = (): FormData => {
     },
     bigMitversicherte: [],
     bigFamilienversicherung: false,
+    vertriebspartner: '',
   };
 };
