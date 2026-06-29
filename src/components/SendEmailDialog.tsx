@@ -27,6 +27,28 @@ import { exportNovitasFamilienversicherung } from '@/utils/novitasExport';
 import { exportDAKFamilienversicherung } from '@/utils/dakExport';
 import { exportFilledPDF, exportRundumSicherPaketOnly } from '@/utils/pdfExport';
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onerror = () => reject(r.error);
+    r.onload = () => {
+      const s = r.result as string;
+      const c = s.indexOf(',');
+      resolve(c >= 0 ? s.slice(c + 1) : s);
+    };
+    r.readAsDataURL(file);
+  });
+}
+
+async function filesToFileForPdf(files: File[]): Promise<FileForPdf[]> {
+  return Promise.all(
+    files.map(async (f) => ({
+      base64: await fileToBase64(f),
+      mimeType: f.type || 'application/octet-stream',
+    })),
+  );
+}
+
 type Attachment = CapturedFile & { include: boolean };
 
 function sanitize(s: string): string {
@@ -154,7 +176,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
     setCombiningDocs(true);
     try {
       const all = [...uploadedDocs, ...arr];
-      const forPdf: FileForPdf[] = all.map((f) => ({ file: f, name: f.name, type: f.type }));
+      const forPdf = await filesToFileForPdf(all);
       const blob = await createCombinedPdf(forPdf);
       const filename = `${baseFilename(formData)}_Dokumente.pdf`;
       setAttachments((prev) => {
@@ -178,7 +200,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
     }
     setCombiningDocs(true);
     try {
-      const forPdf: FileForPdf[] = next.map((f) => ({ file: f, name: f.name, type: f.type }));
+      const forPdf = await filesToFileForPdf(next);
       const blob = await createCombinedPdf(forPdf);
       const filename = `${baseFilename(formData)}_Dokumente.pdf`;
       setAttachments((prev) => {
