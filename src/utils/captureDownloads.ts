@@ -9,6 +9,7 @@ export type CapturedFile = { filename: string; blob: Blob };
 
 export async function captureDownloads(run: () => Promise<void>): Promise<CapturedFile[]> {
   const collected: CapturedFile[] = [];
+  const pendingFetches: Promise<unknown>[] = [];
   const originalClick = HTMLAnchorElement.prototype.click;
 
   HTMLAnchorElement.prototype.click = function patchedClick(this: HTMLAnchorElement) {
@@ -16,13 +17,10 @@ export async function captureDownloads(run: () => Promise<void>): Promise<Captur
       const href = this.getAttribute('href') || '';
       const filename = this.getAttribute('download') || '';
       if (filename && href.startsWith('blob:')) {
-        // Fetch the blob URL synchronously-ish via a microtask queue; we have to
-        // resolve before the caller revokes the object URL on the next line.
         const pending = fetch(href)
           .then((r) => r.blob())
           .then((blob) => { collected.push({ filename, blob }); })
           .catch(() => { /* ignore */ });
-        // Park the promise so we can await it after `run()` finishes.
         pendingFetches.push(pending);
         return;
       }
@@ -31,8 +29,6 @@ export async function captureDownloads(run: () => Promise<void>): Promise<Captur
     }
     return originalClick.call(this);
   } as typeof HTMLAnchorElement.prototype.click;
-
-  const pendingFetches: Promise<unknown>[] = [];
 
   try {
     await run();
