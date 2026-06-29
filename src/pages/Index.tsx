@@ -350,7 +350,15 @@ const Index = () => {
       }
       // BIG Plusbonus Export
       if (formData.selectedKrankenkasse === 'big_plusbonus') {
-        const plusbonusParts = Math.max(1, Math.ceil(formData.bigMitversicherte.length / 3));
+        const partsPerPerson = Math.max(1, Math.ceil(formData.bigMitversicherte.length / 3));
+        let plusbonusPersons = 1; // Mitglied
+        if (formData.bigFamilienversicherung) {
+          if (formData.ehegatte?.eigeneMitgliedschaft && (formData.ehegatte.vorname || formData.ehegatte.name)) {
+            plusbonusPersons += 1;
+          }
+          plusbonusPersons += formData.kinder.filter(k => k.eigeneMitgliedschaft && (k.vorname || k.name)).length;
+        }
+        const plusbonusParts = partsPerPerson * plusbonusPersons;
         if (formData.bigFamilienversicherung) {
           toast.info('BIG Familienversicherung + Plusbonus PDFs werden erstellt...');
           await exportBigFamilienversicherung(formData);
