@@ -9,6 +9,7 @@ import { ViactivSection } from '@/components/ViactivSection';
 import { BigPlusbonusSection } from '@/components/BigPlusbonusSection';
 import { Button } from '@/components/ui/button';
 import { FileDown, FileText, AlertCircle, Users, User, Building2, LogOut, ShieldCheck, Sparkles, ChevronRight, Save, Archive, Settings } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { exportFilledPDF, exportRundumSicherPaketOnly } from '@/utils/pdfExport';
 import { exportViactivBeitrittserklaerung } from '@/utils/viactivExport';
 import { exportViactivFamilienversicherung } from '@/utils/viactivFamilyExport';
@@ -26,6 +27,7 @@ import type { Session } from '@supabase/supabase-js';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { FreitextImportDialog } from '@/components/FreitextImportDialog';
 import { DocumentMergeDialog } from '@/components/DocumentMergeDialog';
+import { SendEmailDialog } from '@/components/SendEmailDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Link } from 'react-router-dom';
@@ -40,6 +42,7 @@ const Index = () => {
   const [formData, setFormData] = useState<FormData>(createInitialFormData);
   const [isExporting, setIsExporting] = useState(false);
   const [applicationId, setApplicationId] = useState<string | null>(null);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const { save, saving, markExported } = useApplicationPersistence();
   const { isAdmin } = useUserRole();
   const [vpMode, setVpMode] = useState<'preset' | 'custom'>('preset');
@@ -540,6 +543,11 @@ const Index = () => {
                 <Link to="/admin"><Settings className="h-4 w-4" /><span className="hidden md:inline ml-1">Admin</span></Link>
               </Button>
             )}
+            {isAdmin && (
+              <Button asChild variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" title="E-Mail-Empfänger">
+                <Link to="/empfaenger"><Mail className="h-4 w-4" /><span className="hidden md:inline ml-1">E-Mail</span></Link>
+              </Button>
+            )}
             <ThemeToggle />
             <Button
               variant="ghost"
@@ -862,6 +870,26 @@ const Index = () => {
                       <FileDown className="h-5 w-5" />
                       {isExporting ? 'Exportiere…' : 'PDF Exportieren'}
                     </Button>
+                    <Button
+                      type="button"
+                      size="lg"
+                      variant="outline"
+                      onClick={async () => {
+                        if (!formData.vertriebspartner?.trim()) { toast.error('Bitte Vertriebspartner wählen.'); return; }
+                        if (!formData.selectedKrankenkasse) { toast.error('Bitte Krankenkasse wählen.'); return; }
+                        // auto-save first so audit event has an application_id
+                        try {
+                          const app = await save({ applicationId, formData });
+                          if (!applicationId) setApplicationId(app.id);
+                        } catch { /* ignore */ }
+                        setEmailDialogOpen(true);
+                      }}
+                      disabled={isExporting || !formData.vertriebspartner?.trim() || !formData.selectedKrankenkasse}
+                      className="gap-2"
+                    >
+                      <Mail className="h-5 w-5" />
+                      Per E-Mail senden
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -870,6 +898,14 @@ const Index = () => {
         </form>
         </div>
       </main>
+
+      <SendEmailDialog
+        open={emailDialogOpen}
+        onOpenChange={setEmailDialogOpen}
+        formData={formData}
+        applicationId={applicationId}
+        bearbeiter={session?.user?.user_metadata?.display_name || session?.user?.email || ''}
+      />
       
       {/* Footer */}
       <footer className="border-t border-border/60 py-6 px-4 mt-8">

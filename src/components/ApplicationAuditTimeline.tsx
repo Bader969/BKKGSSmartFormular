@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useApplicationPersistence } from "@/hooks/useApplicationPersistence";
-import { Clock, Plus, Pencil, FileDown, Eye, KeyRound, Trash2 } from "lucide-react";
+import { Clock, Plus, Pencil, FileDown, Eye, KeyRound, Trash2, Mail } from "lucide-react";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   created: Plus,
@@ -9,6 +9,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   opened: Eye,
   decrypted: KeyRound,
   deleted: Trash2,
+  emailed: Mail,
 };
 
 const LABELS: Record<string, string> = {
@@ -18,6 +19,7 @@ const LABELS: Record<string, string> = {
   opened: "Geöffnet",
   decrypted: "Entschlüsselt",
   deleted: "Gelöscht",
+  emailed: "Per E-Mail versendet",
 };
 
 export function ApplicationAuditTimeline({ applicationId }: { applicationId: string }) {
