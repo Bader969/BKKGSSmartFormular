@@ -1,0 +1,59 @@
+/**
+ * Run an async block while intercepting every anchor-based file download
+ * (the pattern used by the PDF export utils:  a.href = blob:…; a.download = name; a.click()).
+ * Returns the collected files as { filename, blob } pairs.
+ *
+ * The original download is suppressed so nothing pops up in the user's browser.
+ */
+export type CapturedFile = { filename: string; blob: Blob };
+
+export async function captureDownloads(run: () => Promise<void>): Promise<CapturedFile[]> {
+  const collected: CapturedFile[] = [];
+  const originalClick = HTMLAnchorElement.prototype.click;
+
+  HTMLAnchorElement.prototype.click = function patchedClick(this: HTMLAnchorElement) {
+    try {
+      const href = this.getAttribute('href') || '';
+      const filename = this.getAttribute('download') || '';
+      if (filename && href.startsWith('blob:')) {
+        // Fetch the blob URL synchronously-ish via a microtask queue; we have to
+        // resolve before the caller revokes the object URL on the next line.
+        const pending = fetch(href)
+          .then((r) => r.blob())
+          .then((blob) => { collected.push({ filename, blob }); })
+          .catch(() => { /* ignore */ });
+        // Park the promise so we can await it after `run()` finishes.
+        pendingFetches.push(pending);
+        return;
+      }
+    } catch {
+      // fall through to original click
+    }
+    return originalClick.call(this);
+  } as typeof HTMLAnchorElement.prototype.click;
+
+  const pendingFetches: Promise<unknown>[] = [];
+
+  try {
+    await run();
+    await Promise.all(pendingFetches);
+  } finally {
+    HTMLAnchorElement.prototype.click = originalClick;
+  }
+
+  return collected;
+}
+
+export function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => {
+      const result = reader.result as string;
+      // strip the "data:...;base64," prefix
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.readAsDataURL(blob);
+  });
+}
