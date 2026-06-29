@@ -111,8 +111,9 @@ const buildPlusbonusPdfsForPerson = async (
   formData: FormData,
   templateBytes: ArrayBuffer,
   person: Antragsperson,
+  includeMitversicherte: boolean = false,
 ): Promise<void> => {
-  const mv = formData.bigMitversicherte;
+  const mv = includeMitversicherte ? formData.bigMitversicherte : [];
   const chunkSize = 3;
   const chunks: typeof mv[] = mv.length > 0
     ? Array.from({ length: Math.ceil(mv.length / chunkSize) }, (_, i) =>
@@ -242,12 +243,13 @@ export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
     plz: formData.mitgliedPlz,
     ort: formData.ort,
   };
-  await buildPlusbonusPdfsForPerson(formData, templateBytes, mitglied);
+  await buildPlusbonusPdfsForPerson(formData, templateBytes, mitglied, true);
 
   // 2) Variante B: Ehegatte/Kinder mit eigener Mitgliedschaft → eigener Plusbonus
   if (formData.bigFamilienversicherung) {
     const e = formData.ehegatte;
-    if (e && e.eigeneMitgliedschaft && (e.vorname || e.name)) {
+    const eHasOwn = e && (e.eigeneMitgliedschaft === true || e.bisherigArt === 'mitgliedschaft') && (e.vorname || e.name);
+    if (eHasOwn) {
       const eMap: Antragsperson['geschlecht'] =
         e.geschlecht === 'm' ? 'maennlich' :
         e.geschlecht === 'w' ? 'weiblich' :
@@ -262,11 +264,12 @@ export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
         plz: formData.mitgliedPlz,
         ort: formData.ort,
       };
-      await buildPlusbonusPdfsForPerson(formData, templateBytes, ehegatte);
+      await buildPlusbonusPdfsForPerson(formData, templateBytes, ehegatte, false);
     }
 
     for (const k of formData.kinder) {
-      if (!k.eigeneMitgliedschaft) continue;
+      const kHasOwn = (k.eigeneMitgliedschaft === true || k.bisherigArt === 'mitgliedschaft');
+      if (!kHasOwn) continue;
       if (!k.vorname && !k.name) continue;
       const kind: Antragsperson = {
         vorname: k.vorname,
@@ -278,7 +281,7 @@ export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
         plz: formData.mitgliedPlz,
         ort: formData.ort,
       };
-      await buildPlusbonusPdfsForPerson(formData, templateBytes, kind);
+      await buildPlusbonusPdfsForPerson(formData, templateBytes, kind, false);
     }
   }
 };

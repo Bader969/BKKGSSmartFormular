@@ -107,26 +107,6 @@ export const ChildrenSection: React.FC<ChildrenSectionProps> = ({ formData, upda
                 </div>
               </div>
               
-              {formData.selectedKrankenkasse === 'big_plusbonus' && formData.bigFamilienversicherung && (
-                <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <Checkbox
-                      id={`big-kind${index}-eigene-mitgliedschaft`}
-                      checked={!!kind.eigeneMitgliedschaft}
-                      onCheckedChange={(checked) =>
-                        updateKind(index, { eigeneMitgliedschaft: checked === true })
-                      }
-                    />
-                    <Label
-                      htmlFor={`big-kind${index}-eigene-mitgliedschaft`}
-                      className="text-sm font-medium cursor-pointer"
-                    >
-                      Kind hat eigene Mitgliedschaft (nicht familienversichert) → eigener Plusbonus-Antrag
-                    </Label>
-                  </div>
-                </div>
-              )}
-
               {/* Copy Block für Kind-Daten */}
               <CopyBlockButton
                 label={`Kind ${index + 1} Daten`}
