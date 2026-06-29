@@ -142,6 +142,37 @@ const Index = () => {
           newData.bigBank = { ...newData.bigBank, kontoinhaber: newFullName };
         }
       }
+
+      // Automatische Synchronisierung des Ortes (obere Anschrift → alle Ort-Folgefelder)
+      if ('ort' in updates) {
+        const oldOrt = prev.ort || '';
+        const newOrt = (updates.ort as string) || '';
+        // bigBank.ort (Ort der Unterschrift im BIG Plusbonus)
+        if (!newData.bigBank.ort || newData.bigBank.ort === oldOrt) {
+          newData.bigBank = { ...newData.bigBank, ort: newOrt };
+        }
+        // VIACTIV Arbeitgeber-Ort
+        if (!newData.viactivArbeitgeber.ort || newData.viactivArbeitgeber.ort === oldOrt) {
+          newData.viactivArbeitgeber = { ...newData.viactivArbeitgeber, ort: newOrt };
+        }
+        // Arzt-Orte (Rundum-Sicher-Paket)
+        const rsp = newData.rundumSicherPaket;
+        if (rsp) {
+          const updatedRsp = { ...rsp };
+          if (!updatedRsp.arztMitglied?.ort || updatedRsp.arztMitglied.ort === oldOrt) {
+            updatedRsp.arztMitglied = { ...(updatedRsp.arztMitglied || { name: '', ort: '' }), ort: newOrt };
+          }
+          if (!updatedRsp.arztEhegatte?.ort || updatedRsp.arztEhegatte.ort === oldOrt) {
+            updatedRsp.arztEhegatte = { ...(updatedRsp.arztEhegatte || { name: '', ort: '' }), ort: newOrt };
+          }
+          if (Array.isArray(updatedRsp.aerzteKinder)) {
+            updatedRsp.aerzteKinder = updatedRsp.aerzteKinder.map(a =>
+              !a?.ort || a.ort === oldOrt ? { ...(a || { name: '', ort: '' }), ort: newOrt } : a
+            );
+          }
+          newData.rundumSicherPaket = updatedRsp;
+        }
+      }
       
       return newData;
     });
