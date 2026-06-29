@@ -1,34 +1,46 @@
-## BIG direkt — UI/Logic Anpassungen
+# BIG Plusbonus – eigene Anträge für Ehegatte/Kinder mit eigener Mitgliedschaft
 
-### 1. Reihenfolge der Abschnitte (Variante zuerst)
-- In `src/pages/Index.tsx` für Provider `big_plusbonus` den Abschnitt **„Antrags-Variante"** (Toggle `bigFamilienversicherung`) als **ersten** Block rendern — vor `MemberSection`, `SpouseSection`, `ChildrenSection`, `BigPlusbonusSection`, `SignatureSection`.
-- Dazu `BigPlusbonusSection` aufsplitten: ein neuer kleiner Block **`BigVarianteSection`** (nur der Toggle) wird ganz oben gerendert; der Rest von `BigPlusbonusSection` (Geschlecht, Versicherungsstatus, Versicherungsart, Mitversicherte, Bank) bleibt an seiner aktuellen Position unten.
-- Variante A (Toggle aus): Reihenfolge → Variante → Member → BigPlusbonus → Signatur (Spouse/Children ausgeblendet, wie heute).
-- Variante B (Toggle an): Variante → Member (volle Felder) → Spouse → Children → BigPlusbonus → Signatur.
+## Ziel
+Wenn in Variante B (`bigFamilienversicherung = true`) der Ehegatte oder ein Kind `eigeneMitgliedschaft = true` hat, wird zusätzlich zum FamVers-Antrag des Mitglieds **ein eigener Plusbonus-Antrag pro solcher Person** erzeugt. SEPA bleibt über alle Anträge identisch. Neue Dateinamen-Konvention für Plusbonus-Anträge.
 
-### 2. „Mitversicherte Angehörige" — unbegrenzt + Multi-PDF Split
-- Limit von 3 in `BigPlusbonusSection` entfernen (Button immer sichtbar, keine `>= 3` Sperre, keine „max. 3" im Titel).
-- In `src/utils/bigPlusbonusExport.ts`: Wenn mehr als 3 Mitversicherte vorhanden → **mehrere Plusbonus-PDFs** generieren, jeweils mit max. 3 Mitversicherten (Felder `Name Vorname` / `_2` / `_3` und `Höhe der Police in Euro` / `_2` / `_3`). Alle anderen Mitglieds-/Bank-/Versicherungsdaten in jedem Teil identisch.
-- Dateiname-Schema analog Novitas/BIG-FamVers: `BIG-Plusbonus_Name_Vorname (Teil 1).pdf`, `(Teil 2).pdf`, … nur wenn >3; bei ≤3 unverändert ohne Suffix.
+## Verhalten
 
-### 3. Auto-Fill der Mitversicherten bei Variante B
-- Wenn `bigFamilienversicherung === true`, werden die Namenfelder automatisch aus Ehegatte + Kindern befüllt (in der Reihenfolge: Ehegatte zuerst, dann Kinder 1..N). Fehlt der Ehegatte (kein Name/Vorname vorhanden) → Liste besteht nur aus Kindern.
-- Format pro Eintrag: `"Nachname, Vorname"` (leere Einträge übersprungen).
-- Verhalten: Die Auto-Fill-Liste **überschreibt** das `bigMitversicherte`-Array, solange Variante B aktiv ist und sich Ehegatte/Kinder-Namen ändern; `hoehePolice` bleibt manuell editierbar und wird beim Sync für vorhandene Einträge an gleicher Position beibehalten.
-- Implementiert via `useEffect` in `Index.tsx` (oder in `BigPlusbonusSection`) mit Abhängigkeiten auf Ehegatten-/Kindernamen und `bigFamilienversicherung`.
-- Wenn der Toggle wieder auf A wechselt, bleibt der zuletzt gesyncte Stand stehen (manuell editierbar).
+1. **Mitglieds-Plusbonus** (bestehend): wird wie bisher erzeugt – Status/Art/Mitversicherte aus dem Hauptformular.
+2. **Pro Ehegatte mit `eigeneMitgliedschaft`**: eigener Plusbonus-Antrag. Person als Antragsteller (Vorname/Name/Geburtsdatum/Geschlecht). Adresse = Mitglieds-Adresse. SEPA, Versicherungsstatus, `bigHoeheEuro`, `bigVersicherungsarten`, `bigMitversicherte` werden vom Hauptantrag **übernommen** (gleiche Chunk-Logik bei >3 Mitversicherten).
+3. **Pro Kind mit `eigeneMitgliedschaft`**: analog. Adresse vom Mitglied. Geschlecht: Mapping `m→maennlich`, `w→weiblich`, `d→divers`.
+4. **SEPA-Mandat-Daten** (`formData.bigBank`, inkl. Kontoinhaber, IBAN, BIC, Kreditinstitut, Ort, Datum) sind in **jedem** generierten Plusbonus-Antrag identisch.
+5. **Unterschrift im Plusbonus** der Person: weiterhin Mitglieds-Unterschrift (Kontoinhaber). Keine separate Person-Unterschrift im Plusbonus-PDF.
 
-### 4. SEPA — Kreditinstitut & BIC optional
-- In `BigPlusbonusSection`: `required` von `Kreditinstitut` und `BIC` entfernen.
-- In `src/utils/validation.ts` (BIG-Block) die Pflichtprüfung für `bigBank.kreditinstitut` und `bigBank.bic` entfernen. `kontoinhaber`, `iban`, `ort`, `datum` bleiben Pflicht.
+## Datei-Benennung Plusbonus (neu für **alle** Plusbonus-PDFs)
 
-### 5. Memory-Update
-- `mem/features/big-direkt-integration.md`: Reihenfolge der Abschnitte, „Mitversicherte unbegrenzt + Multi-PDF Split (>3 → Teil 1/2/…)", Auto-Fill-Regel aus Familie (Ehegatte zuerst, dann Kinder), neue Pflichtfeld-Liste SEPA (ohne Kreditinstitut/BIC) ergänzen. Alte „max. 3"-Aussage entfernen.
+Format: `Antrag Plusbonus-interaktiv-{Versicherungsbeginn TT.MM.JJJJ}, {Vorname} {Nachname}, {Geburtsdatum TT.MM.JJJJ}.pdf`
 
-### Betroffene Dateien
-- `src/components/BigPlusbonusSection.tsx` (Split + Limit weg + required weg)
-- neu: kleiner `BigVarianteSection` (oder Export des Toggle-Blocks aus obiger Datei)
-- `src/pages/Index.tsx` (Render-Reihenfolge + Auto-Fill-Effect)
-- `src/utils/bigPlusbonusExport.ts` (Multi-PDF Chunking + Filename-Suffix)
-- `src/utils/validation.ts` (SEPA-Pflichtfelder anpassen)
-- `mem/features/big-direkt-integration.md`
+- **Versicherungsbeginn** = `getBeginDate()` (heutiger Monat + 3, 1. des Monats) – globale Logik, gleich für alle Anträge.
+- **Vorname/Nachname/Geburtsdatum** = die jeweilige Antragsperson (Mitglied bzw. Ehegatte bzw. Kind).
+- Bei >3 Mitversicherten Chunks: `… (Teil N).pdf` als Suffix vor `.pdf`.
+- Gilt auch in Variante A (nur Mitglied), damit es eine einheitliche Konvention gibt.
+
+## Technische Umsetzung
+
+### `src/utils/bigPlusbonusExport.ts`
+- Neue interne Funktion `buildPlusbonusPdfs(formData, antragsperson)` mit `antragsperson = { vorname, name, geburtsdatum, geschlecht: 'maennlich'|'weiblich'|'divers', strasse, hausnummer, plz, ort }`. Erzeugt 1..N PDFs (Chunk-Logik bleibt).
+- Bestehende Felder-Befüllung (Name/Vorname/Adresse/Geschlecht) liest aus `antragsperson` statt direkt aus `formData.mitglied*`. SEPA/Status/Art/Mitversicherte/Unterschrift bleiben aus `formData`.
+- Neue Filename-Funktion:
+  ```
+  const beginnStr = formatDateGerman(getBeginDate());        // "01.09.2026"
+  const gebStr    = toGerman(antragsperson.geburtsdatum);    // "TT.MM.JJJJ" oder "" wenn leer
+  `Antrag Plusbonus-interaktiv-${beginnStr}, ${vorname} ${name}, ${gebStr}${suffix}.pdf`
+  ```
+- `exportBigPlusbonus(formData)` ruft `buildPlusbonusPdfs` zuerst für das Mitglied auf. In Variante B zusätzlich für jeden Ehegatten/jedes Kind mit `eigeneMitgliedschaft === true`. Reihenfolge: Mitglied → Ehegatte → Kinder.
+- Kinder-Geschlecht: `kind.geschlecht` (`m|w|d`) → maennlich/weiblich/divers.
+
+### `src/pages/Index.tsx`
+- Keine Order-Änderung. Beim Export-Aufruf nichts zu ändern (Funktion bleibt einheitlich).
+- Validierung: Pflichtfeld-Check für Person mit eigener Mitgliedschaft (Vorname, Name, Geburtsdatum, Geschlecht) – bereits durch bestehende FamVers-Validierung abgedeckt.
+- `pdfCount` für Toast: anpassen, sodass Mitglieds-Chunks + pro „eigene Mitgliedschaft"-Person die jeweilige Chunk-Anzahl addiert wird (gleiche Chunk-Größe, da Mitversicherte identisch).
+
+### `mem/features/big-direkt-integration.md`
+- Abschnitt aktualisieren: neue Filename-Konvention (Plusbonus überall), Regel „eigene Mitgliedschaft → eigener Plusbonus", SEPA identisch über alle Anträge.
+
+## Nicht im Scope
+- Keine Änderungen an FamVers-Export, FamVers-Dateinamen, UI, oder Validation-Logik außerhalb des oben Genannten.

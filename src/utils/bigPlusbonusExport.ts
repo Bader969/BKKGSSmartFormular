@@ -1,6 +1,7 @@
 import { PDFDocument, PDFTextField, PDFCheckBox } from 'pdf-lib';
 import { FormData } from '@/types/form';
 import { getAutoSignatures, ensureSignatureFontReady } from './generateSignature';
+import { getBeginDate, formatDateGerman } from './dateUtils';
 
 // Convert ISO YYYY-MM-DD or DD.MM.YYYY -> DDMMJJ (6-digit, two-digit year)
 const toDDMMJJ = (input: string): string => {
@@ -17,6 +18,34 @@ const toDDMMJJ = (input: string): string => {
   }
   if (!y || !m || !d) return '';
   return `${d.padStart(2, '0')}${m.padStart(2, '0')}${y.slice(-2)}`;
+};
+
+// Convert ISO YYYY-MM-DD or DD.MM.YYYY -> DD.MM.YYYY
+const toGermanDate = (input: string): string => {
+  if (!input) return '';
+  if (input.includes('-')) {
+    const [yy, mm, dd] = input.split('-');
+    if (yy && mm && dd) return `${dd.padStart(2, '0')}.${mm.padStart(2, '0')}.${yy}`;
+  }
+  return input;
+};
+
+type Antragsperson = {
+  vorname: string;
+  name: string;
+  geburtsdatum: string; // ISO or DE
+  geschlecht: 'maennlich' | 'weiblich' | 'divers' | '';
+  strasse: string;
+  hausnummer: string;
+  plz: string;
+  ort: string;
+};
+
+const mapKindGeschlecht = (g: string): Antragsperson['geschlecht'] => {
+  if (g === 'm') return 'maennlich';
+  if (g === 'w') return 'weiblich';
+  if (g === 'd' || g === 'x') return 'divers';
+  return '';
 };
 
 // Erzeuge Encoding-/Whitespace-Varianten eines Feldnamens
@@ -78,14 +107,11 @@ const downloadPdf = (bytes: Uint8Array, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
-export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
-  await ensureSignatureFontReady();
-  const _sigs = getAutoSignatures(formData);
-  formData = { ...formData, unterschrift: _sigs.member ?? '', unterschriftFamilie: _sigs.family ?? '' };
-  const res = await fetch('/big-plusbonus.pdf');
-  const templateBytes = await res.arrayBuffer();
-
-  // Mitversicherte in Chunks à 3 → ggf. mehrere PDFs ("Teil 1", "Teil 2", …)
+const buildPlusbonusPdfsForPerson = async (
+  formData: FormData,
+  templateBytes: ArrayBuffer,
+  person: Antragsperson,
+): Promise<void> => {
   const mv = formData.bigMitversicherte;
   const chunkSize = 3;
   const chunks: typeof mv[] = mv.length > 0
@@ -95,23 +121,26 @@ export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
     : [[]];
   const multi = chunks.length > 1;
 
+  const beginnStr = formatDateGerman(getBeginDate());
+  const gebStr = toGermanDate(person.geburtsdatum);
+
   for (let partIdx = 0; partIdx < chunks.length; partIdx++) {
     const chunk = chunks[partIdx];
     const pdfDoc = await PDFDocument.load(templateBytes);
     const form = pdfDoc.getForm();
 
-  // Personendaten
-  setText(form, 'Name', formData.mitgliedName);
-  setText(form, 'Vorname', formData.mitgliedVorname);
-  setText(form, 'Straße', formData.mitgliedStrasse);
-  setText(form, 'Hausnummer', formData.mitgliedHausnummer);
-  setText(form, 'PLZ', formData.mitgliedPlz);
-  setText(form, 'Ort', formData.ort);
+  // Personendaten (Antragsteller dieses PDFs)
+  setText(form, 'Name', person.name);
+  setText(form, 'Vorname', person.vorname);
+  setText(form, 'Straße', person.strasse);
+  setText(form, 'Hausnummer', person.hausnummer);
+  setText(form, 'PLZ', person.plz);
+  setText(form, 'Ort', person.ort);
 
   // Geschlecht
-  setCheck(form, 'männlich', formData.bigGeschlecht === 'maennlich');
-  setCheck(form, 'weiblich', formData.bigGeschlecht === 'weiblich');
-  setCheck(form, 'divers', formData.bigGeschlecht === 'divers');
+  setCheck(form, 'männlich', person.geschlecht === 'maennlich');
+  setCheck(form, 'weiblich', person.geschlecht === 'weiblich');
+  setCheck(form, 'divers', person.geschlecht === 'divers');
 
   // Bankdaten
   setText(form, 'Kontoinhaberin', formData.bigBank.kontoinhaber);
@@ -186,8 +215,70 @@ export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
     // PDF NICHT flatten – AcroFields sollen bearbeitbar bleiben (wie bei anderen Kassen)
     const out = await pdfDoc.save();
     const suffix = multi ? ` (Teil ${partIdx + 1})` : '';
-    const base = `BIG-Plusbonus_${formData.mitgliedName || 'Antrag'}_${formData.mitgliedVorname || ''}`.replace(/\s+/g, '_');
-    const fname = `${base}${suffix}.pdf`;
+    const vornameOut = (person.vorname || '').trim();
+    const nameOut = (person.name || '').trim();
+    const personLabel = [vornameOut, nameOut].filter(Boolean).join(' ') || 'Antrag';
+    const gebLabel = gebStr ? `, ${gebStr}` : '';
+    const fname = `Antrag Plusbonus-interaktiv-${beginnStr}, ${personLabel}${gebLabel}${suffix}.pdf`;
     downloadPdf(out, fname);
+  }
+};
+
+export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
+  await ensureSignatureFontReady();
+  const _sigs = getAutoSignatures(formData);
+  formData = { ...formData, unterschrift: _sigs.member ?? '', unterschriftFamilie: _sigs.family ?? '' };
+  const res = await fetch('/big-plusbonus.pdf');
+  const templateBytes = await res.arrayBuffer();
+
+  // 1) Mitglied immer
+  const mitglied: Antragsperson = {
+    vorname: formData.mitgliedVorname,
+    name: formData.mitgliedName,
+    geburtsdatum: formData.mitgliedGeburtsdatum,
+    geschlecht: formData.bigGeschlecht as Antragsperson['geschlecht'],
+    strasse: formData.mitgliedStrasse,
+    hausnummer: formData.mitgliedHausnummer,
+    plz: formData.mitgliedPlz,
+    ort: formData.ort,
+  };
+  await buildPlusbonusPdfsForPerson(formData, templateBytes, mitglied);
+
+  // 2) Variante B: Ehegatte/Kinder mit eigener Mitgliedschaft → eigener Plusbonus
+  if (formData.bigFamilienversicherung) {
+    const e = formData.ehegatte;
+    if (e && e.eigeneMitgliedschaft && (e.vorname || e.name)) {
+      const eMap: Antragsperson['geschlecht'] =
+        e.geschlecht === 'm' ? 'maennlich' :
+        e.geschlecht === 'w' ? 'weiblich' :
+        (e.geschlecht === 'd' || e.geschlecht === 'x') ? 'divers' : '';
+      const ehegatte: Antragsperson = {
+        vorname: e.vorname,
+        name: e.name,
+        geburtsdatum: e.geburtsdatum,
+        geschlecht: eMap,
+        strasse: formData.mitgliedStrasse,
+        hausnummer: formData.mitgliedHausnummer,
+        plz: formData.mitgliedPlz,
+        ort: formData.ort,
+      };
+      await buildPlusbonusPdfsForPerson(formData, templateBytes, ehegatte);
+    }
+
+    for (const k of formData.kinder) {
+      if (!k.eigeneMitgliedschaft) continue;
+      if (!k.vorname && !k.name) continue;
+      const kind: Antragsperson = {
+        vorname: k.vorname,
+        name: k.name,
+        geburtsdatum: k.geburtsdatum,
+        geschlecht: mapKindGeschlecht(k.geschlecht),
+        strasse: formData.mitgliedStrasse,
+        hausnummer: formData.mitgliedHausnummer,
+        plz: formData.mitgliedPlz,
+        ort: formData.ort,
+      };
+      await buildPlusbonusPdfsForPerson(formData, templateBytes, kind);
+    }
   }
 };
