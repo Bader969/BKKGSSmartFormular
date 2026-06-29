@@ -244,6 +244,10 @@ const Index = () => {
         if (!formData.telefon || !formData.email) { toast.error('Telefon und E-Mail sind Pflicht.'); return; }
         if (!formData.mitgliedGeburtsdatum) { toast.error('Bitte Geburtsdatum des Mitglieds eingeben.'); return; }
       }
+      if (!formData.mitgliedGeburtsdatum) {
+        toast.error('Bitte Geburtsdatum des Mitglieds eingeben (wird für den Dateinamen benötigt).');
+        return;
+      }
     }
     
     // VIACTIV-spezifische Validierung

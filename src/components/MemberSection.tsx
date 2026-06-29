@@ -62,7 +62,22 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
         />
       </div>
       
-      {/* Geburtsdatum, Geburtsort, Geburtsland - NICHT für Novitas */}
+      {/* Geburtsdatum nur für BIG-Plusbonus-Minimal (für Dateinamen) */}
+      {isBigMinimal && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          <FormField
+            type="date"
+            label="Geburtsdatum"
+            id="mitgliedGeburtsdatum"
+            value={formData.mitgliedGeburtsdatum}
+            onChange={(value) => updateFormData({ mitgliedGeburtsdatum: value })}
+            required
+            validate={validateGeburtsdatum}
+          />
+        </div>
+      )}
+
+      {/* Geburtsdatum, Geburtsort, Geburtsland - NICHT für Novitas, nicht für BIG-Minimal */}
       {formData.selectedKrankenkasse !== 'novitas' && !isBigMinimal && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
           <FormField
