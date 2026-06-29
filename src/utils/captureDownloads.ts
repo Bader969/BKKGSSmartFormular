@@ -10,7 +10,13 @@ export type CapturedFile = { filename: string; blob: Blob };
 export async function captureDownloads(run: () => Promise<void>): Promise<CapturedFile[]> {
   const collected: CapturedFile[] = [];
   const pendingFetches: Promise<unknown>[] = [];
+  const heldUrls: string[] = [];
   const originalClick = HTMLAnchorElement.prototype.click;
+  const originalRevoke = URL.revokeObjectURL.bind(URL);
+
+  // Defer revocation so we can still fetch() blob URLs after the export utility
+  // tries to clean up.
+  URL.revokeObjectURL = (url: string) => { heldUrls.push(url); };
 
   HTMLAnchorElement.prototype.click = function patchedClick(this: HTMLAnchorElement) {
     try {
@@ -35,6 +41,8 @@ export async function captureDownloads(run: () => Promise<void>): Promise<Captur
     await Promise.all(pendingFetches);
   } finally {
     HTMLAnchorElement.prototype.click = originalClick;
+    URL.revokeObjectURL = originalRevoke;
+    for (const u of heldUrls) { try { originalRevoke(u); } catch { /* ignore */ } }
   }
 
   return collected;
