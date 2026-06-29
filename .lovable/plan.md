@@ -1,43 +1,60 @@
 ## Ziel
-Auto-Trigger für eigenen Plusbonus statt manueller UI-Checkbox + Mitversicherte nur im Hauptmitglieds-Plusbonus.
+Antragsliste erweitern um VP, Bearbeiter (Anzeigename), Name, Vorname, Antragsform; Aktions-Spalte entfernen; Suche & XLSX-Export anpassen. VP als Pflichtfeld im Editor erfassen.
 
 ## Änderungen
 
-### 1) UI: Checkboxes entfernen (BIG)
-- `src/components/SpouseSection.tsx`: Den (in der vorherigen Iteration eingefügten) Amber-Checkbox-Block „Ehegatte hat eigene Mitgliedschaft, nicht familienversichert" für `big_plusbonus` wieder entfernen. Keine BIG-spezifischen Checkboxen im UI.
-- `src/components/ChildrenSection.tsx`: Analog den eingefügten Amber-Checkbox-Block pro Kind für `big_plusbonus` entfernen.
-- (Keine Änderungen am bestehenden VIACTIV-Verhalten.)
+### 1. Datenbank-Migration (`applications`-Tabelle)
+Neue Spalten (alle nullable für Bestandsdaten):
+- `vertriebspartner TEXT` — z. B. „AM Blitzvox"
+- `applicant_name TEXT` — Nachname Hauptmitglied (Klartext)
+- `applicant_vorname TEXT` — Vorname Hauptmitglied (Klartext)
+- `antragsform TEXT` — abgeleitete Variante (siehe unten)
 
-### 2) Auto-Ableitung „eigeneMitgliedschaft" für BIG beim Export
-- `src/utils/bigPlusbonusExport.ts` in `exportBigPlusbonus`: Statt `e.eigeneMitgliedschaft` und `k.eigeneMitgliedschaft` zu lesen, verwende für BIG die abgeleitete Bedingung:
-  ```
-  const hasOwnMembership = (m) =>
-    m && (m.eigeneMitgliedschaft === true || m.bisherigArt === 'mitgliedschaft')
-        && (m.vorname || m.name);
-  ```
-- Damit wird beim Ehegatten/Kind automatisch ein eigener Plusbonus-Antrag erzeugt, sobald „bisherige Versicherungsart = Mitgliedschaft" ausgewählt ist. Kein UI-Toggle nötig.
+RLS bleibt unverändert (gleiche Policies decken die neuen Spalten). Keine GRANT-Änderung nötig.
 
-### 3) Mitversicherte nur im Hauptmitglied-Plusbonus
-- `buildPlusbonusPdfsForPerson` erhält neuen optionalen Parameter `includeMitversicherte: boolean` (default `false`).
-- Chunk-/Loop-Logik: Wenn `includeMitversicherte === false`, dann
-  - keine Chunks bilden (`chunks = [[]]`, also genau 1 PDF, ohne Suffix `(Teil N)`),
-  - die drei Felder `Name Vorname` / `Name Vorname_2` / `Name Vorname_3` und `Höhe der Police in Euro` (_2/_3) leer lassen.
-- In `exportBigPlusbonus`:
-  - Mitglied → `includeMitversicherte: true` (bestehendes Verhalten inkl. Chunking).
-  - Ehegatte/Kinder mit eigener Mitgliedschaft → `includeMitversicherte: false` (genau 1 PDF, Mitversicherten-Felder leer; SEPA, Versicherungsstatus, Höhe Euro, Versicherungsarten bleiben übernommen).
+Hinweis zur Encryption-Memory: Diese vier Spalten werden bewusst im Klartext geführt, da sie ausschließlich für die Antragsliste benötigt werden. Verschlüsselter `payload` bleibt unverändert.
 
-### 4) `pdfCount` (Index.tsx)
-- `partsPerPerson` (Chunks) gilt nur noch fürs Mitglied. Pro „eigene Mitgliedschaft"-Person genau 1 zusätzliches PDF.
-- Neue Formel:
-  ```
-  plusbonusParts = mitgliedChunks + ownMembershipPersons
-  ```
-  wobei `ownMembershipPersons` = #Spouses/Kinder mit (`eigeneMitgliedschaft` || `bisherigArt === 'mitgliedschaft'`) und vorhandenem Namen.
+### 2. Edge Function `applications-api`
+- `save`-Action akzeptiert zusätzlich `vertriebspartner`, `applicant_name`, `applicant_vorname`, `antragsform` und schreibt sie als Klartext-Spalten (sowohl bei Insert als auch Update).
+- `list`-Action gibt diese Spalten zusätzlich zurück und liefert `display_name` aus `profiles` mit (`userDisplayNames`-Map analog zu `userEmails`).
 
-### 5) Memory-Update
-- `mem/features/big-direkt-integration.md`: Regel anpassen:
-  - „Eigene Mitgliedschaft → eigener Plusbonus" wird automatisch ausgelöst, wenn `bisherigArt === 'mitgliedschaft'` (oder vorhandenes `eigeneMitgliedschaft`-Flag). Keine separate UI-Checkbox bei BIG.
-  - Mitversicherte Angehörige nur im Hauptmitglied-PDF; bei eigenen Plusbonus-PDFs für Ehegatte/Kinder bleiben diese Felder leer und es gibt keine Chunk-Aufteilung dort.
+### 3. Client: VP-Pflichtfeld im Formular
+- Neues Feld in `formData`: `vertriebspartner: string`.
+- Neuer Bereich oben im Editor (in `src/pages/Index.tsx`) mit `Select` (Combobox: vorgegebene Liste + Option „Eigener VP"). Vorgaben:
+  - BA / EM BA / GH / EM GH / AM / EM AM / MO / EM MO / AD / EM AD / HZ / EM HZ — jeweils „Blitzvox".
+  - Bei „Eigener VP" → freies Textfeld.
+- Letzte Auswahl in `localStorage` (`lastVertriebspartner`) speichern und beim Start vorbelegen.
+- Export-Buttons werden disabled, solange VP leer ist; bei Klick mit leerem VP Toast „Bitte Vertriebspartner auswählen".
 
-## Nicht im Scope
-- Keine Änderungen an FamVers-PDF, an Validation, an Plusbonus-Hauptmitgliedslogik (Chunking >3), an VIACTIV.
+### 4. Antragsform-Ableitung
+Helper `deriveAntragsform(formData)` in neuer Datei `src/utils/antragsform.ts`:
+- BIG: „Plusbonus + Familienvers." | „Plusbonus" | „Familienvers."
+- VIACTIV: Kombination aus „Beitritt" / „Familienvers." / „Bonus" je nach exportierten Teilen
+- Novitas: „Familienvers."
+- DAK: „Familienvers."
+
+Wird beim `save`/`markExported`-Aufruf mitgegeben.
+
+### 5. Persistenz-Hook (`useApplicationPersistence`)
+- `save({ applicationId, formData })` extrahiert `vertriebspartner`, `applicant_name` (= `formData.mitgliedName`), `applicant_vorname` (= `formData.mitgliedVorname`), `antragsform` und sendet sie an die Edge Function.
+
+### 6. Antragsliste (`src/pages/Applications.tsx`)
+Spalten (neue Reihenfolge):
+`Krankenkasse | Status | PDFs | Aktualisiert | Erstellt | VP | Bearbeiter | Name | Vorname | Antragsform`
+- Aktions-Spalte entfernen; ganzer Row klickbar (bereits vorhanden).
+- „Bearbeiter" zeigt `display_name` (Fallback: E-Mail).
+- Suche erweitern: Krankenkasse, VP, Bearbeiter (Name + E-Mail), Name, Vorname, Antragsform.
+
+### 7. XLSX-Export
+- Neuer Button „Als Excel exportieren" oben rechts neben Filtern.
+- Nutzt bestehendes `xlsx`-Paket falls vorhanden, sonst Installation von `xlsx` via `bun add xlsx`.
+- Exportiert die aktuell gefilterten Zeilen mit denselben Spalten.
+
+### 8. ApplicationRow-Type & Drawer
+- `ApplicationRow`-Type um neue Felder erweitern.
+- `ApplicationDetailDrawer` zeigt VP + Antragsteller-Name als zusätzliche Badges/Info.
+
+## Technische Details
+- Display-Name kommt aus `profiles.display_name` (Spalte existiert bereits, siehe `handle_new_user`-Trigger).
+- VP-Liste als Konstante in `src/utils/vertriebspartner.ts`.
+- Bestandsdaten ohne neue Felder erscheinen mit „—" in der Liste.

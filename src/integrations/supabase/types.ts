@@ -105,6 +105,9 @@ export type Database = {
       }
       applications: {
         Row: {
+          antragsform: string | null
+          applicant_name: string | null
+          applicant_vorname: string | null
           created_at: string
           exported_at: string | null
           id: string
@@ -117,8 +120,12 @@ export type Database = {
           status: string
           updated_at: string
           user_id: string
+          vertriebspartner: string | null
         }
         Insert: {
+          antragsform?: string | null
+          applicant_name?: string | null
+          applicant_vorname?: string | null
           created_at?: string
           exported_at?: string | null
           id?: string
@@ -131,8 +138,12 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id: string
+          vertriebspartner?: string | null
         }
         Update: {
+          antragsform?: string | null
+          applicant_name?: string | null
+          applicant_vorname?: string | null
           created_at?: string
           exported_at?: string | null
           id?: string
@@ -145,6 +156,7 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+          vertriebspartner?: string | null
         }
         Relationships: []
       }

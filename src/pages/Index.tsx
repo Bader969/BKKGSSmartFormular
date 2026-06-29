@@ -31,6 +31,8 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { Link } from 'react-router-dom';
 import { useApplicationPersistence } from '@/hooks/useApplicationPersistence';
 import { useUserRole } from '@/hooks/useUserRole';
+import { VERTRIEBSPARTNER_OPTIONS, VP_STORAGE_KEY, CUSTOM_VP_VALUE } from '@/utils/vertriebspartner';
+import { Input } from '@/components/ui/input';
 
 const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
@@ -40,6 +42,26 @@ const Index = () => {
   const [applicationId, setApplicationId] = useState<string | null>(null);
   const { save, saving, markExported } = useApplicationPersistence();
   const { isAdmin } = useUserRole();
+  const [vpMode, setVpMode] = useState<'preset' | 'custom'>('preset');
+
+  // Pre-fill VP from localStorage on first mount (only if no app loaded yet)
+  useEffect(() => {
+    const stored = typeof window !== 'undefined' ? localStorage.getItem(VP_STORAGE_KEY) : null;
+    if (stored) {
+      setFormData((p) => (p.vertriebspartner ? p : { ...p, vertriebspartner: stored }));
+      if (!(VERTRIEBSPARTNER_OPTIONS as readonly string[]).includes(stored)) {
+        setVpMode('custom');
+      }
+    }
+  }, []);
+
+  // Sync vpMode when formData.vertriebspartner changes externally (e.g. loaded application)
+  useEffect(() => {
+    const vp = formData.vertriebspartner;
+    if (vp && !(VERTRIEBSPARTNER_OPTIONS as readonly string[]).includes(vp)) {
+      setVpMode('custom');
+    }
+  }, [formData.vertriebspartner]);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
@@ -207,6 +229,10 @@ const Index = () => {
   };
   
   const handleExport = async () => {
+    if (!formData.vertriebspartner || !formData.vertriebspartner.trim()) {
+      toast.error('Bitte Vertriebspartner (VP) auswählen.');
+      return;
+    }
     // Basis-Validierung für alle Krankenkassen
     if (!formData.mitgliedName || !formData.mitgliedVorname) {
       toast.error('Bitte geben Sie Name und Vorname des Mitglieds ein.');
@@ -375,6 +401,8 @@ const Index = () => {
     let savedAppId = applicationId;
     let pdfCount = 0;
     try {
+      // Remember last VP locally for convenience
+      try { localStorage.setItem(VP_STORAGE_KEY, formData.vertriebspartner.trim()); } catch { /* ignore */ }
       // Auto-save before exporting so every export is tracked
       try {
         const app = await save({ applicationId, formData });
@@ -637,6 +665,48 @@ const Index = () => {
                     ? 'Es wird die VIACTIV Beitrittserklärung erstellt.'
                     : 'Es werden BKK GS Familienversicherung und Rundum-Sicher-Paket erstellt.'}
             </p>
+
+            {/* Vertriebspartner — Pflichtfeld nur für Antragsliste, nicht im PDF */}
+            <div className="mt-5 pt-5 border-t border-border/60">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                Vertriebspartner (VP) <span className="text-destructive">*</span>
+              </Label>
+              <p className="text-xs text-muted-foreground mt-0.5 mb-2">
+                Wird nur intern in der Antragsliste angezeigt, nicht im PDF.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Select
+                  value={vpMode === 'custom' ? CUSTOM_VP_VALUE : (formData.vertriebspartner || '')}
+                  onValueChange={(value) => {
+                    if (value === CUSTOM_VP_VALUE) {
+                      setVpMode('custom');
+                      updateFormData({ vertriebspartner: '' });
+                    } else {
+                      setVpMode('preset');
+                      updateFormData({ vertriebspartner: value });
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-72">
+                    <SelectValue placeholder="VP auswählen…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VERTRIEBSPARTNER_OPTIONS.map((opt) => (
+                      <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                    ))}
+                    <SelectItem value={CUSTOM_VP_VALUE}>Eigener VP…</SelectItem>
+                  </SelectContent>
+                </Select>
+                {vpMode === 'custom' && (
+                  <Input
+                    placeholder="Eigene VP-Bezeichnung"
+                    value={formData.vertriebspartner}
+                    onChange={(e) => updateFormData({ vertriebspartner: e.target.value })}
+                    className="w-full sm:w-72"
+                  />
+                )}
+              </div>
+            </div>
           </div>
           
           {/* Formular-Sektionen nur anzeigen wenn Krankenkasse gewählt */}
@@ -786,7 +856,7 @@ const Index = () => {
                       type="button"
                       size="lg"
                       onClick={handleExport}
-                      disabled={isExporting}
+                      disabled={isExporting || !formData.vertriebspartner?.trim()}
                       className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8 shadow-card"
                     >
                       <FileDown className="h-5 w-5" />

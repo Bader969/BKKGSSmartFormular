@@ -124,15 +124,25 @@ Deno.serve(async (req) => {
     };
 
     if (action === "save") {
-      const { application_id, krankenkasse, payload } = body as {
+      const { application_id, krankenkasse, payload, vertriebspartner, applicant_name, applicant_vorname, antragsform } = body as {
         application_id?: string;
         krankenkasse?: string;
         payload?: unknown;
+        vertriebspartner?: string;
+        applicant_name?: string;
+        applicant_vorname?: string;
+        antragsform?: string;
       };
       if (!krankenkasse || typeof krankenkasse !== "string") return json(400, { error: "krankenkasse_required" });
       if (!payload || typeof payload !== "object") return json(400, { error: "payload_required" });
 
       const { iv, ct, hash } = await encryptPayload(payload);
+      const meta = {
+        vertriebspartner: typeof vertriebspartner === "string" ? vertriebspartner.slice(0, 120) : null,
+        applicant_name: typeof applicant_name === "string" ? applicant_name.slice(0, 120) : null,
+        applicant_vorname: typeof applicant_vorname === "string" ? applicant_vorname.slice(0, 120) : null,
+        antragsform: typeof antragsform === "string" ? antragsform.slice(0, 80) : null,
+      };
 
       if (application_id) {
         const { data, error } = await admin
@@ -142,6 +152,7 @@ Deno.serve(async (req) => {
             payload_encrypted: bytesToHex(ct),
             payload_iv: bytesToHex(iv),
             payload_hash: hash,
+            ...meta,
           })
           .eq("id", application_id)
           .eq("user_id", user.id)
@@ -160,6 +171,7 @@ Deno.serve(async (req) => {
             payload_encrypted: bytesToHex(ct),
             payload_iv: bytesToHex(iv),
             payload_hash: hash,
+            ...meta,
           })
           .select("id, krankenkasse, status, created_at, updated_at, payload_hash, pdf_count, exported_at")
           .single();
@@ -172,21 +184,23 @@ Deno.serve(async (req) => {
     if (action === "list") {
       const { data, error } = await admin
         .from("applications")
-        .select("id, user_id, krankenkasse, status, pdf_count, exported_at, last_opened_at, created_at, updated_at")
+        .select("id, user_id, krankenkasse, status, pdf_count, exported_at, last_opened_at, created_at, updated_at, vertriebspartner, applicant_name, applicant_vorname, antragsform")
         .order("updated_at", { ascending: false })
         .limit(500);
       if (error) return json(500, { error: "db_list_failed" });
       // Apply role-based filter manually since we're on service_role
       const isAdminData = await checkAdmin();
       const filtered = isAdminData ? data : (data ?? []).filter((r) => r.user_id === user.id);
-      // Attach emails for admin view
+      // Attach emails and display names for every visible row
       let userEmails: Record<string, string> = {};
-      if (isAdminData && filtered && filtered.length) {
+      let userDisplayNames: Record<string, string> = {};
+      if (filtered && filtered.length) {
         const ids = Array.from(new Set(filtered.map((r) => r.user_id)));
-        const { data: profs } = await admin.from("profiles").select("id, email").in("id", ids);
+        const { data: profs } = await admin.from("profiles").select("id, email, display_name").in("id", ids);
         userEmails = Object.fromEntries((profs ?? []).map((p) => [p.id, p.email ?? ""]));
+        userDisplayNames = Object.fromEntries((profs ?? []).map((p) => [p.id, p.display_name ?? ""]));
       }
-      return json(200, { applications: filtered, isAdmin: !!isAdminData, userEmails });
+      return json(200, { applications: filtered, isAdmin: !!isAdminData, userEmails, userDisplayNames });
     }
 
     if (action === "decrypt") {

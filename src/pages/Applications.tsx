@@ -5,19 +5,21 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShieldCheck, FileText, ArrowLeft } from "lucide-react";
+import { ShieldCheck, FileText, ArrowLeft, FileSpreadsheet } from "lucide-react";
 import { useApplicationPersistence } from "@/hooks/useApplicationPersistence";
 import { ApplicationDetailDrawer, type ApplicationRow } from "@/components/ApplicationDetailDrawer";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 
 export default function Applications() {
   const { list } = useApplicationPersistence();
   const { isAdmin } = useUserRole();
   const [rows, setRows] = useState<ApplicationRow[]>([]);
   const [emails, setEmails] = useState<Record<string, string>>({});
+  const [displayNames, setDisplayNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [kkFilter, setKkFilter] = useState<string>("all");
@@ -26,25 +28,57 @@ export default function Applications() {
 
   const reload = () => {
     setLoading(true);
-    list().then(({ applications, userEmails }) => {
+    list().then(({ applications, userEmails, userDisplayNames }) => {
       setRows(applications);
       setEmails(userEmails);
+      setDisplayNames(userDisplayNames ?? {});
     }).catch(() => toast.error("Konnte Anträge nicht laden.")).finally(() => setLoading(false));
   };
 
   useEffect(reload, [list]);
+
+  const bearbeiterOf = (userId: string) => displayNames[userId] || emails[userId] || userId.slice(0, 8);
 
   const filtered = useMemo(() => rows.filter((r) => {
     if (kkFilter !== "all" && r.krankenkasse !== kkFilter) return false;
     if (statusFilter !== "all" && r.status !== statusFilter) return false;
     if (search) {
       const s = search.toLowerCase();
-      if (!r.krankenkasse.toLowerCase().includes(s) && !(emails[r.user_id] ?? "").toLowerCase().includes(s)) return false;
+      const haystacks = [
+        r.krankenkasse,
+        r.vertriebspartner ?? "",
+        displayNames[r.user_id] ?? "",
+        emails[r.user_id] ?? "",
+        r.applicant_name ?? "",
+        r.applicant_vorname ?? "",
+        r.antragsform ?? "",
+      ];
+      if (!haystacks.some((h) => h.toLowerCase().includes(s))) return false;
     }
     return true;
-  }), [rows, kkFilter, statusFilter, search, emails]);
+  }), [rows, kkFilter, statusFilter, search, emails, displayNames]);
 
   const kks = Array.from(new Set(rows.map((r) => r.krankenkasse)));
+
+  const handleExportXlsx = () => {
+    const data = filtered.map((r) => ({
+      Krankenkasse: r.krankenkasse,
+      Status: r.status === "exported" ? "Exportiert" : "Entwurf",
+      PDFs: r.pdf_count,
+      Aktualisiert: new Date(r.updated_at).toLocaleString("de-DE"),
+      Erstellt: new Date(r.created_at).toLocaleString("de-DE"),
+      VP: r.vertriebspartner ?? "",
+      Bearbeiter: bearbeiterOf(r.user_id),
+      Name: r.applicant_name ?? "",
+      Vorname: r.applicant_vorname ?? "",
+      Antragsform: r.antragsform ?? "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Anträge");
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    XLSX.writeFile(wb, `antraege_${ts}.xlsx`);
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -78,7 +112,7 @@ export default function Applications() {
         <div className="flex flex-col md:flex-row gap-3 md:items-end">
           <div className="flex-1">
             <label className="text-xs text-muted-foreground">Suche</label>
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Krankenkasse oder Bearbeiter…" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Krankenkasse, VP, Bearbeiter, Name, Vorname, Antragsform…" />
           </div>
           <div className="w-full md:w-48">
             <label className="text-xs text-muted-foreground">Krankenkasse</label>
@@ -101,6 +135,14 @@ export default function Applications() {
               </SelectContent>
             </Select>
           </div>
+          <Button
+            variant="outline"
+            onClick={handleExportXlsx}
+            disabled={!filtered.length}
+            className="gap-2"
+          >
+            <FileSpreadsheet className="h-4 w-4" /> Als Excel exportieren
+          </Button>
         </div>
 
         <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden">
@@ -112,16 +154,19 @@ export default function Applications() {
                 <TableHead>PDFs</TableHead>
                 <TableHead>Aktualisiert</TableHead>
                 <TableHead>Erstellt</TableHead>
-                {isAdmin && <TableHead>Bearbeiter</TableHead>}
-                <TableHead className="text-right">Aktion</TableHead>
+                <TableHead>VP</TableHead>
+                <TableHead>Bearbeiter</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Vorname</TableHead>
+                <TableHead>Antragsform</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && (
-                <TableRow><TableCell colSpan={isAdmin ? 7 : 6} className="text-center text-muted-foreground py-8">Lädt…</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">Lädt…</TableCell></TableRow>
               )}
               {!loading && filtered.length === 0 && (
-                <TableRow><TableCell colSpan={isAdmin ? 7 : 6} className="text-center text-muted-foreground py-8">
+                <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                   <FileText className="inline h-4 w-4 mr-1" /> Noch keine Anträge gespeichert.
                 </TableCell></TableRow>
               )}
@@ -136,10 +181,11 @@ export default function Applications() {
                   <TableCell>{r.pdf_count}</TableCell>
                   <TableCell className="text-muted-foreground">{new Date(r.updated_at).toLocaleString("de-DE")}</TableCell>
                   <TableCell className="text-muted-foreground">{new Date(r.created_at).toLocaleString("de-DE")}</TableCell>
-                  {isAdmin && <TableCell className="text-muted-foreground text-xs">{emails[r.user_id] ?? r.user_id.slice(0, 8)}</TableCell>}
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelected(r); }}>Öffnen</Button>
-                  </TableCell>
+                  <TableCell>{r.vertriebspartner || <span className="text-muted-foreground">—</span>}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs">{bearbeiterOf(r.user_id)}</TableCell>
+                  <TableCell>{r.applicant_name || <span className="text-muted-foreground">—</span>}</TableCell>
+                  <TableCell>{r.applicant_vorname || <span className="text-muted-foreground">—</span>}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs">{r.antragsform || <span className="text-muted-foreground">—</span>}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -151,7 +197,7 @@ export default function Applications() {
         application={selected}
         onClose={() => setSelected(null)}
         onChanged={reload}
-        userEmail={selected ? emails[selected.user_id] : undefined}
+        userEmail={selected ? (displayNames[selected.user_id] || emails[selected.user_id]) : undefined}
       />
     </div>
   );

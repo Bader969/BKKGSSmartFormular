@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { FormData } from "@/types/form";
+import { deriveAntragsform } from "@/utils/antragsform";
 
 type SaveArgs = { applicationId?: string | null; formData: FormData };
 
@@ -22,6 +23,10 @@ export function useApplicationPersistence() {
         application_id: applicationId ?? undefined,
         krankenkasse: formData.selectedKrankenkasse ?? "unselected",
         payload: formData,
+        vertriebspartner: formData.vertriebspartner ?? "",
+        applicant_name: formData.mitgliedName ?? "",
+        applicant_vorname: formData.mitgliedVorname ?? "",
+        antragsform: deriveAntragsform(formData),
       });
       return res.application;
     } finally {
@@ -39,9 +44,14 @@ export function useApplicationPersistence() {
       id: string; user_id: string; krankenkasse: string; status: string;
       pdf_count: number; exported_at: string | null; last_opened_at: string | null;
       created_at: string; updated_at: string;
+      vertriebspartner: string | null;
+      applicant_name: string | null;
+      applicant_vorname: string | null;
+      antragsform: string | null;
     }>;
     isAdmin: boolean;
     userEmails: Record<string, string>;
+    userDisplayNames: Record<string, string>;
   }>("list"), [call]);
 
   const decrypt = useCallback((applicationId: string) => call<{ payload: FormData; krankenkasse: string }>("decrypt", { application_id: applicationId }), [call]);
