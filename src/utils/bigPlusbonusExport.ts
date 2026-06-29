@@ -3,7 +3,7 @@ import { FormData } from '@/types/form';
 import { getAutoSignatures, ensureSignatureFontReady } from './generateSignature';
 import { getBeginDate, formatDateGerman } from './dateUtils';
 
-// Convert ISO YYYY-MM-DD or DD.MM.YYYY -> DDMMJJ (6-digit, two-digit year)
+// Convert ISO YYYY-MM-DD or DD.MM.YYYY -> DD.MM.YYYY (mit Trennpunkten, 4-stelliges Jahr)
 const toDDMMJJ = (input: string): string => {
   if (!input) return '';
   let d = '', m = '', y = '';
@@ -17,7 +17,8 @@ const toDDMMJJ = (input: string): string => {
     return input;
   }
   if (!y || !m || !d) return '';
-  return `${d.padStart(2, '0')}${m.padStart(2, '0')}${y.slice(-2)}`;
+  const yyyy = y.length === 2 ? `20${y}` : y;
+  return `${d.padStart(2, '0')}.${m.padStart(2, '0')}.${yyyy}`;
 };
 
 // Convert ISO YYYY-MM-DD or DD.MM.YYYY -> DD.MM.YYYY
