@@ -31,6 +31,8 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { Link } from 'react-router-dom';
 import { useApplicationPersistence } from '@/hooks/useApplicationPersistence';
 import { useUserRole } from '@/hooks/useUserRole';
+import { VERTRIEBSPARTNER_OPTIONS, VP_STORAGE_KEY, CUSTOM_VP_VALUE } from '@/utils/vertriebspartner';
+import { Input } from '@/components/ui/input';
 
 const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
@@ -40,6 +42,26 @@ const Index = () => {
   const [applicationId, setApplicationId] = useState<string | null>(null);
   const { save, saving, markExported } = useApplicationPersistence();
   const { isAdmin } = useUserRole();
+  const [vpMode, setVpMode] = useState<'preset' | 'custom'>('preset');
+
+  // Pre-fill VP from localStorage on first mount (only if no app loaded yet)
+  useEffect(() => {
+    const stored = typeof window !== 'undefined' ? localStorage.getItem(VP_STORAGE_KEY) : null;
+    if (stored) {
+      setFormData((p) => (p.vertriebspartner ? p : { ...p, vertriebspartner: stored }));
+      if (!(VERTRIEBSPARTNER_OPTIONS as readonly string[]).includes(stored)) {
+        setVpMode('custom');
+      }
+    }
+  }, []);
+
+  // Sync vpMode when formData.vertriebspartner changes externally (e.g. loaded application)
+  useEffect(() => {
+    const vp = formData.vertriebspartner;
+    if (vp && !(VERTRIEBSPARTNER_OPTIONS as readonly string[]).includes(vp)) {
+      setVpMode('custom');
+    }
+  }, [formData.vertriebspartner]);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
@@ -207,6 +229,10 @@ const Index = () => {
   };
   
   const handleExport = async () => {
+    if (!formData.vertriebspartner || !formData.vertriebspartner.trim()) {
+      toast.error('Bitte Vertriebspartner (VP) auswählen.');
+      return;
+    }
     // Basis-Validierung für alle Krankenkassen
     if (!formData.mitgliedName || !formData.mitgliedVorname) {
       toast.error('Bitte geben Sie Name und Vorname des Mitglieds ein.');
