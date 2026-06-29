@@ -103,6 +103,39 @@ export type Database = {
           },
         ]
       }
+      application_recipients: {
+        Row: {
+          antragsform: string | null
+          bcc: string | null
+          cc: string | null
+          created_at: string
+          id: string
+          krankenkasse: string
+          recipient_email: string
+          updated_at: string
+        }
+        Insert: {
+          antragsform?: string | null
+          bcc?: string | null
+          cc?: string | null
+          created_at?: string
+          id?: string
+          krankenkasse: string
+          recipient_email: string
+          updated_at?: string
+        }
+        Update: {
+          antragsform?: string | null
+          bcc?: string | null
+          cc?: string | null
+          created_at?: string
+          id?: string
+          krankenkasse?: string
+          recipient_email?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       applications: {
         Row: {
           antragsform: string | null
@@ -157,6 +190,36 @@ export type Database = {
           updated_at?: string
           user_id?: string
           vertriebspartner?: string | null
+        }
+        Relationships: []
+      }
+      email_templates: {
+        Row: {
+          body_template: string
+          created_at: string
+          id: string
+          is_default: boolean
+          name: string
+          subject_template: string
+          updated_at: string
+        }
+        Insert: {
+          body_template: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name: string
+          subject_template: string
+          updated_at?: string
+        }
+        Update: {
+          body_template?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          subject_template?: string
+          updated_at?: string
         }
         Relationships: []
       }
