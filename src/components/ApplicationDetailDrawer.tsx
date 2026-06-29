@@ -11,6 +11,10 @@ export type ApplicationRow = {
   id: string; user_id: string; krankenkasse: string; status: string;
   pdf_count: number; exported_at: string | null; last_opened_at: string | null;
   created_at: string; updated_at: string;
+  vertriebspartner: string | null;
+  applicant_name: string | null;
+  applicant_vorname: string | null;
+  antragsform: string | null;
 };
 
 export function ApplicationDetailDrawer({
