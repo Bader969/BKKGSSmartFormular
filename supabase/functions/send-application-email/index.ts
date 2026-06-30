@@ -59,8 +59,8 @@ function buildRawMessage(opts: {
     plainBody.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
     '</body></html>';
 
-  const plainB64 = btoa(unescape(encodeURIComponent(plainBody))).replace(/(.{76})/g, '$1\r\n');
-  const htmlB64 = btoa(unescape(encodeURIComponent(htmlBody))).replace(/(.{76})/g, '$1\r\n');
+  const plainB64 = btoa(unescape(encodeURIComponent(plainBody)));
+  const htmlB64 = btoa(unescape(encodeURIComponent(htmlBody)));
 
   // multipart/alternative wrapper for the body
   parts.push(
@@ -86,7 +86,7 @@ function buildRawMessage(opts: {
       `Content-Type: ${att.mimeType}; name="${safeName}"\r\n` +
       `Content-Disposition: attachment; filename="${safeName}"\r\n` +
       'Content-Transfer-Encoding: base64\r\n\r\n' +
-      att.base64.replace(/(.{76})/g, '$1\r\n') + '\r\n',
+      att.base64 + '\r\n',
     );
   }
   parts.push(`--${mixedBoundary}--\r\n`);
