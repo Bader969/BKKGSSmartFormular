@@ -198,7 +198,8 @@ const Index = () => {
       _name: string,
     ) => ({
       versicherungsstatus: formData.bigVersicherungsstatus,
-      hoeheEuro: formData.bigHoeheEuro,
+      // Eigener Plusbonus: beliebige ganze Zahl 200–245 (keine Summe).
+      hoeheEuro: randomPoliceBetrag(),
       versicherungsarten: { ...formData.bigVersicherungsarten },
     });
 
