@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { FormSection } from './FormSection';
 import { FamilyMemberForm } from './FamilyMemberForm';
 import { FormField } from './FormField';
-import { FormData, FamilyMember } from '@/types/form';
+import { FormData, FamilyMember, VIACTIV_BESCHAEFTIGUNG_OPTIONS } from '@/types/form';
 import { CopyBlockButton } from './CopyBlockButton';
 import { validateName, validateOrt, validateSelect, validateKrankenkasse } from '@/utils/validation';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { COUNTRY_OPTIONS, NATIONALITY_OPTIONS } from '@/utils/countries';
+import { FormField } from './FormField';
+import { EigenePlusbonusBlock } from './EigenePlusbonusBlock';
 
 interface SpouseSectionProps {
   formData: FormData;
@@ -210,6 +212,40 @@ export const SpouseSection: React.FC<SpouseSectionProps> = ({ formData, updateFo
               geschlecht: 'Geschlecht',
             }}
           />
+
+          {/* BIG Variante B: Beschäftigung Ehegatte (nur wenn Hauptmitglied beschäftigt) */}
+          {formData.selectedKrankenkasse === 'big_plusbonus'
+            && formData.bigFamilienversicherung
+            && formData.bigMitgliedBeschaeftigt === 'beschaeftigt' && (
+            <div className="mt-4 pt-4 border-t border-secondary/20">
+              <FormField
+                type="select"
+                id="ehegatte-beschaeftigung"
+                label="Beschäftigungsstatus Ehegatte"
+                value={formData.ehegatte.beschaeftigung}
+                onChange={(v) => updateEhegatte({ beschaeftigung: v as FamilyMember['beschaeftigung'] })}
+                options={VIACTIV_BESCHAEFTIGUNG_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+                placeholder="Bitte auswählen"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Wenn "Ich bin beschäftigt": Ehegatte erhält eine eigene Mitgliedschaft (+ separaten Plusbonus-Antrag).
+              </p>
+            </div>
+          )}
+
+          {/* BIG Variante B: Eigener Plusbonus-Block sobald eigene Mitgliedschaft aktiv */}
+          {formData.selectedKrankenkasse === 'big_plusbonus'
+            && formData.bigFamilienversicherung
+            && formData.ehegatte.eigeneMitgliedschaft && (
+            <div className="mt-4">
+              <EigenePlusbonusBlock
+                personLabel={[formData.ehegatte.vorname, formData.ehegatte.name].filter(Boolean).join(' ') || 'Ehegatte'}
+                value={formData.ehegatte.eigenePlusbonus}
+                onChange={(v) => updateEhegatte({ eigenePlusbonus: v })}
+                idPrefix="eh-pb"
+              />
+            </div>
+          )}
         </>
       )}
     </FormSection>
