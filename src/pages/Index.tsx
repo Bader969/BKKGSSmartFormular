@@ -127,35 +127,68 @@ const Index = () => {
     JSON.stringify(formData.kinder.map(k => [k.name, k.vorname])),
   ]);
 
-  // BIG Variante B: Beschäftigungsstatus des Hauptmitglieds bestimmt,
-  // ob Ehegatte/Kinder familienversichert oder eigenständig versichert sind.
+  // BIG Variante B: Beschäftigungsstatus + Alter steuern eigene Mitgliedschaft
+  // (analog VIACTIV).
+  //  - Hauptmitglied beschäftigt: alle familienversichert; Ausnahme: Ehegatte/
+  //    Kinder ≥15 mit eigener Beschäftigung 'beschaeftigt' → eigene Mitgliedschaft.
+  //  - Hauptmitglied arbeitslos: Ehegatte immer + Kinder ≥15 immer eigene
+  //    Mitgliedschaft. Kinder <15 bleiben familienversichert.
   useEffect(() => {
     if (formData.selectedKrankenkasse !== 'big_plusbonus') return;
     if (!formData.bigFamilienversicherung) return;
     const status = formData.bigMitgliedBeschaeftigt;
     if (status !== 'beschaeftigt' && status !== 'arbeitslos') return;
-    const own = status === 'arbeitslos';
-    const targetArt = own ? 'mitgliedschaft' : 'familienversicherung';
 
-    const ehegatteNeedsUpdate =
-      formData.ehegatte.eigeneMitgliedschaft !== own ||
-      formData.ehegatte.bisherigArt !== targetArt;
-    const kinderNeedUpdate = formData.kinder.some(
-      k => k.eigeneMitgliedschaft !== own || k.bisherigArt !== targetArt,
+    const ageOf = (g: string): number | null => {
+      if (!g) return null;
+      const d = g.includes('-') ? new Date(g)
+        : (() => { const [dd, mm, yy] = g.split('.'); return dd && mm && yy ? new Date(Number(yy), Number(mm) - 1, Number(dd)) : null; })();
+      if (!d || isNaN(d.getTime())) return null;
+      return (Date.now() - d.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+    };
+
+    const spouseOwn = status === 'arbeitslos'
+      ? true
+      : formData.ehegatte.beschaeftigung === 'beschaeftigt';
+    const childOwn = (k: typeof formData.kinder[number]) => {
+      const age = ageOf(k.geburtsdatum);
+      if (age === null || age < 15) return false;
+      if (status === 'arbeitslos') return true;
+      return k.beschaeftigung === 'beschaeftigt';
+    };
+
+    const newEh = {
+      ...formData.ehegatte,
+      eigeneMitgliedschaft: spouseOwn,
+      bisherigArt: spouseOwn ? ('mitgliedschaft' as const) : ('familienversicherung' as const),
+    };
+    const newKinder = formData.kinder.map(k => {
+      const own = childOwn(k);
+      return {
+        ...k,
+        eigeneMitgliedschaft: own,
+        bisherigArt: own ? ('mitgliedschaft' as const) : ('familienversicherung' as const),
+      };
+    });
+
+    const ehChanged =
+      formData.ehegatte.eigeneMitgliedschaft !== newEh.eigeneMitgliedschaft ||
+      formData.ehegatte.bisherigArt !== newEh.bisherigArt;
+    const kChanged = formData.kinder.some((k, i) =>
+      k.eigeneMitgliedschaft !== newKinder[i].eigeneMitgliedschaft ||
+      k.bisherigArt !== newKinder[i].bisherigArt,
     );
-    if (!ehegatteNeedsUpdate && !kinderNeedUpdate) return;
+    if (!ehChanged && !kChanged) return;
 
-    setFormData(p => ({
-      ...p,
-      ehegatte: { ...p.ehegatte, eigeneMitgliedschaft: own, bisherigArt: targetArt },
-      kinder: p.kinder.map(k => ({ ...k, eigeneMitgliedschaft: own, bisherigArt: targetArt })),
-    }));
+    setFormData(p => ({ ...p, ehegatte: newEh, kinder: newKinder }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     formData.selectedKrankenkasse,
     formData.bigFamilienversicherung,
     formData.bigMitgliedBeschaeftigt,
-    formData.kinder.length,
+    formData.ehegatte?.beschaeftigung,
+    formData.ehegatte?.geburtsdatum,
+    JSON.stringify(formData.kinder.map(k => [k.geburtsdatum, k.beschaeftigung])),
   ]);
 
   if (authLoading) {
