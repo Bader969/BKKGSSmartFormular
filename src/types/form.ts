@@ -34,7 +34,8 @@ export interface EigenePlusbonusDaten {
   versicherungsstatus: BigVersicherungsstatus;
   hoeheEuro: string;
   versicherungsarten: BigVersicherungsarten;
-  bank: BigBankDaten;
+  /** @deprecated Bankdaten werden zentral aus formData.bigBank übernommen. */
+  bank?: BigBankDaten;
 }
 
 export const createEmptyEigenePlusbonus = (): EigenePlusbonusDaten => ({
@@ -46,7 +47,6 @@ export const createEmptyEigenePlusbonus = (): EigenePlusbonusDaten => ({
     unfall: false,
     grundfaehigkeit: false,
   },
-  bank: createEmptyBigBankDaten(),
 });
 
 // Arzt-Daten für Rundum-Sicher-Paket
@@ -296,6 +296,11 @@ export interface FormData {
   // BIG direkt — zusätzlich Familienversicherung beantragen?
   bigFamilienversicherung: boolean;
 
+  // BIG: einmalig erzeugter Zufallswert (200-245) für den Eigenanteil des
+  // Hauptmitglieds. Wird zur Police-Summe addiert und in `bigHoeheEuro` als
+  // Gesamtsumme geschrieben. Persistiert, damit der Wert stabil bleibt.
+  bigHoeheEuroSelfRandom: string;
+
   // BIG Variante B: Beschäftigungsstatus des Hauptmitglieds steuert,
   // ob Familie familienversichert ('beschaeftigt') oder eigene
   // Mitgliedschaft ('arbeitslos') erhält.
@@ -425,6 +430,7 @@ export const createInitialFormData = (): FormData => {
     },
     bigMitversicherte: [],
     bigFamilienversicherung: false,
+    bigHoeheEuroSelfRandom: '',
     bigMitgliedBeschaeftigt: '',
     vertriebspartner: '',
   };
