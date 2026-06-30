@@ -122,13 +122,91 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
   const [to, setTo] = useState('');
   const [cc, setCc] = useState('');
   const [bcc, setBcc] = useState('');
-  const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploadedDocs, setUploadedDocs] = useState<File[]>([]);
   const [combiningDocs, setCombiningDocs] = useState(false);
+  const [subjTpl, setSubjTpl] = useState<string>(DEFAULT_SUBJECT_TEMPLATE);
+  const [groupSubjects, setGroupSubjects] = useState<Record<string, string>>({});
 
   const vars = useMemo(() => buildTemplateVars(formData, bearbeiter), [formData, bearbeiter]);
+
+  // Berechne Sende-Gruppen basierend auf Anhängen + Variante-B Personen
+  const groups: SendGroup[] = useMemo(() => {
+    if (loadingAttachments) return [];
+    const docsIndices = attachments
+      .map((a, i) => (a.filename.toLowerCase().endsWith('_dokumente.pdf') ? i : -1))
+      .filter((i) => i >= 0);
+
+    const result: SendGroup[] = [];
+
+    // Hauptmitglied: FamVers + alle Plusbonus-PDFs des Mitglieds + Dokumente
+    const mainIdx: number[] = [];
+    attachments.forEach((a, i) => {
+      const fn = a.filename.toLowerCase();
+      if (fn.startsWith('zusammenfassung_familienversicherung')) mainIdx.push(i);
+      else if (fn.startsWith('antrag plusbonus') && fileBelongsToPerson(a.filename, formData.mitgliedVorname, formData.mitgliedName)) mainIdx.push(i);
+      else if (formData.selectedKrankenkasse !== 'big_plusbonus' && !fn.endsWith('_dokumente.pdf')) {
+        // Für nicht-BIG: alle Antrags-PDFs gehören zum Hauptmitglied
+        mainIdx.push(i);
+      }
+    });
+    const mainAttIdx = Array.from(new Set([...mainIdx, ...docsIndices]));
+    const mainKey = 'main';
+    const mainVars = buildTemplateVarsForPerson(
+      formData,
+      { vorname: formData.mitgliedVorname, name: formData.mitgliedName, geburtsdatum: formData.mitgliedGeburtsdatum },
+      bearbeiter,
+    );
+    result.push({
+      id: mainKey,
+      label: `Hauptmitglied — ${formData.mitgliedVorname} ${formData.mitgliedName}`.trim(),
+      person: { vorname: formData.mitgliedVorname, name: formData.mitgliedName, geburtsdatum: formData.mitgliedGeburtsdatum },
+      antragsform: mainVars.antragsform,
+      subject: groupSubjects[mainKey] ?? applyTemplate(subjTpl, mainVars),
+      body: applyTemplate(body || DEFAULT_BODY_TEMPLATE, mainVars),
+      attachmentIndices: mainAttIdx,
+    });
+
+    // BIG Variante B: pro Ehegatte/Kind mit eigener Mitgliedschaft
+    if (formData.selectedKrankenkasse === 'big_plusbonus' && formData.bigFamilienversicherung) {
+      const persons: Array<{ id: string; label: string; vorname: string; name: string; geb: string }> = [];
+      const e = formData.ehegatte;
+      if (e && e.eigeneMitgliedschaft && (e.vorname || e.name)) {
+        persons.push({ id: 'spouse', label: `Ehegatte — ${e.vorname} ${e.name}`.trim(), vorname: e.vorname, name: e.name, geb: e.geburtsdatum });
+      }
+      formData.kinder.forEach((k, i) => {
+        if (k.eigeneMitgliedschaft && (k.vorname || k.name)) {
+          persons.push({ id: `kind-${i}`, label: `Kind ${i + 1} — ${k.vorname} ${k.name}`.trim(), vorname: k.vorname, name: k.name, geb: k.geburtsdatum });
+        }
+      });
+      for (const p of persons) {
+        const idx: number[] = [];
+        attachments.forEach((a, i) => {
+          const fn = a.filename.toLowerCase();
+          if (fn.startsWith('antrag plusbonus') && fileBelongsToPerson(a.filename, p.vorname, p.name)) idx.push(i);
+        });
+        const attIdx = Array.from(new Set([...idx, ...docsIndices]));
+        const pVars = buildTemplateVarsForPerson(
+          formData,
+          { vorname: p.vorname, name: p.name, geburtsdatum: p.geb },
+          bearbeiter,
+          'Plusbonus',
+        );
+        result.push({
+          id: p.id,
+          label: p.label,
+          person: { vorname: p.vorname, name: p.name, geburtsdatum: p.geb },
+          antragsform: pVars.antragsform,
+          subject: groupSubjects[p.id] ?? applyTemplate(subjTpl, pVars),
+          body: applyTemplate(body || DEFAULT_BODY_TEMPLATE, pVars),
+          attachmentIndices: attIdx,
+        });
+      }
+    }
+
+    return result;
+  }, [attachments, formData, bearbeiter, subjTpl, groupSubjects, body, loadingAttachments]);
 
   // When dialog opens: run exports under capture, look up recipient, fill template
   useEffect(() => {
@@ -140,7 +218,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
     (async () => {
       try {
         // Default subject / body — fetch override template if present
-        let subjTpl = DEFAULT_SUBJECT_TEMPLATE;
+        let nextSubjTpl = DEFAULT_SUBJECT_TEMPLATE;
         let bodyTpl = DEFAULT_BODY_TEMPLATE;
         try {
           const { data: tpl } = await supabase
@@ -148,7 +226,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
             .select('subject_template, body_template')
             .eq('is_default', true)
             .maybeSingle();
-          if (tpl) { subjTpl = tpl.subject_template; bodyTpl = tpl.body_template; }
+          if (tpl) { nextSubjTpl = tpl.subject_template; bodyTpl = tpl.body_template; }
         } catch { /* ignore */ }
 
         // Look up recipient by Krankenkasse (+ optional antragsform match)
@@ -170,8 +248,9 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
         } catch { /* ignore */ }
 
         if (!cancelled) {
-          setSubject(applyTemplate(subjTpl, vars));
-          setBody(applyTemplate(bodyTpl, vars));
+          setSubjTpl(nextSubjTpl);
+          setBody(bodyTpl);
+          setGroupSubjects({});
         }
 
         // Capture PDFs
