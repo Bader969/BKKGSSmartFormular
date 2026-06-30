@@ -402,11 +402,6 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           </div>
 
           <div>
-            <Label htmlFor="email-subject">Betreff *</Label>
-            <Input id="email-subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
-          </div>
-
-          <div>
             <Label htmlFor="email-body">Nachricht</Label>
             <Textarea id="email-body" rows={8} value={body} onChange={(e) => setBody(e.target.value)} />
             <p className="text-xs text-muted-foreground mt-1">
@@ -414,33 +409,59 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
             </p>
           </div>
 
-          <div>
-            <Label className="flex items-center gap-2"><Paperclip className="h-4 w-4" /> Anhänge</Label>
+          <div className="space-y-3">
+            <Label>Sende-Gruppen (eine E-Mail pro Gruppe)</Label>
             {loadingAttachments ? (
-              <div className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
+              <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" /> Erstelle Antrags-PDFs…
               </div>
-            ) : attachments.length === 0 ? (
-              <p className="text-sm text-muted-foreground mt-2">Keine PDFs erzeugt.</p>
+            ) : groups.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Keine Gruppen.</p>
             ) : (
-              <ul className="mt-2 space-y-1 border border-border/60 rounded-lg p-2">
-                {attachments.map((a, i) => (
-                  <li key={a.filename + i} className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={a.include}
-                      onCheckedChange={(v) => setAttachments((prev) => prev.map((x, j) => (j === i ? { ...x, include: !!v } : x)))}
-                      id={`att-${i}`}
-                    />
-                    <label htmlFor={`att-${i}`} className="flex-1 truncate cursor-pointer">{a.filename}</label>
-                    <span className="text-xs text-muted-foreground shrink-0">{(a.blob.size / 1024).toFixed(0)} KB</span>
-                  </li>
-                ))}
-              </ul>
+              groups.map((g) => {
+                const groupSize = g.attachmentIndices
+                  .map((i) => attachments[i])
+                  .filter((a) => a && a.include)
+                  .reduce((s, a) => s + a.blob.size, 0);
+                const groupTooLarge = groupSize > 24 * 1024 * 1024;
+                return (
+                  <div key={g.id} className="border border-border/60 rounded-lg p-3 space-y-2">
+                    <div className="text-xs font-semibold text-muted-foreground">{g.label}</div>
+                    <div>
+                      <Label htmlFor={`subj-${g.id}`} className="text-xs">Betreff *</Label>
+                      <Input
+                        id={`subj-${g.id}`}
+                        value={g.subject}
+                        onChange={(e) => setGroupSubjects((prev) => ({ ...prev, [g.id]: e.target.value }))}
+                      />
+                    </div>
+                    <ul className="space-y-1">
+                      {g.attachmentIndices.map((idx) => {
+                        const a = attachments[idx];
+                        if (!a) return null;
+                        return (
+                          <li key={a.filename + idx} className="flex items-center gap-2 text-sm">
+                            <Checkbox
+                              checked={a.include}
+                              onCheckedChange={(v) => setAttachments((prev) => prev.map((x, j) => (j === idx ? { ...x, include: !!v } : x)))}
+                              id={`g-${g.id}-att-${idx}`}
+                            />
+                            <label htmlFor={`g-${g.id}-att-${idx}`} className="flex-1 truncate cursor-pointer">{a.filename}</label>
+                            <span className="text-xs text-muted-foreground shrink-0">{(a.blob.size / 1024).toFixed(0)} KB</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <p className={`text-xs ${groupTooLarge ? 'text-destructive' : 'text-muted-foreground'}`}>
+                      Größe: {(groupSize / 1024 / 1024).toFixed(2)} MB {groupTooLarge && '· >24 MB'}
+                    </p>
+                  </div>
+                );
+              })
             )}
-            <p className={`text-xs mt-1 ${tooLarge ? 'text-destructive' : 'text-muted-foreground'}`}>
-              Gesamtgröße: {(totalSize / 1024 / 1024).toFixed(2)} MB {tooLarge && '· Gmail-Limit 25 MB überschritten'}
-            </p>
           </div>
+
+          {/* (Alte zentrale Anhängeliste entfernt — wird jetzt pro Gruppe angezeigt) */}
 
           <div className="border-t border-border/60 pt-3">
             <Label className="flex items-center gap-2"><Upload className="h-4 w-4" /> Zusätzliche Dokumente (Bilder/PDF → "Dokumente.pdf")</Label>
