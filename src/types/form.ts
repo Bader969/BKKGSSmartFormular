@@ -338,7 +338,7 @@ export const createEmptyFamilyMember = (): FamilyMember => ({
   geburtsdatum: '',
   abweichendeAnschrift: '',
   verwandtschaft: '',
-  isEhegatteVerwandt: false,
+  isEhegatteVerwandt: true,
   bisherigEndeteAm: '',
   bisherigBestandBei: '',
   bisherigArt: '',
