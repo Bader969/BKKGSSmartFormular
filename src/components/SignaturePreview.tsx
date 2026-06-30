@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Info } from 'lucide-react';
-import { pickSignatureFont } from '@/utils/generateSignature';
+import { pickSignatureFont, pickLoadedSignatureFont, ensureSignatureFontReady } from '@/utils/generateSignature';
 
 interface SignaturePreviewProps {
   lastName: string | null | undefined;
@@ -10,7 +10,19 @@ interface SignaturePreviewProps {
 
 export const SignaturePreview: React.FC<SignaturePreviewProps> = ({ lastName, emptyHint, seed }) => {
   const name = (lastName ?? '').trim();
-  const font = pickSignatureFont(seed ?? name);
+  const [fontsReady, setFontsReady] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try { await ensureSignatureFontReady(); } catch { /* noop */ }
+      try { if ('fonts' in document) await (document as any).fonts.ready; } catch { /* noop */ }
+      if (!cancelled) setFontsReady(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const font = fontsReady
+    ? pickLoadedSignatureFont(seed ?? name, name || 'Abc')
+    : pickSignatureFont(seed ?? name);
   return (
     <div className="space-y-2">
       <div className="relative bg-card rounded-lg h-40 flex items-end px-6 pb-3">
