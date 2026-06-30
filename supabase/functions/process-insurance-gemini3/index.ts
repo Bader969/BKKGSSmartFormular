@@ -307,6 +307,26 @@ KINDER (ALLE Felder pro Kind):
 - VERSICHERTENNUMMER (PFLICHT!)`
       };
       
+    case 'big_plusbonus':
+      return {
+        schema: bigSchema,
+        prompt: `Extrahiere Daten für BIG direkt Plusbonus-Antrag.
+
+MITGLIED:
+- Vorname, Name, Geburtsdatum, Geburtsort, Geburtsland (ISO-Code)
+- Adresse (Straße, Hausnummer, PLZ, Ort)
+- KV-Nummer, Krankenkasse, Familienstand, Telefon, Email
+
+SEPA / BANKKARTE (PFLICHT wenn auf Dokument/Bankkarte vorhanden — in "bigBank" einsetzen!):
+- kontoinhaberVorname, kontoinhaberNachname (Name wie auf der Karte; aufteilen in Vor- und Nachname)
+- kreditinstitut (Name der Bank, z.B. "Sparkasse Köln", "DKB", "ING")
+- iban (Großbuchstaben, ohne Leerzeichen)
+- bic (Großbuchstaben)
+
+EHEGATTE / KINDER (falls vorhanden): Vorname, Name, Geburtsdatum, Geschlecht, Geburtsname,
+Geburtsort, Geburtsland (ISO-Code), Staatsangehörigkeit (ISO-Code), bei Kindern Verwandtschaft.`
+      };
+
     case 'novitas':
       return {
         schema: novitasSchema,
