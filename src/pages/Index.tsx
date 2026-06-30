@@ -189,14 +189,27 @@ const Index = () => {
       if ('mitgliedVorname' in updates || 'mitgliedName' in updates) {
         const oldFullName = `${prev.mitgliedVorname} ${prev.mitgliedName}`.trim();
         const newFullName = `${newData.mitgliedVorname} ${newData.mitgliedName}`.trim();
-        
-        // Nur synchronisieren wenn Feld leer ist oder noch dem alten Wert entspricht
+
         if (!newData.viactivBonusKontoinhaber || newData.viactivBonusKontoinhaber === oldFullName) {
           newData.viactivBonusKontoinhaber = newFullName;
         }
-        if (!newData.bigBank.kontoinhaber || newData.bigBank.kontoinhaber === oldFullName) {
-          newData.bigBank = { ...newData.bigBank, kontoinhaber: newFullName };
-        }
+        // BIG Kontoinhaber V + N separat (UI), und das kombinierte Feld wird für das PDF mitgeführt
+        const bb = newData.bigBank;
+        const ovn = prev.bigBank.kontoinhaberVorname || '';
+        const onn = prev.bigBank.kontoinhaberNachname || '';
+        const nextVn = (!bb.kontoinhaberVorname || bb.kontoinhaberVorname === prev.mitgliedVorname || bb.kontoinhaberVorname === ovn)
+          ? newData.mitgliedVorname
+          : bb.kontoinhaberVorname;
+        const nextNn = (!bb.kontoinhaberNachname || bb.kontoinhaberNachname === prev.mitgliedName || bb.kontoinhaberNachname === onn)
+          ? newData.mitgliedName
+          : bb.kontoinhaberNachname;
+        const combined = [nextVn, nextNn].filter(Boolean).join(' ').trim();
+        newData.bigBank = {
+          ...bb,
+          kontoinhaberVorname: nextVn,
+          kontoinhaberNachname: nextNn,
+          kontoinhaber: combined,
+        };
       }
 
       // Automatische Synchronisierung des Ortes (obere Anschrift → alle Ort-Folgefelder)
