@@ -1,16 +1,45 @@
 import { FormData } from '@/types/form';
 
+export const SIGNATURE_FONTS: string[] = [
+  'SigRilonaNotes',
+  'SigArabellaForteny',
+  'SigSignaturePresent',
+  'SigGartenyaCalligraph',
+  'SigMillenial',
+  'SigMelismaSignature',
+  'SigDestomed',
+  'SigOTF',
+];
+
 let fontReadyPromise: Promise<unknown> | null = null;
 
 const ensureFontLoaded = async (): Promise<void> => {
   if (typeof document === 'undefined' || !('fonts' in document)) return;
   if (!fontReadyPromise) {
-    fontReadyPromise = Promise.all([
-      (document as any).fonts.load('700 56px "Caveat"'),
-      (document as any).fonts.load('400 56px "Caveat"'),
-    ]).catch(() => undefined);
+    fontReadyPromise = Promise.all(
+      SIGNATURE_FONTS.flatMap((f) => [
+        (document as any).fonts.load(`400 64px "${f}"`),
+        (document as any).fonts.load(`700 64px "${f}"`),
+      ]),
+    ).catch(() => undefined);
   }
   await fontReadyPromise;
+};
+
+// Stable FNV-1a 32-bit hash → deterministic font choice per person.
+const fnv1a = (s: string): number => {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return h >>> 0;
+};
+
+export const pickSignatureFont = (seed: string | null | undefined): string => {
+  const s = (seed ?? '').trim().toLowerCase();
+  if (!s) return SIGNATURE_FONTS[0];
+  return SIGNATURE_FONTS[fnv1a(s) % SIGNATURE_FONTS.length];
 };
 
 export interface SignatureOptions {
@@ -18,6 +47,8 @@ export interface SignatureOptions {
   height?: number;
   color?: string;
   fontSize?: number;
+  fontFamily?: string;
+  seed?: string;
 }
 
 /**
@@ -39,6 +70,7 @@ export const generateSignatureDataUrl = (
   const height = opts.height ?? 160;
   const color = opts.color ?? '#1a365d';
   let fontSize = opts.fontSize ?? 96;
+  const fontFamily = opts.fontFamily ?? pickSignatureFont(opts.seed ?? text);
 
   const canvas = document.createElement('canvas');
   const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
@@ -54,10 +86,11 @@ export const generateSignatureDataUrl = (
 
   // Auto-Downscale, damit der Text in die Zielbreite passt
   const maxWidth = width - 24;
-  ctx.font = `700 ${fontSize}px "Caveat", cursive`;
+  const setFont = () => { ctx.font = `400 ${fontSize}px "${fontFamily}", "Caveat", cursive`; };
+  setFont();
   while (ctx.measureText(text).width > maxWidth && fontSize > 20) {
     fontSize -= 4;
-    ctx.font = `700 ${fontSize}px "Caveat", cursive`;
+    setFont();
   }
 
   ctx.fillText(text, 12, height / 2);
@@ -121,8 +154,14 @@ export const resolveFamilySignatureLastName = (formData: FormData): string | nul
  * berücksichtigen und in diesem Fall keine Signatur einbetten.
  */
 export const getAutoSignatures = (formData: FormData) => {
+  const memberSeed = [formData.mitgliedVorname, formData.mitgliedName, formData.mitgliedGeburtsdatum]
+    .filter(Boolean).join('|');
+  const familyLast = resolveFamilySignatureLastName(formData);
+  const fam = formData.ehegatte?.name?.trim()
+    ? [formData.ehegatte?.vorname, formData.ehegatte?.name, formData.ehegatte?.geburtsdatum].filter(Boolean).join('|')
+    : familyLast || '';
   return {
-    member: generateSignatureDataUrl(formData.mitgliedName),
-    family: generateSignatureDataUrl(resolveFamilySignatureLastName(formData)),
+    member: generateSignatureDataUrl(formData.mitgliedName, { seed: memberSeed }),
+    family: generateSignatureDataUrl(familyLast, { seed: fam }),
   };
 };
