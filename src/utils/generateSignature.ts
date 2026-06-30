@@ -94,7 +94,7 @@ export const generateSignatureDataUrl = (
   const height = opts.height ?? 160;
   const color = opts.color ?? '#1a365d';
   let fontSize = opts.fontSize ?? 96;
-  const fontFamily = opts.fontFamily ?? pickSignatureFont(opts.seed ?? text);
+  const fontFamily = opts.fontFamily ?? pickLoadedSignatureFont(opts.seed ?? text, text);
 
   const canvas = document.createElement('canvas');
   const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
