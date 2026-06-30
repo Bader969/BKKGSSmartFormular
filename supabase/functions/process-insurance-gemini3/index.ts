@@ -101,6 +101,52 @@ const novitasSchema = `{
   }]
 }`;
 
+// BIG direkt Plusbonus Schema - Mitglied + SEPA-Bankdaten + Familie
+const bigSchema = `{
+  "mitgliedVorname": "",
+  "mitgliedName": "",
+  "mitgliedGeburtsdatum": "TT.MM.JJJJ",
+  "mitgliedGeburtsort": "",
+  "mitgliedGeburtsland": "ISO-Code (DE, TR, SY...)",
+  "mitgliedStrasse": "",
+  "mitgliedHausnummer": "",
+  "mitgliedPlz": "",
+  "ort": "",
+  "mitgliedKvNummer": "",
+  "mitgliedKrankenkasse": "",
+  "familienstand": "ledig|verheiratet|geschieden|verwitwet",
+  "telefon": "",
+  "email": "",
+  "bigBank": {
+    "kontoinhaberVorname": "",
+    "kontoinhaberNachname": "",
+    "kreditinstitut": "",
+    "iban": "",
+    "bic": ""
+  },
+  "ehegatte": {
+    "vorname": "",
+    "name": "",
+    "geburtsdatum": "TT.MM.JJJJ",
+    "geschlecht": "m|w|d",
+    "geburtsname": "",
+    "geburtsort": "",
+    "geburtsland": "ISO-Code",
+    "staatsangehoerigkeit": "ISO-Code"
+  },
+  "kinder": [{
+    "vorname": "",
+    "name": "",
+    "geburtsdatum": "TT.MM.JJJJ",
+    "geschlecht": "m|w|d",
+    "geburtsname": "",
+    "geburtsort": "",
+    "geburtsland": "ISO-Code",
+    "staatsangehoerigkeit": "ISO-Code",
+    "verwandtschaft": "leiblich|stief|pflege|adoptiert"
+  }]
+}`;
+
 // DAK Schema - Familienversicherung
 const dakSchema = `{
   "mitgliedVorname": "",
