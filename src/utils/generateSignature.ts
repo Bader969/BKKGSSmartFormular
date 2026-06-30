@@ -99,6 +99,20 @@ export const generateSignatureDataUrl = (
 
 export const ensureSignatureFontReady = ensureFontLoaded;
 
+/**
+ * Liefert den Nachnamen, der bei BIG Plusbonus für die Unterschrift verwendet wird.
+ * Quelle: Kontoinhaber (letztes Wort). Fallback: mitgliedName.
+ */
+export const resolveBigSignatureLastName = (formData: FormData): string | null => {
+  const ki = (formData.bigBank?.kontoinhaber || '').trim();
+  if (ki) {
+    const parts = ki.split(/\s+/);
+    const last = parts[parts.length - 1];
+    if (last) return last;
+  }
+  return (formData.mitgliedName || '').trim() || null;
+};
+
 const parseGeburtsdatum = (value: string): Date | null => {
   if (!value) return null;
   if (value.includes('-')) {
