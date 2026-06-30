@@ -312,10 +312,20 @@ KINDER (ALLE Felder pro Kind):
         schema: bigSchema,
         prompt: `Extrahiere Daten für BIG direkt Plusbonus-Antrag.
 
-MITGLIED:
+WICHTIG: Die Dokumente enthalten i.d.R. MEHRERE Kartenbilder bzw. Scans:
+- eine elektronische Gesundheitskarte (eGK / Versichertenkarte) → liefert KV-Nummer und Name der aktuellen Krankenkasse
+- eine Bankkarte (Debit/EC) → liefert Kontoinhaber, Kreditinstitut, IBAN, BIC
+- ggf. Personalausweis/Pass und/oder Meldebescheinigung → liefert Geburtsdaten und Anschrift
+Werte ALLE Bilder/Seiten aus und kombiniere sie. Verwechsle Versichertenkarte und Bankkarte nicht.
+
+MITGLIED (aus eGK + Ausweis/Meldebescheinigung):
 - Vorname, Name, Geburtsdatum, Geburtsort, Geburtsland (ISO-Code)
 - Adresse (Straße, Hausnummer, PLZ, Ort)
-- KV-Nummer, Krankenkasse, Familienstand, Telefon, Email
+- Familienstand, Telefon, Email
+
+VERSICHERTENKARTE / eGK (PFLICHT wenn ein eGK-Bild vorhanden ist):
+- mitgliedKvNummer: Die Versicherten-/KV-Nummer auf der Karte (Format: 1 Großbuchstabe + 9 Ziffern, z.B. A123456789). Steht meist auf der Vorderseite über/unter dem Namen. NIEMALS leer lassen, wenn auf einem der Bilder eine eGK zu sehen ist.
+- mitgliedKrankenkasse: Name der Krankenkasse wie auf der Karte aufgedruckt (z.B. "AOK Bayern", "Techniker Krankenkasse", "BARMER", "DAK-Gesundheit", "BIG direkt gesund"). Auch das Logo oben links/rechts auswerten.
 
 SEPA / BANKKARTE (PFLICHT wenn auf Dokument/Bankkarte vorhanden — in "bigBank" einsetzen!):
 - kontoinhaberVorname, kontoinhaberNachname (Name wie auf der Karte; aufteilen in Vor- und Nachname)
@@ -324,7 +334,8 @@ SEPA / BANKKARTE (PFLICHT wenn auf Dokument/Bankkarte vorhanden — in "bigBank"
 - bic (Großbuchstaben)
 
 EHEGATTE / KINDER (falls vorhanden): Vorname, Name, Geburtsdatum, Geschlecht, Geburtsname,
-Geburtsort, Geburtsland (ISO-Code), Staatsangehörigkeit (ISO-Code), bei Kindern Verwandtschaft.`
+Geburtsort, Geburtsland (ISO-Code), Staatsangehörigkeit (ISO-Code), bei Kindern Verwandtschaft.
+Falls für Ehegatte/Kinder ebenfalls eine eGK vorliegt, deren KV-Nummer + Krankenkasse mit übernehmen.`
       };
 
     case 'novitas':
