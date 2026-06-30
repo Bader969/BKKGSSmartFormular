@@ -13,6 +13,7 @@ import { captureDownloads, blobToBase64, type CapturedFile } from '@/utils/captu
 import {
   applyTemplate,
   buildTemplateVars,
+  buildTemplateVarsForPerson,
   DEFAULT_BODY_TEMPLATE,
   DEFAULT_SUBJECT_TEMPLATE,
 } from '@/utils/emailTemplate';
@@ -50,6 +51,27 @@ async function filesToFileForPdf(files: File[]): Promise<FileForPdf[]> {
 }
 
 type Attachment = CapturedFile & { include: boolean };
+
+type SendGroup = {
+  id: string;
+  label: string;            // angezeigt im UI
+  person: { vorname: string; name: string; geburtsdatum: string };
+  antragsform: string;      // für Betreff/Body Vars
+  subject: string;
+  body: string;
+  attachmentIndices: number[]; // Verweis auf attachments
+};
+
+function fullNameLower(v: string, n: string) {
+  return `${(v || '').trim()} ${(n || '').trim()}`.trim().toLowerCase();
+}
+
+function fileBelongsToPerson(filename: string, vorname: string, name: string): boolean {
+  const fn = filename.toLowerCase();
+  const full = fullNameLower(vorname, name);
+  if (!full) return false;
+  return fn.includes(full);
+}
 
 function sanitize(s: string): string {
   return s.replace(/[^a-zA-Z0-9_\-.äöüÄÖÜß ]/g, '_');
