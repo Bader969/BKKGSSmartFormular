@@ -72,7 +72,29 @@ export const ChildrenSection: React.FC<ChildrenSectionProps> = ({ formData, upda
                 selectedKrankenkasse={formData.selectedKrankenkasse}
                 mitgliedKrankenkasse={formData.mitgliedKrankenkasse}
               />
-              
+
+              {/* BIG Variante B: Eigene Mitgliedschaft pro Kind */}
+              {formData.selectedKrankenkasse === 'big_plusbonus' && formData.bigFamilienversicherung && (
+                <div className="mt-3 p-3 rounded-lg border bg-card/50">
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={kind.eigeneMitgliedschaft}
+                      onCheckedChange={(checked) =>
+                        updateKind(index, {
+                          eigeneMitgliedschaft: checked === true,
+                          bisherigArt: checked === true ? 'mitgliedschaft' : 'familienversicherung',
+                        })
+                      }
+                      className="mt-0.5"
+                    />
+                    <span className="text-sm">
+                      Eigene Mitgliedschaft (kein Eintrag in der Familienversicherung — es wird ein
+                      separater Plusbonus-Antrag erzeugt)
+                    </span>
+                  </label>
+                </div>
+              )}
+
               {/* Pre-filled Felder anzeigen (vom Antragsteller - bearbeitbar) */}
               <div className="mt-4 p-4 bg-card/50 rounded-lg border">
                 <p className="text-sm text-muted-foreground mb-3">Vorausgefüllte Felder (vom Antragsteller - bearbeitbar):</p>

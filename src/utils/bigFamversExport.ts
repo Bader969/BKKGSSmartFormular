@@ -359,7 +359,10 @@ const buildPdf = async (
 
 // ---------- Public export ----------
 export const exportBigFamilienversicherung = async (formData: FormData): Promise<void> => {
-  const children = formData.kinder || [];
+  // Kinder mit eigener Mitgliedschaft erscheinen NICHT im FamVers-PDF
+  // (sie bekommen einen separaten Plusbonus-Antrag). Ehegatte bleibt
+  // immer im FamVers-PDF eingetragen — unabhängig von eigener Mitgliedschaft.
+  const children = (formData.kinder || []).filter(k => !k.eigeneMitgliedschaft);
   // Up to 3 Kinder pro PDF (wie Novitas)
   const numPDFs = Math.max(1, Math.ceil(children.length / 3));
   for (let i = 0; i < numPDFs; i++) {
