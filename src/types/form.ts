@@ -271,6 +271,11 @@ export interface FormData {
   // BIG direkt — zusätzlich Familienversicherung beantragen?
   bigFamilienversicherung: boolean;
 
+  // BIG Variante B: Beschäftigungsstatus des Hauptmitglieds steuert,
+  // ob Familie familienversichert ('beschaeftigt') oder eigene
+  // Mitgliedschaft ('arbeitslos') erhält.
+  bigMitgliedBeschaeftigt: 'beschaeftigt' | 'arbeitslos' | '';
+
   // Vertriebspartner (intern, für Antragsliste — wird nicht in PDFs gerendert)
   vertriebspartner: string;
 }
