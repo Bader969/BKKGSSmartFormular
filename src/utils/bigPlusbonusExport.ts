@@ -118,7 +118,6 @@ const buildPlusbonusPdfsForPerson = async (
   person: Antragsperson,
   includeMitversicherte: boolean = false,
   overrides?: EigenePlusbonusDaten,
-  personSignatureDataUrl?: string,
 ): Promise<void> => {
   const mv = includeMitversicherte ? formData.bigMitversicherte : [];
   const chunkSize = 3;
@@ -150,8 +149,8 @@ const buildPlusbonusPdfsForPerson = async (
   setCheck(form, 'weiblich', person.geschlecht === 'weiblich');
   setCheck(form, 'divers', person.geschlecht === 'divers');
 
-  // Bankdaten — pro Person Overrides erlauben
-  const bank = overrides?.bank ?? formData.bigBank;
+  // Bankdaten — zentral aus Hauptantrag (gilt für alle Plusbonus-PDFs)
+  const bank = formData.bigBank;
   const kontoinhaberFull = bank.kontoinhaber
     || [bank.kontoinhaberVorname, bank.kontoinhaberNachname].filter(Boolean).join(' ').trim();
   setText(form, 'Kontoinhaberin', kontoinhaberFull);
@@ -192,7 +191,8 @@ const buildPlusbonusPdfsForPerson = async (
   }
 
   // Unterschrift Kontoinhaber als Bild über Signatur16-Widget
-  const sigUrl = personSignatureDataUrl || formData.unterschrift;
+  // (zentral aus formData.unterschrift = Nachname des Kontoinhabers)
+  const sigUrl = formData.unterschrift;
   if (sigUrl) {
     try {
       const base64 = sigUrl.split(',')[1];
@@ -279,9 +279,7 @@ export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
         plz: formData.mitgliedPlz,
         ort: formData.ort,
       };
-      const ehNachname = (e.eigenePlusbonus?.bank.kontoinhaberNachname || e.name || '').trim();
-      const ehSig = generateSignatureDataUrl(ehNachname, { seed: `big|eh|${ehNachname}|${e.geburtsdatum}` }) ?? '';
-      await buildPlusbonusPdfsForPerson(formData, templateBytes, ehegatte, false, e.eigenePlusbonus, ehSig);
+      await buildPlusbonusPdfsForPerson(formData, templateBytes, ehegatte, false, e.eigenePlusbonus);
     }
 
     for (const k of formData.kinder) {
@@ -298,9 +296,7 @@ export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
         plz: formData.mitgliedPlz,
         ort: formData.ort,
       };
-      const kNachname = (k.eigenePlusbonus?.bank.kontoinhaberNachname || k.name || '').trim();
-      const kSig = generateSignatureDataUrl(kNachname, { seed: `big|kind|${kNachname}|${k.geburtsdatum}` }) ?? '';
-      await buildPlusbonusPdfsForPerson(formData, templateBytes, kind, false, k.eigenePlusbonus, kSig);
+      await buildPlusbonusPdfsForPerson(formData, templateBytes, kind, false, k.eigenePlusbonus);
     }
   }
 };
