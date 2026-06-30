@@ -1,6 +1,11 @@
 import { PDFDocument, PDFTextField, PDFCheckBox } from 'pdf-lib';
 import { FormData } from '@/types/form';
-import { getAutoSignatures, ensureSignatureFontReady } from './generateSignature';
+import {
+  getAutoSignatures,
+  ensureSignatureFontReady,
+  generateSignatureDataUrl,
+  resolveBigSignatureLastName,
+} from './generateSignature';
 import { getBeginDate, formatDateGerman } from './dateUtils';
 
 // Convert ISO YYYY-MM-DD or DD.MM.YYYY -> DDMMJJ (6-digit, two-digit year)
@@ -228,7 +233,11 @@ const buildPlusbonusPdfsForPerson = async (
 export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
   await ensureSignatureFontReady();
   const _sigs = getAutoSignatures(formData);
-  formData = { ...formData, unterschrift: _sigs.member ?? '', unterschriftFamilie: _sigs.family ?? '' };
+  // BIG: Mitglieds-Unterschrift kommt aus dem Nachnamen des Kontoinhabers
+  const bigLast = resolveBigSignatureLastName(formData);
+  const bigSeed = `big|${formData.bigBank?.kontoinhaber || ''}|${formData.mitgliedGeburtsdatum || ''}`;
+  const memberSig = generateSignatureDataUrl(bigLast, { seed: bigSeed }) ?? '';
+  formData = { ...formData, unterschrift: memberSig, unterschriftFamilie: _sigs.family ?? '' };
   const res = await fetch('/big-plusbonus.pdf');
   const templateBytes = await res.arrayBuffer();
 
