@@ -104,11 +104,13 @@ export const ensureSignatureFontReady = ensureFontLoaded;
  * Quelle: Kontoinhaber (letztes Wort). Fallback: mitgliedName.
  */
 export const resolveBigSignatureLastName = (formData: FormData): string | null => {
+  const last = (formData.bigBank?.kontoinhaberNachname || '').trim();
+  if (last) return last;
   const ki = (formData.bigBank?.kontoinhaber || '').trim();
   if (ki) {
     const parts = ki.split(/\s+/);
-    const last = parts[parts.length - 1];
-    if (last) return last;
+    const p = parts[parts.length - 1];
+    if (p) return p;
   }
   return (formData.mitgliedName || '').trim() || null;
 };

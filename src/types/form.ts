@@ -26,7 +26,28 @@ export interface FamilyMember {
   beschaeftigung: '' | 'beschaeftigt' | 'ausbildung' | 'rente' | 'freiwillig_versichert' | 'studiere' | 'al_geld_1' | 'al_geld_2' | 'minijob' | 'selbststaendig' | 'einkommen_ueber_grenze';
   // VIACTIV Kind mit eigener Mitgliedschaft (für Kinder >= 15 bei ALG II)
   eigeneMitgliedschaft: boolean;
+  // BIG Variante B: pro Person eigene Plusbonus-Daten, wenn eigeneMitgliedschaft=true
+  eigenePlusbonus?: EigenePlusbonusDaten;
 }
+
+export interface EigenePlusbonusDaten {
+  versicherungsstatus: BigVersicherungsstatus;
+  hoeheEuro: string;
+  versicherungsarten: BigVersicherungsarten;
+  bank: BigBankDaten;
+}
+
+export const createEmptyEigenePlusbonus = (): EigenePlusbonusDaten => ({
+  versicherungsstatus: '',
+  hoeheEuro: '',
+  versicherungsarten: {
+    privateZusatz: false,
+    berufsunfaehigkeit: false,
+    unfall: false,
+    grundfaehigkeit: false,
+  },
+  bank: createEmptyBigBankDaten(),
+});
 
 // Arzt-Daten für Rundum-Sicher-Paket
 export interface ArztDaten {
@@ -164,6 +185,8 @@ export const BIG_GESCHLECHT_OPTIONS = [
 
 export interface BigBankDaten {
   kontoinhaber: string;
+  kontoinhaberVorname: string;
+  kontoinhaberNachname: string;
   kreditinstitut: string;
   iban: string;
   bic: string;
@@ -173,6 +196,8 @@ export interface BigBankDaten {
 
 export const createEmptyBigBankDaten = (): BigBankDaten => ({
   kontoinhaber: '',
+  kontoinhaberVorname: '',
+  kontoinhaberNachname: '',
   kreditinstitut: '',
   iban: '',
   bic: '',

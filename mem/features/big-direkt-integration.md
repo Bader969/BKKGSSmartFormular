@@ -11,10 +11,24 @@ type: feature
 
 ## Variante B — Beschäftigungsstatus-Logik (Auto-Sync)
 - Pflichtfeld `bigMitgliedBeschaeftigt` ('beschaeftigt' | 'arbeitslos') in `BigPlusbonusSection` (mode `variante`), nur wenn `bigFamilienversicherung=true`.
-- `beschaeftigt` (SGB I) → Auto-Sync: Ehegatte + alle Kinder bekommen `eigeneMitgliedschaft=false`, `bisherigArt='familienversicherung'`. Keine separaten Plusbonus-PDFs für Familie.
-- `arbeitslos` (SGB II) → Auto-Sync: Ehegatte + alle Kinder bekommen `eigeneMitgliedschaft=true`, `bisherigArt='mitgliedschaft'`. Pro Person zusätzlicher Plusbonus-PDF.
-- `ChildrenSection` zeigt bei BIG Variante B pro Kind eine manuell überschreibbare Checkbox „Eigene Mitgliedschaft" (synct `bisherigArt` mit).
+- VIACTIV-Style Logik (`Index.tsx` useEffect):
+  - `beschaeftigt` (SGB I) → Familie i.d.R. familienversichert. Ausnahme: Ehegatte / Kinder ≥15 mit eigener `beschaeftigung === 'beschaeftigt'` → eigene Mitgliedschaft.
+  - `arbeitslos` (SGB II) → Ehegatte **immer** + Kinder **≥15** eigene Mitgliedschaft; Kinder <15 bleiben familienversichert.
+- Bei eigener Mitgliedschaft wird automatisch `FamilyMember.eigenePlusbonus` (Status/Höhe/Arten/Bank inkl. eigene Kontoinhaber-V+N) initialisiert (Defaults aus Hauptmitglied).
+- `SpouseSection`: Beschäftigungs-Dropdown (Ehegatte) nur sichtbar bei Hauptmitglied=beschäftigt. „Eigene Mitgliedschaft" wird abgeleitet (kein manueller Toggle mehr).
+- `ChildrenSection`: Beschäftigungs-Dropdown pro Kind nur ab 15 Jahren und nur bei Hauptmitglied=beschäftigt. Status zeigt automatisch „Eigene Mitgliedschaft" oder „Familienversichert".
+- Pro Person mit eigener Mitgliedschaft: separate `EigenePlusbonusBlock`-Sektion (Status, Höhe in Euro, Versicherungsarten, SEPA inkl. Kontoinhaber Vorname+Nachname).
 - `bigFamversExport`: Kinder mit `eigeneMitgliedschaft===true` werden aus dem FamVers-PDF gefiltert. Ehegatte bleibt IMMER im FamVers-PDF eingetragen (auch mit eigener Mitgliedschaft) und erhält parallel einen separaten Plusbonus.
+- `bigPlusbonusExport`: pro Ehegatte/Kind mit eigener Mitgliedschaft eigenes PDF mit Override aus `eigenePlusbonus` (Bank, Status, Höhe, Arten). Unterschrift = `eigenePlusbonus.bank.kontoinhaberNachname`.
+
+## Unterschriften (korrigiert)
+- **Familienversicherungs-Antrag**: Mitgliedsunterschrift = Nachname **Hauptmitglied** (`mitgliedName`). Familienangehörigen-Unterschrift = Nachname **Ehegatte** (Fallback: ältestes Kind ≥15).
+- **Plusbonus-Antrag** (Hauptmitglied): Unterschrift = Nachname **Kontoinhaber** (`bigBank.kontoinhaberNachname`). UI: Kontoinhaber als zwei Felder Vorname/Nachname; PDF-AcroField `Kontoinhaberin` wird zusammengeschrieben befüllt.
+- **Plusbonus-Antrag pro Person** (Variante B): Unterschrift = Nachname des Kontoinhabers im `eigenePlusbonus.bank` der jeweiligen Person.
+
+## E-Mail-Versand (Variante B)
+- `SendEmailDialog` gruppiert Anhänge pro Empfängerperson: Hauptmitglied (FamVers + Mitglied-Plusbonus + Dokumente), pro Ehegatte/Kind mit eigener Mitgliedschaft (jeweiliger Plusbonus + Dokumente).
+- Pro Gruppe eigener vorausgefüllter Betreff (aus `buildTemplateVarsForPerson`, `antragsform="Plusbonus"` für Sub-Mails). Senden löst N separate `send-application-email`-Calls aus.
 - Pflichtfelder Variante B: Mitglied (KV-Nr, Familienstand, KK, Telefon, E-Mail, Geburtsdatum), Ehegatte (Beginn FamVers auto, Geburtsdatum, Geschlecht, Versichertennr., bisherige KK + Enddatum), Kinder je (Beginn auto, Geburtsdatum, Geschlecht, Verwandtschaft, Versichertennr.), und für Angehörige ohne RV-Nr.: Geburtsname/-ort/-land/Staatsangehörigkeit.
 - Auto-Fill Variante B: `bisherigBestehtWeiterBei = 'BIG direkt gesund'`, `abgeleitetVon = Vorname+Name Mitglied` (Kinder), Erreichbarkeit=Mobil, bisher selbst versichert (Mitglied), Anlass = "Beginn meiner Mitgliedschaft", Beginn FamVers = +3 Monate (1. des Monats), bisherige Vers endete = Monatsende davor.
 

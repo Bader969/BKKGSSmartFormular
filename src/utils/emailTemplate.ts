@@ -38,6 +38,22 @@ export function buildTemplateVars(formData: FormData, bearbeiter: string): Templ
   };
 }
 
+export function buildTemplateVarsForPerson(
+  formData: FormData,
+  person: { vorname: string; name: string; geburtsdatum: string },
+  bearbeiter: string,
+  antragsformOverride?: string,
+): TemplateVars {
+  return {
+    name: person.name || '',
+    vorname: person.vorname || '',
+    geburtsdatum: formatGeburtsdatum(person.geburtsdatum || ''),
+    antragsform: antragsformOverride ?? deriveAntragsform(formData),
+    krankenkasse: KK_LABEL[formData.selectedKrankenkasse] || formData.selectedKrankenkasse || '',
+    bearbeiter: bearbeiter || '',
+  };
+}
+
 export function applyTemplate(tpl: string, vars: TemplateVars): string {
   return tpl.replace(/\{(\w+)\}/g, (_, k: string) => (vars as Record<string, string>)[k] ?? `{${k}}`);
 }

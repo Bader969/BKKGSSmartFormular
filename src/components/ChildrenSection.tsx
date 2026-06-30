@@ -1,13 +1,24 @@
 import React from 'react';
 import { FormSection } from './FormSection';
 import { FamilyMemberForm } from './FamilyMemberForm';
-import { FormData, FamilyMember, createEmptyFamilyMember } from '@/types/form';
+import { FormData, FamilyMember, createEmptyFamilyMember, VIACTIV_BESCHAEFTIGUNG_OPTIONS } from '@/types/form';
 import { CopyBlockButton } from './CopyBlockButton';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { FormField } from './FormField';
+import { EigenePlusbonusBlock } from './EigenePlusbonusBlock';
+
+const parseAge = (g: string): number | null => {
+  if (!g) return null;
+  const d = g.includes('-')
+    ? new Date(g)
+    : (() => { const [dd, mm, yy] = g.split('.'); return dd && mm && yy ? new Date(Number(yy), Number(mm) - 1, Number(dd)) : null; })();
+  if (!d || isNaN(d.getTime())) return null;
+  return (Date.now() - d.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+};
 
 interface ChildrenSectionProps {
   formData: FormData;
@@ -73,25 +84,43 @@ export const ChildrenSection: React.FC<ChildrenSectionProps> = ({ formData, upda
                 mitgliedKrankenkasse={formData.mitgliedKrankenkasse}
               />
 
-              {/* BIG Variante B: Eigene Mitgliedschaft pro Kind */}
-              {formData.selectedKrankenkasse === 'big_plusbonus' && formData.bigFamilienversicherung && (
-                <div className="mt-3 p-3 rounded-lg border bg-card/50">
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <Checkbox
-                      checked={kind.eigeneMitgliedschaft}
-                      onCheckedChange={(checked) =>
-                        updateKind(index, {
-                          eigeneMitgliedschaft: checked === true,
-                          bisherigArt: checked === true ? 'mitgliedschaft' : 'familienversicherung',
-                        })
-                      }
-                      className="mt-0.5"
-                    />
-                    <span className="text-sm">
-                      Eigene Mitgliedschaft (kein Eintrag in der Familienversicherung — es wird ein
-                      separater Plusbonus-Antrag erzeugt)
-                    </span>
-                  </label>
+              {/* BIG Variante B: Beschäftigung & eigene Mitgliedschaft pro Kind */}
+              {formData.selectedKrankenkasse === 'big_plusbonus' && formData.bigFamilienversicherung && (() => {
+                const age = parseAge(kind.geburtsdatum);
+                const eligible = age !== null && age >= 15;
+                return (
+                  <div className="mt-3 p-3 rounded-lg border bg-card/50 space-y-3">
+                    {eligible && formData.bigMitgliedBeschaeftigt === 'beschaeftigt' && (
+                      <FormField
+                        type="select"
+                        id={`kind-${index}-beschaeftigung`}
+                        label="Beschäftigungsstatus (Kind ≥15)"
+                        value={kind.beschaeftigung}
+                        onChange={(v) => updateKind(index, { beschaeftigung: v as FamilyMember['beschaeftigung'] })}
+                        options={VIACTIV_BESCHAEFTIGUNG_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+                        placeholder="Bitte auswählen"
+                      />
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {kind.eigeneMitgliedschaft
+                        ? '✓ Eigene Mitgliedschaft (separater Plusbonus-Antrag wird erzeugt, kein Eintrag in Familienversicherung).'
+                        : 'Familienversichert — wird im Familienversicherungs-Antrag eingetragen.'}
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {/* Eigener Plusbonus-Block sobald Kind eigene Mitgliedschaft hat */}
+              {formData.selectedKrankenkasse === 'big_plusbonus'
+                && formData.bigFamilienversicherung
+                && kind.eigeneMitgliedschaft && (
+                <div className="mt-4">
+                  <EigenePlusbonusBlock
+                    personLabel={[kind.vorname, kind.name].filter(Boolean).join(' ') || `Kind ${index + 1}`}
+                    value={kind.eigenePlusbonus}
+                    onChange={(v) => updateKind(index, { eigenePlusbonus: v })}
+                    idPrefix={`kind-${index}-pb`}
+                  />
                 </div>
               )}
 

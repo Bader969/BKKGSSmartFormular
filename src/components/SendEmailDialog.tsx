@@ -13,6 +13,7 @@ import { captureDownloads, blobToBase64, type CapturedFile } from '@/utils/captu
 import {
   applyTemplate,
   buildTemplateVars,
+  buildTemplateVarsForPerson,
   DEFAULT_BODY_TEMPLATE,
   DEFAULT_SUBJECT_TEMPLATE,
 } from '@/utils/emailTemplate';
@@ -50,6 +51,27 @@ async function filesToFileForPdf(files: File[]): Promise<FileForPdf[]> {
 }
 
 type Attachment = CapturedFile & { include: boolean };
+
+type SendGroup = {
+  id: string;
+  label: string;            // angezeigt im UI
+  person: { vorname: string; name: string; geburtsdatum: string };
+  antragsform: string;      // für Betreff/Body Vars
+  subject: string;
+  body: string;
+  attachmentIndices: number[]; // Verweis auf attachments
+};
+
+function fullNameLower(v: string, n: string) {
+  return `${(v || '').trim()} ${(n || '').trim()}`.trim().toLowerCase();
+}
+
+function fileBelongsToPerson(filename: string, vorname: string, name: string): boolean {
+  const fn = filename.toLowerCase();
+  const full = fullNameLower(vorname, name);
+  if (!full) return false;
+  return fn.includes(full);
+}
 
 function sanitize(s: string): string {
   return s.replace(/[^a-zA-Z0-9_\-.äöüÄÖÜß ]/g, '_');
@@ -100,13 +122,91 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
   const [to, setTo] = useState('');
   const [cc, setCc] = useState('');
   const [bcc, setBcc] = useState('');
-  const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploadedDocs, setUploadedDocs] = useState<File[]>([]);
   const [combiningDocs, setCombiningDocs] = useState(false);
+  const [subjTpl, setSubjTpl] = useState<string>(DEFAULT_SUBJECT_TEMPLATE);
+  const [groupSubjects, setGroupSubjects] = useState<Record<string, string>>({});
 
   const vars = useMemo(() => buildTemplateVars(formData, bearbeiter), [formData, bearbeiter]);
+
+  // Berechne Sende-Gruppen basierend auf Anhängen + Variante-B Personen
+  const groups: SendGroup[] = useMemo(() => {
+    if (loadingAttachments) return [];
+    const docsIndices = attachments
+      .map((a, i) => (a.filename.toLowerCase().endsWith('_dokumente.pdf') ? i : -1))
+      .filter((i) => i >= 0);
+
+    const result: SendGroup[] = [];
+
+    // Hauptmitglied: FamVers + alle Plusbonus-PDFs des Mitglieds + Dokumente
+    const mainIdx: number[] = [];
+    attachments.forEach((a, i) => {
+      const fn = a.filename.toLowerCase();
+      if (fn.startsWith('zusammenfassung_familienversicherung')) mainIdx.push(i);
+      else if (fn.startsWith('antrag plusbonus') && fileBelongsToPerson(a.filename, formData.mitgliedVorname, formData.mitgliedName)) mainIdx.push(i);
+      else if (formData.selectedKrankenkasse !== 'big_plusbonus' && !fn.endsWith('_dokumente.pdf')) {
+        // Für nicht-BIG: alle Antrags-PDFs gehören zum Hauptmitglied
+        mainIdx.push(i);
+      }
+    });
+    const mainAttIdx = Array.from(new Set([...mainIdx, ...docsIndices]));
+    const mainKey = 'main';
+    const mainVars = buildTemplateVarsForPerson(
+      formData,
+      { vorname: formData.mitgliedVorname, name: formData.mitgliedName, geburtsdatum: formData.mitgliedGeburtsdatum },
+      bearbeiter,
+    );
+    result.push({
+      id: mainKey,
+      label: `Hauptmitglied — ${formData.mitgliedVorname} ${formData.mitgliedName}`.trim(),
+      person: { vorname: formData.mitgliedVorname, name: formData.mitgliedName, geburtsdatum: formData.mitgliedGeburtsdatum },
+      antragsform: mainVars.antragsform,
+      subject: groupSubjects[mainKey] ?? applyTemplate(subjTpl, mainVars),
+      body: applyTemplate(body || DEFAULT_BODY_TEMPLATE, mainVars),
+      attachmentIndices: mainAttIdx,
+    });
+
+    // BIG Variante B: pro Ehegatte/Kind mit eigener Mitgliedschaft
+    if (formData.selectedKrankenkasse === 'big_plusbonus' && formData.bigFamilienversicherung) {
+      const persons: Array<{ id: string; label: string; vorname: string; name: string; geb: string }> = [];
+      const e = formData.ehegatte;
+      if (e && e.eigeneMitgliedschaft && (e.vorname || e.name)) {
+        persons.push({ id: 'spouse', label: `Ehegatte — ${e.vorname} ${e.name}`.trim(), vorname: e.vorname, name: e.name, geb: e.geburtsdatum });
+      }
+      formData.kinder.forEach((k, i) => {
+        if (k.eigeneMitgliedschaft && (k.vorname || k.name)) {
+          persons.push({ id: `kind-${i}`, label: `Kind ${i + 1} — ${k.vorname} ${k.name}`.trim(), vorname: k.vorname, name: k.name, geb: k.geburtsdatum });
+        }
+      });
+      for (const p of persons) {
+        const idx: number[] = [];
+        attachments.forEach((a, i) => {
+          const fn = a.filename.toLowerCase();
+          if (fn.startsWith('antrag plusbonus') && fileBelongsToPerson(a.filename, p.vorname, p.name)) idx.push(i);
+        });
+        const attIdx = Array.from(new Set([...idx, ...docsIndices]));
+        const pVars = buildTemplateVarsForPerson(
+          formData,
+          { vorname: p.vorname, name: p.name, geburtsdatum: p.geb },
+          bearbeiter,
+          'Plusbonus',
+        );
+        result.push({
+          id: p.id,
+          label: p.label,
+          person: { vorname: p.vorname, name: p.name, geburtsdatum: p.geb },
+          antragsform: pVars.antragsform,
+          subject: groupSubjects[p.id] ?? applyTemplate(subjTpl, pVars),
+          body: applyTemplate(body || DEFAULT_BODY_TEMPLATE, pVars),
+          attachmentIndices: attIdx,
+        });
+      }
+    }
+
+    return result;
+  }, [attachments, formData, bearbeiter, subjTpl, groupSubjects, body, loadingAttachments]);
 
   // When dialog opens: run exports under capture, look up recipient, fill template
   useEffect(() => {
@@ -118,7 +218,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
     (async () => {
       try {
         // Default subject / body — fetch override template if present
-        let subjTpl = DEFAULT_SUBJECT_TEMPLATE;
+        let nextSubjTpl = DEFAULT_SUBJECT_TEMPLATE;
         let bodyTpl = DEFAULT_BODY_TEMPLATE;
         try {
           const { data: tpl } = await supabase
@@ -126,7 +226,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
             .select('subject_template, body_template')
             .eq('is_default', true)
             .maybeSingle();
-          if (tpl) { subjTpl = tpl.subject_template; bodyTpl = tpl.body_template; }
+          if (tpl) { nextSubjTpl = tpl.subject_template; bodyTpl = tpl.body_template; }
         } catch { /* ignore */ }
 
         // Look up recipient by Krankenkasse (+ optional antragsform match)
@@ -148,8 +248,9 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
         } catch { /* ignore */ }
 
         if (!cancelled) {
-          setSubject(applyTemplate(subjTpl, vars));
-          setBody(applyTemplate(bodyTpl, vars));
+          setSubjTpl(nextSubjTpl);
+          setBody(bodyTpl);
+          setGroupSubjects({});
         }
 
         // Capture PDFs
@@ -215,42 +316,58 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
 
   const handleSend = async () => {
     if (!to.trim()) { toast.error('Bitte Empfänger angeben.'); return; }
-    if (!subject.trim()) { toast.error('Betreff darf nicht leer sein.'); return; }
-    const active = attachments.filter((a) => a.include);
-    if (!active.length) { toast.error('Mindestens ein Anhang erforderlich.'); return; }
-    if (tooLarge) { toast.error('Anhänge überschreiten 24 MB (Gmail-Limit).'); return; }
+    if (!groups.length) { toast.error('Keine Sende-Gruppen.'); return; }
+    for (const g of groups) {
+      if (!g.subject.trim()) { toast.error(`Betreff für "${g.label}" fehlt.`); return; }
+      const active = g.attachmentIndices.map((i) => attachments[i]).filter((a) => a && a.include);
+      if (!active.length) { toast.error(`Mindestens ein Anhang für "${g.label}" erforderlich.`); return; }
+      const size = active.reduce((s, a) => s + a.blob.size, 0);
+      if (size > 24 * 1024 * 1024) { toast.error(`"${g.label}" überschreitet 24 MB.`); return; }
+    }
 
     setSending(true);
+    let okCount = 0;
+    let failCount = 0;
     try {
-      const encoded = await Promise.all(
-        active.map(async (a) => ({
-          filename: a.filename,
-          mimeType: a.blob.type || 'application/pdf',
-          base64: await blobToBase64(a.blob),
-        })),
-      );
-      const { data, error } = await supabase.functions.invoke('send-application-email', {
-        body: {
-          application_id: applicationId,
-          to: to.trim(),
-          cc: cc.trim() || undefined,
-          bcc: bcc.trim() || undefined,
-          subject: subject.trim(),
-          body,
-          attachments: encoded,
-        },
-      });
-      if (error) throw new Error(error.message);
-      if (data?.error === 'gmail_scope_missing') {
-        toast.error('Gmail-Verbindung erlaubt kein Senden. Bitte Verbindung mit Scope "gmail.send" neu autorisieren.');
-        return;
+      for (const g of groups) {
+        try {
+          const active = g.attachmentIndices.map((i) => attachments[i]).filter((a) => a && a.include);
+          const encoded = await Promise.all(
+            active.map(async (a) => ({
+              filename: a.filename,
+              mimeType: a.blob.type || 'application/pdf',
+              base64: await blobToBase64(a.blob),
+            })),
+          );
+          const { data, error } = await supabase.functions.invoke('send-application-email', {
+            body: {
+              application_id: applicationId,
+              to: to.trim(),
+              cc: cc.trim() || undefined,
+              bcc: bcc.trim() || undefined,
+              subject: g.subject.trim(),
+              body: g.body,
+              attachments: encoded,
+            },
+          });
+          if (error) throw new Error(error.message);
+          if (data?.error === 'gmail_scope_missing') {
+            toast.error('Gmail-Verbindung erlaubt kein Senden. Bitte Verbindung mit Scope "gmail.send" neu autorisieren.');
+            failCount++;
+            continue;
+          }
+          if (data?.error) throw new Error(data.error);
+          okCount++;
+        } catch (e) {
+          failCount++;
+          toast.error(`"${g.label}" fehlgeschlagen: ${(e as Error).message}`);
+        }
       }
-      if (data?.error) throw new Error(data.error);
-      toast.success('E-Mail versendet.');
-      onSent?.();
-      onOpenChange(false);
-    } catch (e) {
-      toast.error(`Versand fehlgeschlagen: ${(e as Error).message}`);
+      if (okCount) toast.success(`${okCount} E-Mail(s) versendet.`);
+      if (okCount && !failCount) {
+        onSent?.();
+        onOpenChange(false);
+      }
     } finally {
       setSending(false);
     }
@@ -285,11 +402,6 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           </div>
 
           <div>
-            <Label htmlFor="email-subject">Betreff *</Label>
-            <Input id="email-subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
-          </div>
-
-          <div>
             <Label htmlFor="email-body">Nachricht</Label>
             <Textarea id="email-body" rows={8} value={body} onChange={(e) => setBody(e.target.value)} />
             <p className="text-xs text-muted-foreground mt-1">
@@ -297,33 +409,59 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
             </p>
           </div>
 
-          <div>
-            <Label className="flex items-center gap-2"><Paperclip className="h-4 w-4" /> Anhänge</Label>
+          <div className="space-y-3">
+            <Label>Sende-Gruppen (eine E-Mail pro Gruppe)</Label>
             {loadingAttachments ? (
-              <div className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
+              <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" /> Erstelle Antrags-PDFs…
               </div>
-            ) : attachments.length === 0 ? (
-              <p className="text-sm text-muted-foreground mt-2">Keine PDFs erzeugt.</p>
+            ) : groups.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Keine Gruppen.</p>
             ) : (
-              <ul className="mt-2 space-y-1 border border-border/60 rounded-lg p-2">
-                {attachments.map((a, i) => (
-                  <li key={a.filename + i} className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={a.include}
-                      onCheckedChange={(v) => setAttachments((prev) => prev.map((x, j) => (j === i ? { ...x, include: !!v } : x)))}
-                      id={`att-${i}`}
-                    />
-                    <label htmlFor={`att-${i}`} className="flex-1 truncate cursor-pointer">{a.filename}</label>
-                    <span className="text-xs text-muted-foreground shrink-0">{(a.blob.size / 1024).toFixed(0)} KB</span>
-                  </li>
-                ))}
-              </ul>
+              groups.map((g) => {
+                const groupSize = g.attachmentIndices
+                  .map((i) => attachments[i])
+                  .filter((a) => a && a.include)
+                  .reduce((s, a) => s + a.blob.size, 0);
+                const groupTooLarge = groupSize > 24 * 1024 * 1024;
+                return (
+                  <div key={g.id} className="border border-border/60 rounded-lg p-3 space-y-2">
+                    <div className="text-xs font-semibold text-muted-foreground">{g.label}</div>
+                    <div>
+                      <Label htmlFor={`subj-${g.id}`} className="text-xs">Betreff *</Label>
+                      <Input
+                        id={`subj-${g.id}`}
+                        value={g.subject}
+                        onChange={(e) => setGroupSubjects((prev) => ({ ...prev, [g.id]: e.target.value }))}
+                      />
+                    </div>
+                    <ul className="space-y-1">
+                      {g.attachmentIndices.map((idx) => {
+                        const a = attachments[idx];
+                        if (!a) return null;
+                        return (
+                          <li key={a.filename + idx} className="flex items-center gap-2 text-sm">
+                            <Checkbox
+                              checked={a.include}
+                              onCheckedChange={(v) => setAttachments((prev) => prev.map((x, j) => (j === idx ? { ...x, include: !!v } : x)))}
+                              id={`g-${g.id}-att-${idx}`}
+                            />
+                            <label htmlFor={`g-${g.id}-att-${idx}`} className="flex-1 truncate cursor-pointer">{a.filename}</label>
+                            <span className="text-xs text-muted-foreground shrink-0">{(a.blob.size / 1024).toFixed(0)} KB</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <p className={`text-xs ${groupTooLarge ? 'text-destructive' : 'text-muted-foreground'}`}>
+                      Größe: {(groupSize / 1024 / 1024).toFixed(2)} MB {groupTooLarge && '· >24 MB'}
+                    </p>
+                  </div>
+                );
+              })
             )}
-            <p className={`text-xs mt-1 ${tooLarge ? 'text-destructive' : 'text-muted-foreground'}`}>
-              Gesamtgröße: {(totalSize / 1024 / 1024).toFixed(2)} MB {tooLarge && '· Gmail-Limit 25 MB überschritten'}
-            </p>
           </div>
+
+          {/* (Alte zentrale Anhängeliste entfernt — wird jetzt pro Gruppe angezeigt) */}
 
           <div className="border-t border-border/60 pt-3">
             <Label className="flex items-center gap-2"><Upload className="h-4 w-4" /> Zusätzliche Dokumente (Bilder/PDF → "Dokumente.pdf")</Label>
