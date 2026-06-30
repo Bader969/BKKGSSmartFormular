@@ -127,6 +127,37 @@ const Index = () => {
     JSON.stringify(formData.kinder.map(k => [k.name, k.vorname])),
   ]);
 
+  // BIG Variante B: Beschäftigungsstatus des Hauptmitglieds bestimmt,
+  // ob Ehegatte/Kinder familienversichert oder eigenständig versichert sind.
+  useEffect(() => {
+    if (formData.selectedKrankenkasse !== 'big_plusbonus') return;
+    if (!formData.bigFamilienversicherung) return;
+    const status = formData.bigMitgliedBeschaeftigt;
+    if (status !== 'beschaeftigt' && status !== 'arbeitslos') return;
+    const own = status === 'arbeitslos';
+    const targetArt = own ? 'mitgliedschaft' : 'familienversicherung';
+
+    const ehegatteNeedsUpdate =
+      formData.ehegatte.eigeneMitgliedschaft !== own ||
+      formData.ehegatte.bisherigArt !== targetArt;
+    const kinderNeedUpdate = formData.kinder.some(
+      k => k.eigeneMitgliedschaft !== own || k.bisherigArt !== targetArt,
+    );
+    if (!ehegatteNeedsUpdate && !kinderNeedUpdate) return;
+
+    setFormData(p => ({
+      ...p,
+      ehegatte: { ...p.ehegatte, eigeneMitgliedschaft: own, bisherigArt: targetArt },
+      kinder: p.kinder.map(k => ({ ...k, eigeneMitgliedschaft: own, bisherigArt: targetArt })),
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    formData.selectedKrankenkasse,
+    formData.bigFamilienversicherung,
+    formData.bigMitgliedBeschaeftigt,
+    formData.kinder.length,
+  ]);
+
   if (authLoading) {
     return <div className="min-h-screen flex items-center justify-center text-slate-500">Lädt…</div>;
   }
@@ -272,6 +303,10 @@ const Index = () => {
         if (!formData.familienstand) { toast.error('Bitte Familienstand auswählen.'); return; }
         if (!formData.telefon || !formData.email) { toast.error('Telefon und E-Mail sind Pflicht.'); return; }
         if (!formData.mitgliedGeburtsdatum) { toast.error('Bitte Geburtsdatum des Mitglieds eingeben.'); return; }
+        if (!formData.bigMitgliedBeschaeftigt) {
+          toast.error('Bitte Beschäftigungsstatus des Hauptmitglieds (beschäftigt/arbeitslos) auswählen.');
+          return;
+        }
       }
       if (!formData.mitgliedGeburtsdatum) {
         toast.error('Bitte Geburtsdatum des Mitglieds eingeben (wird für den Dateinamen benötigt).');
