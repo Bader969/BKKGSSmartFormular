@@ -279,7 +279,9 @@ export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
         plz: formData.mitgliedPlz,
         ort: formData.ort,
       };
-      await buildPlusbonusPdfsForPerson(formData, templateBytes, ehegatte, false);
+      const ehNachname = (e.eigenePlusbonus?.bank.kontoinhaberNachname || e.name || '').trim();
+      const ehSig = generateSignatureDataUrl(ehNachname, { seed: `big|eh|${ehNachname}|${e.geburtsdatum}` }) ?? '';
+      await buildPlusbonusPdfsForPerson(formData, templateBytes, ehegatte, false, e.eigenePlusbonus, ehSig);
     }
 
     for (const k of formData.kinder) {
@@ -296,7 +298,9 @@ export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
         plz: formData.mitgliedPlz,
         ort: formData.ort,
       };
-      await buildPlusbonusPdfsForPerson(formData, templateBytes, kind, false);
+      const kNachname = (k.eigenePlusbonus?.bank.kontoinhaberNachname || k.name || '').trim();
+      const kSig = generateSignatureDataUrl(kNachname, { seed: `big|kind|${kNachname}|${k.geburtsdatum}` }) ?? '';
+      await buildPlusbonusPdfsForPerson(formData, templateBytes, kind, false, k.eigenePlusbonus, kSig);
     }
   }
 };
