@@ -41,7 +41,8 @@ export default function Applications() {
 
   const filtered = useMemo(() => rows.filter((r) => {
     if (kkFilter !== "all" && r.krankenkasse !== kkFilter) return false;
-    if (statusFilter !== "all" && r.status !== statusFilter) return false;
+    // Status filter applies only to parent entries; sub-entries follow parent.
+    if (statusFilter !== "all" && !r.parent_application_id && r.status !== statusFilter) return false;
     if (search) {
       const s = search.toLowerCase();
       const haystacks = [
@@ -58,13 +59,52 @@ export default function Applications() {
     return true;
   }), [rows, kkFilter, statusFilter, search, emails, displayNames]);
 
+  // Group sub-entries under their parent, preserving the existing top-level sort order.
+  const grouped = useMemo(() => {
+    const childrenByParent = new Map<string, ApplicationRow[]>();
+    const parents: ApplicationRow[] = [];
+    for (const r of filtered) {
+      if (r.parent_application_id) {
+        const arr = childrenByParent.get(r.parent_application_id) ?? [];
+        arr.push(r);
+        childrenByParent.set(r.parent_application_id, arr);
+      } else {
+        parents.push(r);
+      }
+    }
+    for (const arr of childrenByParent.values()) {
+      arr.sort((a, b) => {
+        if (a.person_role !== b.person_role) {
+          return a.person_role === "ehegatte" ? -1 : 1;
+        }
+        return (a.person_index ?? 0) - (b.person_index ?? 0);
+      });
+    }
+    // Orphan sub-entries (parent not in current filtered set) → render as-is at top.
+    const parentIds = new Set(parents.map((p) => p.id));
+    const orphans: ApplicationRow[] = [];
+    for (const [pid, arr] of childrenByParent) {
+      if (!parentIds.has(pid)) orphans.push(...arr);
+    }
+    const out: ApplicationRow[] = [...orphans];
+    for (const p of parents) {
+      out.push(p);
+      const kids = childrenByParent.get(p.id);
+      if (kids) out.push(...kids);
+    }
+    return out;
+  }, [filtered]);
+
   const kks = Array.from(new Set(rows.map((r) => r.krankenkasse)));
 
   const handleExportXlsx = () => {
-    const data = filtered.map((r) => ({
+    const data = grouped.map((r) => ({
+      Typ: r.parent_application_id
+        ? r.person_role === "ehegatte" ? "Ehegatte" : `Kind ${r.person_index ?? ""}`.trim()
+        : "Hauptantrag",
       Krankenkasse: r.krankenkasse,
-      Status: r.status === "exported" ? "Exportiert" : "Entwurf",
-      PDFs: r.pdf_count,
+      Status: r.parent_application_id ? "" : (r.status === "exported" ? "Exportiert" : "Entwurf"),
+      PDFs: r.parent_application_id ? "" : r.pdf_count,
       Aktualisiert: new Date(r.updated_at).toLocaleString("de-DE"),
       Erstellt: new Date(r.created_at).toLocaleString("de-DE"),
       VP: r.vertriebspartner ?? "",
@@ -149,6 +189,7 @@ export default function Applications() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Typ</TableHead>
                 <TableHead>Krankenkasse</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>PDFs</TableHead>
@@ -163,22 +204,34 @@ export default function Applications() {
             </TableHeader>
             <TableBody>
               {loading && (
-                <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">Lädt…</TableCell></TableRow>
+                <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">Lädt…</TableCell></TableRow>
               )}
-              {!loading && filtered.length === 0 && (
-                <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+              {!loading && grouped.length === 0 && (
+                <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                   <FileText className="inline h-4 w-4 mr-1" /> Noch keine Anträge gespeichert.
                 </TableCell></TableRow>
               )}
-              {filtered.map((r) => (
-                <TableRow key={r.id} className="cursor-pointer" onClick={() => setSelected(r)}>
-                  <TableCell className="font-medium">{r.krankenkasse}</TableCell>
+              {grouped.map((r) => {
+                const isSub = !!r.parent_application_id;
+                const typLabel = isSub
+                  ? r.person_role === "ehegatte" ? "Ehegatte" : `Kind ${r.person_index ?? ""}`.trim()
+                  : "Hauptantrag";
+                return (
+                <TableRow key={r.id} className={`cursor-pointer ${isSub ? "bg-muted/30" : ""}`} onClick={() => setSelected(r)}>
                   <TableCell>
-                    <Badge variant={r.status === "exported" ? "default" : "secondary"}>
-                      {r.status === "exported" ? "Exportiert" : "Entwurf"}
-                    </Badge>
+                    <Badge variant={isSub ? "outline" : "secondary"} className="text-xs">{typLabel}</Badge>
                   </TableCell>
-                  <TableCell>{r.pdf_count}</TableCell>
+                  <TableCell className={`font-medium ${isSub ? "pl-6" : ""}`}>{r.krankenkasse}</TableCell>
+                  <TableCell>
+                    {isSub ? (
+                      <span className="text-muted-foreground">—</span>
+                    ) : (
+                      <Badge variant={r.status === "exported" ? "default" : "secondary"}>
+                        {r.status === "exported" ? "Exportiert" : "Entwurf"}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>{isSub ? <span className="text-muted-foreground">—</span> : r.pdf_count}</TableCell>
                   <TableCell className="text-muted-foreground">{new Date(r.updated_at).toLocaleString("de-DE")}</TableCell>
                   <TableCell className="text-muted-foreground">{new Date(r.created_at).toLocaleString("de-DE")}</TableCell>
                   <TableCell>{r.vertriebspartner || <span className="text-muted-foreground">—</span>}</TableCell>
@@ -187,7 +240,8 @@ export default function Applications() {
                   <TableCell>{r.applicant_vorname || <span className="text-muted-foreground">—</span>}</TableCell>
                   <TableCell className="text-muted-foreground text-xs">{r.antragsform || <span className="text-muted-foreground">—</span>}</TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </div>

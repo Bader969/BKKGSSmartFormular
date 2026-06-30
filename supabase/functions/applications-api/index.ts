@@ -77,6 +77,104 @@ async function hashIp(ip: string | null): Promise<string | null> {
 
 type Action = "save" | "list" | "decrypt" | "mark-exported" | "delete" | "events";
 
+type PersonDesired = {
+  person_role: "ehegatte" | "kind";
+  person_index: number | null;
+  applicant_vorname: string;
+  applicant_name: string;
+};
+
+function collectPersonsWithOwnMembership(payload: Record<string, unknown>): PersonDesired[] {
+  const out: PersonDesired[] = [];
+  const eh = payload.ehegatte as Record<string, unknown> | undefined;
+  if (eh && eh.eigeneMitgliedschaft === true) {
+    const vor = typeof eh.vorname === "string" ? eh.vorname.trim() : "";
+    const nam = typeof eh.name === "string" ? eh.name.trim() : "";
+    if (vor || nam) {
+      out.push({ person_role: "ehegatte", person_index: null, applicant_vorname: vor.slice(0, 120), applicant_name: nam.slice(0, 120) });
+    }
+  }
+  const kinder = Array.isArray(payload.kinder) ? (payload.kinder as Array<Record<string, unknown>>) : [];
+  kinder.forEach((k, i) => {
+    if (k && k.eigeneMitgliedschaft === true) {
+      const vor = typeof k.vorname === "string" ? k.vorname.trim() : "";
+      const nam = typeof k.name === "string" ? k.name.trim() : "";
+      if (vor || nam) {
+        out.push({ person_role: "kind", person_index: i + 1, applicant_vorname: vor.slice(0, 120), applicant_name: nam.slice(0, 120) });
+      }
+    }
+  });
+  return out;
+}
+
+function buildSubAntragsform(baseAntragsform: string | null, p: PersonDesired): string {
+  const label = p.person_role === "ehegatte"
+    ? "Ehegatte"
+    : `Kind ${p.person_index ?? ""}`.trim();
+  const personName = [p.applicant_vorname, p.applicant_name].filter(Boolean).join(" ");
+  const suffix = personName ? `${label}: ${personName}` : label;
+  const base = baseAntragsform ?? "";
+  return (base ? `${base} (${suffix})` : suffix).slice(0, 80);
+}
+
+async function syncSubEntries(args: {
+  admin: ReturnType<typeof createClient>;
+  parentId: string;
+  userId: string;
+  krankenkasse: string;
+  vertriebspartner: string | null;
+  antragsform: string | null;
+  ctHex: string;
+  ivHex: string;
+  hash: string;
+  payload: Record<string, unknown>;
+}): Promise<void> {
+  const { admin, parentId, userId, krankenkasse, vertriebspartner, antragsform, ctHex, ivHex, hash, payload } = args;
+
+  const desired = collectPersonsWithOwnMembership(payload);
+  const { data: existing } = await admin
+    .from("applications")
+    .select("id, person_role, person_index")
+    .eq("parent_application_id", parentId);
+
+  const existingMap = new Map<string, { id: string }>();
+  (existing ?? []).forEach((r) => {
+    const key = `${r.person_role}#${r.person_index ?? ""}`;
+    existingMap.set(key, { id: r.id });
+  });
+
+  const desiredKeys = new Set<string>();
+  for (const p of desired) {
+    const key = `${p.person_role}#${p.person_index ?? ""}`;
+    desiredKeys.add(key);
+    const sub = {
+      user_id: userId,
+      krankenkasse,
+      payload_encrypted: ctHex,
+      payload_iv: ivHex,
+      payload_hash: hash,
+      vertriebspartner,
+      applicant_name: p.applicant_name || null,
+      applicant_vorname: p.applicant_vorname || null,
+      antragsform: buildSubAntragsform(antragsform, p),
+      parent_application_id: parentId,
+      person_role: p.person_role,
+      person_index: p.person_index,
+    };
+    const existingRow = existingMap.get(key);
+    if (existingRow) {
+      await admin.from("applications").update(sub).eq("id", existingRow.id);
+    } else {
+      await admin.from("applications").insert(sub);
+    }
+  }
+
+  const stale = (existing ?? []).filter((r) => !desiredKeys.has(`${r.person_role}#${r.person_index ?? ""}`));
+  if (stale.length) {
+    await admin.from("applications").delete().in("id", stale.map((s) => s.id));
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -144,32 +242,38 @@ Deno.serve(async (req) => {
         antragsform: typeof antragsform === "string" ? antragsform.slice(0, 80) : null,
       };
 
+      const ctHex = bytesToHex(ct);
+      const ivHex = bytesToHex(iv);
+
+      let parentRow: { id: string; krankenkasse: string; status: string; created_at: string; updated_at: string; payload_hash: string; pdf_count: number; exported_at: string | null } | null = null;
+
       if (application_id) {
         const { data, error } = await admin
           .from("applications")
           .update({
             krankenkasse,
-            payload_encrypted: bytesToHex(ct),
-            payload_iv: bytesToHex(iv),
+            payload_encrypted: ctHex,
+            payload_iv: ivHex,
             payload_hash: hash,
             ...meta,
           })
           .eq("id", application_id)
           .eq("user_id", user.id)
+          .is("parent_application_id", null)
           .select("id, krankenkasse, status, created_at, updated_at, payload_hash, pdf_count, exported_at")
           .maybeSingle();
         if (error) return json(500, { error: "db_update_failed" });
         if (!data) return json(404, { error: "not_found" });
         await writeEvent(data.id, "updated", { krankenkasse });
-        return json(200, { application: data });
+        parentRow = data;
       } else {
         const { data, error } = await admin
           .from("applications")
           .insert({
             user_id: user.id,
             krankenkasse,
-            payload_encrypted: bytesToHex(ct),
-            payload_iv: bytesToHex(iv),
+            payload_encrypted: ctHex,
+            payload_iv: ivHex,
             payload_hash: hash,
             ...meta,
           })
@@ -177,14 +281,30 @@ Deno.serve(async (req) => {
           .single();
         if (error) return json(500, { error: "db_insert_failed" });
         await writeEvent(data.id, "created", { krankenkasse });
-        return json(200, { application: data });
+        parentRow = data;
       }
+
+      // Sync sub-entries for persons with their own membership
+      await syncSubEntries({
+        admin,
+        parentId: parentRow.id,
+        userId: user.id,
+        krankenkasse,
+        vertriebspartner: meta.vertriebspartner,
+        antragsform: meta.antragsform,
+        ctHex,
+        ivHex,
+        hash,
+        payload: payload as Record<string, unknown>,
+      });
+
+      return json(200, { application: parentRow });
     }
 
     if (action === "list") {
       const { data, error } = await admin
         .from("applications")
-        .select("id, user_id, krankenkasse, status, pdf_count, exported_at, last_opened_at, created_at, updated_at, vertriebspartner, applicant_name, applicant_vorname, antragsform")
+        .select("id, user_id, krankenkasse, status, pdf_count, exported_at, last_opened_at, created_at, updated_at, vertriebspartner, applicant_name, applicant_vorname, antragsform, parent_application_id, person_role, person_index")
         .order("updated_at", { ascending: false })
         .limit(500);
       if (error) return json(500, { error: "db_list_failed" });
@@ -242,6 +362,13 @@ Deno.serve(async (req) => {
     if (action === "delete") {
       const { application_id } = body as { application_id?: string };
       if (!application_id) return json(400, { error: "application_id_required" });
+      // Disallow deleting sub-entries directly — they are managed via the parent.
+      const { data: target } = await admin
+        .from("applications")
+        .select("parent_application_id")
+        .eq("id", application_id)
+        .maybeSingle();
+      if (target?.parent_application_id) return json(400, { error: "delete_subentry_via_parent" });
       const isAdminData = await checkAdmin();
       const q = admin.from("applications").delete().eq("id", application_id);
       const { error } = isAdminData ? await q : await q.eq("user_id", user.id);

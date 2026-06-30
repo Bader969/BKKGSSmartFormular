@@ -48,6 +48,9 @@ export function useApplicationPersistence() {
       applicant_name: string | null;
       applicant_vorname: string | null;
       antragsform: string | null;
+      parent_application_id: string | null;
+      person_role: string | null;
+      person_index: number | null;
     }>;
     isAdmin: boolean;
     userEmails: Record<string, string>;

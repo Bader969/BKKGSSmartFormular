@@ -146,10 +146,13 @@ export type Database = {
           id: string
           krankenkasse: string
           last_opened_at: string | null
+          parent_application_id: string | null
           payload_encrypted: string
           payload_hash: string
           payload_iv: string
           pdf_count: number
+          person_index: number | null
+          person_role: string | null
           status: string
           updated_at: string
           user_id: string
@@ -164,10 +167,13 @@ export type Database = {
           id?: string
           krankenkasse: string
           last_opened_at?: string | null
+          parent_application_id?: string | null
           payload_encrypted: string
           payload_hash: string
           payload_iv: string
           pdf_count?: number
+          person_index?: number | null
+          person_role?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -182,16 +188,27 @@ export type Database = {
           id?: string
           krankenkasse?: string
           last_opened_at?: string | null
+          parent_application_id?: string | null
           payload_encrypted?: string
           payload_hash?: string
           payload_iv?: string
           pdf_count?: number
+          person_index?: number | null
+          person_role?: string | null
           status?: string
           updated_at?: string
           user_id?: string
           vertriebspartner?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "applications_parent_application_id_fkey"
+            columns: ["parent_application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       email_templates: {
         Row: {
