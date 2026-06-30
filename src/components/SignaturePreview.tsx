@@ -1,20 +1,23 @@
 import React from 'react';
 import { Info } from 'lucide-react';
+import { pickSignatureFont } from '@/utils/generateSignature';
 
 interface SignaturePreviewProps {
   lastName: string | null | undefined;
   emptyHint?: string;
+  seed?: string;
 }
 
-export const SignaturePreview: React.FC<SignaturePreviewProps> = ({ lastName, emptyHint }) => {
+export const SignaturePreview: React.FC<SignaturePreviewProps> = ({ lastName, emptyHint, seed }) => {
   const name = (lastName ?? '').trim();
+  const font = pickSignatureFont(seed ?? name);
   return (
     <div className="space-y-2">
       <div className="relative bg-card rounded-lg h-40 flex items-end px-6 pb-3">
         {name ? (
           <span
-            className="font-signature text-5xl leading-none"
-            style={{ color: '#1a365d' }}
+            className="text-5xl leading-none"
+            style={{ color: '#1a365d', fontFamily: `"${font}", "Caveat", cursive` }}
           >
             {name}
           </span>

@@ -3,7 +3,7 @@ import { FormSection } from './FormSection';
 import { FormField } from './FormField';
 import { SignaturePreview } from './SignaturePreview';
 import { FormData } from '@/types/form';
-import { resolveFamilySignatureLastName } from '@/utils/generateSignature';
+import { resolveFamilySignatureLastName, resolveBigSignatureLastName } from '@/utils/generateSignature';
 
 interface SignatureSectionProps {
   formData: FormData;
@@ -13,6 +13,16 @@ interface SignatureSectionProps {
 export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, updateFormData }) => {
   const isNurRundumMode = formData.mode === 'nur_rundum';
   const familyLastName = resolveFamilySignatureLastName(formData);
+  const isBig = formData.selectedKrankenkasse === 'big_plusbonus';
+  const memberLastName = isBig
+    ? resolveBigSignatureLastName(formData)
+    : (formData.mitgliedName || '');
+  const memberSeed = isBig
+    ? `big|${formData.bigBank?.kontoinhaber || ''}|${formData.mitgliedGeburtsdatum || ''}`
+    : [formData.mitgliedVorname, formData.mitgliedName, formData.mitgliedGeburtsdatum].filter(Boolean).join('|');
+  const familySeed = formData.ehegatte?.name?.trim()
+    ? [formData.ehegatte?.vorname, formData.ehegatte?.name, formData.ehegatte?.geburtsdatum].filter(Boolean).join('|')
+    : familyLastName || '';
   
   return (
     <FormSection title="Ort, Datum und Unterschriften" variant="signature">
@@ -39,7 +49,11 @@ export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, up
           <label className="block text-sm font-medium mb-2">
             Unterschrift des Mitglieds
           </label>
-          <SignaturePreview lastName={formData.mitgliedName} />
+          <SignaturePreview
+            lastName={memberLastName}
+            seed={memberSeed}
+            emptyHint={isBig ? 'Wird automatisch aus dem Nachnamen des Kontoinhabers erzeugt' : undefined}
+          />
         </div>
         
         {!isNurRundumMode && (
@@ -49,6 +63,7 @@ export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, up
             </label>
             <SignaturePreview
               lastName={familyLastName}
+              seed={familySeed}
               emptyHint="Ehegatte bzw. Kind ≥ 16 – sonst keine Signatur"
             />
           </div>

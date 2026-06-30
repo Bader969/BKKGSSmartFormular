@@ -32,37 +32,64 @@ function encodeMimeHeader(value: string): string {
 }
 
 function buildRawMessage(opts: {
-  to: string; cc?: string; bcc?: string; subject: string; body: string; attachments: Attachment[];
+  from?: string; to: string; cc?: string; bcc?: string; subject: string; body: string; attachments: Attachment[];
 }): string {
-  const boundary = '----lovable_boundary_' + Math.random().toString(36).slice(2);
+  const mixedBoundary = '----mixed_' + Math.random().toString(36).slice(2);
+  const altBoundary = '----alt_' + Math.random().toString(36).slice(2);
+  const messageId = `<${crypto.randomUUID()}@mail.gmail.com>`;
   const headers: string[] = [];
+  if (opts.from) headers.push(`From: ${opts.from}`);
   headers.push(`To: ${opts.to}`);
   if (opts.cc) headers.push(`Cc: ${opts.cc}`);
   if (opts.bcc) headers.push(`Bcc: ${opts.bcc}`);
+  if (opts.from) headers.push(`Reply-To: ${opts.from}`);
+  headers.push(`Date: ${new Date().toUTCString()}`);
+  headers.push(`Message-ID: ${messageId}`);
   headers.push(`Subject: ${encodeMimeHeader(opts.subject)}`);
   headers.push('MIME-Version: 1.0');
-  headers.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+  headers.push(`Content-Type: multipart/mixed; boundary="${mixedBoundary}"`);
 
   const parts: string[] = [];
-  parts.push(headers.join('\r\n') + '\r\n');
+  // Blank line separates headers from body (RFC 5322)
+  parts.push(headers.join('\r\n') + '\r\n\r\n');
 
-  // Body part
-  parts.push(`--${boundary}\r\n` +
+  const plainBody = opts.body || '';
+  const htmlBody =
+    '<!doctype html><html><body style="font-family:Arial,sans-serif;font-size:14px;color:#111;white-space:pre-wrap;">' +
+    plainBody.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+    '</body></html>';
+
+  const plainB64 = btoa(unescape(encodeURIComponent(plainBody))).replace(/(.{76})/g, '$1\r\n');
+  const htmlB64 = btoa(unescape(encodeURIComponent(htmlBody))).replace(/(.{76})/g, '$1\r\n');
+
+  // multipart/alternative wrapper for the body
+  parts.push(
+    `--${mixedBoundary}\r\n` +
+    `Content-Type: multipart/alternative; boundary="${altBoundary}"\r\n\r\n` +
+    `--${altBoundary}\r\n` +
     'Content-Type: text/plain; charset="UTF-8"\r\n' +
-    'Content-Transfer-Encoding: base64\r\n\r\n' +
-    btoa(unescape(encodeURIComponent(opts.body))).replace(/(.{76})/g, '$1\r\n') + '\r\n');
+    'Content-Transfer-Encoding: base64\r\n' +
+    'Content-Disposition: inline\r\n\r\n' +
+    plainB64 + '\r\n' +
+    `--${altBoundary}\r\n` +
+    'Content-Type: text/html; charset="UTF-8"\r\n' +
+    'Content-Transfer-Encoding: base64\r\n' +
+    'Content-Disposition: inline\r\n\r\n' +
+    htmlB64 + '\r\n' +
+    `--${altBoundary}--\r\n`,
+  );
 
   for (const att of opts.attachments) {
     const safeName = encodeMimeHeader(att.filename);
     parts.push(
-      `--${boundary}\r\n` +
+      `--${mixedBoundary}\r\n` +
       `Content-Type: ${att.mimeType}; name="${safeName}"\r\n` +
       `Content-Disposition: attachment; filename="${safeName}"\r\n` +
       'Content-Transfer-Encoding: base64\r\n\r\n' +
       att.base64.replace(/(.{76})/g, '$1\r\n') + '\r\n',
     );
   }
-  parts.push(`--${boundary}--\r\n`);
+  parts.push(`--${mixedBoundary}--\r\n`);
 
   return parts.join('');
 }
@@ -109,7 +136,22 @@ Deno.serve(async (req) => {
   const totalB64 = attachments.reduce((s, a) => s + (a.base64?.length || 0), 0);
   if (totalB64 > 32 * 1024 * 1024) return json(413, { error: 'attachments_too_large' });
 
-  const raw = buildRawMessage({ to, cc: payload.cc, bcc: payload.bcc, subject, body, attachments });
+  // Try to resolve the authenticated Gmail address for a proper From: header
+  let fromHeader: string | undefined;
+  try {
+    const profileResp = await fetch('https://connector-gateway.lovable.dev/google_mail/gmail/v1/users/me/profile', {
+      headers: {
+        'Authorization': `Bearer ${lovableKey}`,
+        'X-Connection-Api-Key': gmailKey,
+      },
+    });
+    if (profileResp.ok) {
+      const prof = await profileResp.json().catch(() => ({} as any));
+      if (prof?.emailAddress) fromHeader = String(prof.emailAddress);
+    }
+  } catch (_) { /* non-fatal */ }
+
+  const raw = buildRawMessage({ from: fromHeader, to, cc: payload.cc, bcc: payload.bcc, subject, body, attachments });
   const rawB64Url = b64urlEncodeString(raw);
 
   const gmailResp = await fetch('https://connector-gateway.lovable.dev/google_mail/gmail/v1/users/me/messages/send', {

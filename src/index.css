@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face { font-family: 'SigRilonaNotes'; src: url('/fonts/RilonaNotes.otf') format('opentype'); font-display: swap; }
+@font-face { font-family: 'SigArabellaForteny'; src: url('/fonts/ArabellaForteny.ttf') format('truetype'); font-display: swap; }
+@font-face { font-family: 'SigSignaturePresent'; src: url('/fonts/SignaturePresent.ttf') format('truetype'); font-display: swap; }
+@font-face { font-family: 'SigGartenyaCalligraph'; src: url('/fonts/GartenyaCalligraph.ttf') format('truetype'); font-display: swap; }
+@font-face { font-family: 'SigMillenial'; src: url('/fonts/Millenial.ttf') format('truetype'); font-display: swap; }
+@font-face { font-family: 'SigMelismaSignature'; src: url('/fonts/MelismaSignature.otf') format('opentype'); font-display: swap; }
+@font-face { font-family: 'SigDestomed'; src: url('/fonts/Destomed.otf') format('opentype'); font-display: swap; }
+@font-face { font-family: 'SigOTF'; src: url('/fonts/OTF.otf') format('opentype'); font-display: swap; }
+
 @layer base {
   :root {
     /* Navy Trust palette — base anchors:
