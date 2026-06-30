@@ -15,12 +15,53 @@ function isValidEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 }
 
-function b64urlEncodeString(s: string): string {
-  // Encode a UTF-8 string to base64url
-  const utf8 = new TextEncoder().encode(s);
-  let bin = '';
-  for (let i = 0; i < utf8.length; i++) bin += String.fromCharCode(utf8[i]);
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+function toBase64UrlChunk(b64: string): string {
+  return b64.replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+function base64EncodeUtf8(s: string): string {
+  return btoa(unescape(encodeURIComponent(s)));
+}
+
+class MimeBase64UrlEncoder {
+  private readonly parts: string[] = [];
+  private carry = '';
+
+  appendAscii(input: string): void {
+    let offset = 0;
+
+    if (this.carry) {
+      const needed = 3 - this.carry.length;
+      const prefix = input.slice(0, needed);
+      this.carry += prefix;
+      offset = prefix.length;
+
+      if (this.carry.length === 3) {
+        this.parts.push(toBase64UrlChunk(btoa(this.carry)));
+        this.carry = '';
+      }
+    }
+
+    const remaining = input.length - offset;
+    const encodableLength = remaining - (remaining % 3);
+    const end = offset + encodableLength;
+    const chunkSize = 32766; // multiple of 3; keeps btoa/replace memory bounded
+
+    for (let i = offset; i < end; i += chunkSize) {
+      const chunk = input.slice(i, Math.min(i + chunkSize, end));
+      this.parts.push(toBase64UrlChunk(btoa(chunk)));
+    }
+
+    this.carry = input.slice(end);
+  }
+
+  finish(): string {
+    if (this.carry) {
+      this.parts.push(toBase64UrlChunk(btoa(this.carry)).replace(/=+$/, ''));
+      this.carry = '';
+    }
+    return this.parts.join('');
+  }
 }
 
 function encodeMimeHeader(value: string): string {
@@ -31,7 +72,7 @@ function encodeMimeHeader(value: string): string {
   return `=?UTF-8?B?${b}?=`;
 }
 
-function buildRawMessage(opts: {
+function buildRawMessageBase64Url(opts: {
   from?: string; to: string; cc?: string; bcc?: string; subject: string; body: string; attachments: Attachment[];
 }): string {
   const mixedBoundary = '----mixed_' + Math.random().toString(36).slice(2);
@@ -49,9 +90,9 @@ function buildRawMessage(opts: {
   headers.push('MIME-Version: 1.0');
   headers.push(`Content-Type: multipart/mixed; boundary="${mixedBoundary}"`);
 
-  const parts: string[] = [];
+  const encoder = new MimeBase64UrlEncoder();
   // Blank line separates headers from body (RFC 5322)
-  parts.push(headers.join('\r\n') + '\r\n\r\n');
+  encoder.appendAscii(headers.join('\r\n') + '\r\n\r\n');
 
   const plainBody = opts.body || '';
   const htmlBody =
@@ -59,11 +100,11 @@ function buildRawMessage(opts: {
     plainBody.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
     '</body></html>';
 
-  const plainB64 = btoa(unescape(encodeURIComponent(plainBody)));
-  const htmlB64 = btoa(unescape(encodeURIComponent(htmlBody)));
+  const plainB64 = base64EncodeUtf8(plainBody);
+  const htmlB64 = base64EncodeUtf8(htmlBody);
 
   // multipart/alternative wrapper for the body
-  parts.push(
+  encoder.appendAscii(
     `--${mixedBoundary}\r\n` +
     `Content-Type: multipart/alternative; boundary="${altBoundary}"\r\n\r\n` +
     `--${altBoundary}\r\n` +
@@ -81,17 +122,18 @@ function buildRawMessage(opts: {
 
   for (const att of opts.attachments) {
     const safeName = encodeMimeHeader(att.filename);
-    parts.push(
+    encoder.appendAscii(
       `--${mixedBoundary}\r\n` +
       `Content-Type: ${att.mimeType}; name="${safeName}"\r\n` +
       `Content-Disposition: attachment; filename="${safeName}"\r\n` +
-      'Content-Transfer-Encoding: base64\r\n\r\n' +
-      att.base64 + '\r\n',
+      'Content-Transfer-Encoding: base64\r\n\r\n',
     );
+    encoder.appendAscii(att.base64);
+    encoder.appendAscii('\r\n');
   }
-  parts.push(`--${mixedBoundary}--\r\n`);
+  encoder.appendAscii(`--${mixedBoundary}--\r\n`);
 
-  return parts.join('');
+  return encoder.finish();
 }
 
 Deno.serve(async (req) => {
@@ -151,8 +193,7 @@ Deno.serve(async (req) => {
     }
   } catch (_) { /* non-fatal */ }
 
-  const raw = buildRawMessage({ from: fromHeader, to, cc: payload.cc, bcc: payload.bcc, subject, body, attachments });
-  const rawB64Url = b64urlEncodeString(raw);
+  const rawB64Url = buildRawMessageBase64Url({ from: fromHeader, to, cc: payload.cc, bcc: payload.bcc, subject, body, attachments });
 
   const gmailResp = await fetch('https://connector-gateway.lovable.dev/google_mail/gmail/v1/users/me/messages/send', {
     method: 'POST',
