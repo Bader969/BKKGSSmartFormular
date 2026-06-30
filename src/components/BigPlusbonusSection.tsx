@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { randomPoliceBetrag } from '@/utils/bigRandom';
 
 interface Props {
   formData: FormData;
@@ -32,7 +33,12 @@ export const BigPlusbonusSection: React.FC<Props> = ({ formData, updateFormData,
   };
 
   const addMitversichert = () => {
-    updateFormData({ bigMitversicherte: [...formData.bigMitversicherte, { nameVorname: '', hoehePolice: '' }] });
+    updateFormData({
+      bigMitversicherte: [
+        ...formData.bigMitversicherte,
+        { nameVorname: '', hoehePolice: randomPoliceBetrag() },
+      ],
+    });
   };
 
   const removeMitversichert = (idx: number) => {
