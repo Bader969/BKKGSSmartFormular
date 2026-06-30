@@ -400,6 +400,7 @@ export const createInitialFormData = (): FormData => {
     },
     bigMitversicherte: [],
     bigFamilienversicherung: false,
+    bigMitgliedBeschaeftigt: '',
     vertriebspartner: '',
   };
 };
