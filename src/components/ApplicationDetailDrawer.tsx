@@ -15,6 +15,9 @@ export type ApplicationRow = {
   applicant_name: string | null;
   applicant_vorname: string | null;
   antragsform: string | null;
+  parent_application_id: string | null;
+  person_role: string | null;
+  person_index: number | null;
 };
 
 export function ApplicationDetailDrawer({
@@ -33,6 +36,7 @@ export function ApplicationDetailDrawer({
   const navigate = useNavigate();
 
   const open = !!application;
+  const isSub = !!application?.parent_application_id;
 
   const handleLoad = async () => {
     if (!application) return;
@@ -51,6 +55,10 @@ export function ApplicationDetailDrawer({
 
   const handleDelete = async () => {
     if (!application) return;
+    if (isSub) {
+      toast.error("Untereinträge können nicht einzeln gelöscht werden. Bitte den Hauptantrag löschen oder die eigene Mitgliedschaft im Formular entfernen.");
+      return;
+    }
     if (!confirm("Antrag wirklich löschen? Diese Aktion ist nicht umkehrbar.")) return;
     setBusy(true);
     try {
@@ -71,7 +79,13 @@ export function ApplicationDetailDrawer({
         {application && (
           <>
             <SheetHeader>
-              <SheetTitle className="font-display">Antrag</SheetTitle>
+              <SheetTitle className="font-display">
+                {isSub
+                  ? application.person_role === "ehegatte"
+                    ? "Untereintrag · Ehegatte"
+                    : `Untereintrag · Kind ${application.person_index ?? ""}`.trim()
+                  : "Antrag"}
+              </SheetTitle>
               <SheetDescription>
                 {application.krankenkasse.toUpperCase()} · erstellt {new Date(application.created_at).toLocaleString("de-DE")}
               </SheetDescription>
@@ -79,16 +93,27 @@ export function ApplicationDetailDrawer({
 
             <div className="mt-6 space-y-4">
               <div className="flex flex-wrap gap-2">
-                <Badge variant={application.status === "exported" ? "default" : "secondary"}>
-                  {application.status === "exported" ? "Exportiert" : "Entwurf"}
-                </Badge>
-                <Badge variant="outline">{application.pdf_count} PDFs</Badge>
+                {!isSub && (
+                  <>
+                    <Badge variant={application.status === "exported" ? "default" : "secondary"}>
+                      {application.status === "exported" ? "Exportiert" : "Entwurf"}
+                    </Badge>
+                    <Badge variant="outline">{application.pdf_count} PDFs</Badge>
+                  </>
+                )}
+                {isSub && <Badge variant="outline">Untereintrag</Badge>}
                 {userEmail && <Badge variant="outline">{userEmail}</Badge>}
               </div>
 
+              {isSub && (
+                <p className="text-xs text-muted-foreground">
+                  Dieser Eintrag gehört zu einem Hauptantrag und teilt sich dessen Datensatz. Beim Laden wird der vollständige Antrag im Editor geöffnet.
+                </p>
+              )}
+
               <div className="flex gap-2">
                 <Button onClick={handleLoad} disabled={busy} className="flex-1">In Editor laden</Button>
-                <Button onClick={handleDelete} disabled={busy} variant="destructive">Löschen</Button>
+                <Button onClick={handleDelete} disabled={busy || isSub} variant="destructive">Löschen</Button>
               </div>
 
               <div>
