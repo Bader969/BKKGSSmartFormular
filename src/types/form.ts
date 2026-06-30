@@ -185,6 +185,8 @@ export const BIG_GESCHLECHT_OPTIONS = [
 
 export interface BigBankDaten {
   kontoinhaber: string;
+  kontoinhaberVorname: string;
+  kontoinhaberNachname: string;
   kreditinstitut: string;
   iban: string;
   bic: string;
@@ -194,6 +196,8 @@ export interface BigBankDaten {
 
 export const createEmptyBigBankDaten = (): BigBankDaten => ({
   kontoinhaber: '',
+  kontoinhaberVorname: '',
+  kontoinhaberNachname: '',
   kreditinstitut: '',
   iban: '',
   bic: '',
