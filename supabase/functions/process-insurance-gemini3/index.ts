@@ -101,6 +101,52 @@ const novitasSchema = `{
   }]
 }`;
 
+// BIG direkt Plusbonus Schema - Mitglied + SEPA-Bankdaten + Familie
+const bigSchema = `{
+  "mitgliedVorname": "",
+  "mitgliedName": "",
+  "mitgliedGeburtsdatum": "TT.MM.JJJJ",
+  "mitgliedGeburtsort": "",
+  "mitgliedGeburtsland": "ISO-Code (DE, TR, SY...)",
+  "mitgliedStrasse": "",
+  "mitgliedHausnummer": "",
+  "mitgliedPlz": "",
+  "ort": "",
+  "mitgliedKvNummer": "",
+  "mitgliedKrankenkasse": "",
+  "familienstand": "ledig|verheiratet|geschieden|verwitwet",
+  "telefon": "",
+  "email": "",
+  "bigBank": {
+    "kontoinhaberVorname": "",
+    "kontoinhaberNachname": "",
+    "kreditinstitut": "",
+    "iban": "",
+    "bic": ""
+  },
+  "ehegatte": {
+    "vorname": "",
+    "name": "",
+    "geburtsdatum": "TT.MM.JJJJ",
+    "geschlecht": "m|w|d",
+    "geburtsname": "",
+    "geburtsort": "",
+    "geburtsland": "ISO-Code",
+    "staatsangehoerigkeit": "ISO-Code"
+  },
+  "kinder": [{
+    "vorname": "",
+    "name": "",
+    "geburtsdatum": "TT.MM.JJJJ",
+    "geschlecht": "m|w|d",
+    "geburtsname": "",
+    "geburtsort": "",
+    "geburtsland": "ISO-Code",
+    "staatsangehoerigkeit": "ISO-Code",
+    "verwandtschaft": "leiblich|stief|pflege|adoptiert"
+  }]
+}`;
+
 // DAK Schema - Familienversicherung
 const dakSchema = `{
   "mitgliedVorname": "",
@@ -261,6 +307,26 @@ KINDER (ALLE Felder pro Kind):
 - VERSICHERTENNUMMER (PFLICHT!)`
       };
       
+    case 'big_plusbonus':
+      return {
+        schema: bigSchema,
+        prompt: `Extrahiere Daten für BIG direkt Plusbonus-Antrag.
+
+MITGLIED:
+- Vorname, Name, Geburtsdatum, Geburtsort, Geburtsland (ISO-Code)
+- Adresse (Straße, Hausnummer, PLZ, Ort)
+- KV-Nummer, Krankenkasse, Familienstand, Telefon, Email
+
+SEPA / BANKKARTE (PFLICHT wenn auf Dokument/Bankkarte vorhanden — in "bigBank" einsetzen!):
+- kontoinhaberVorname, kontoinhaberNachname (Name wie auf der Karte; aufteilen in Vor- und Nachname)
+- kreditinstitut (Name der Bank, z.B. "Sparkasse Köln", "DKB", "ING")
+- iban (Großbuchstaben, ohne Leerzeichen)
+- bic (Großbuchstaben)
+
+EHEGATTE / KINDER (falls vorhanden): Vorname, Name, Geburtsdatum, Geschlecht, Geburtsname,
+Geburtsort, Geburtsland (ISO-Code), Staatsangehörigkeit (ISO-Code), bei Kindern Verwandtschaft.`
+      };
+
     case 'novitas':
       return {
         schema: novitasSchema,
