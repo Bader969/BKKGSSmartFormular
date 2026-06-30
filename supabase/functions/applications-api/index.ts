@@ -77,6 +77,104 @@ async function hashIp(ip: string | null): Promise<string | null> {
 
 type Action = "save" | "list" | "decrypt" | "mark-exported" | "delete" | "events";
 
+type PersonDesired = {
+  person_role: "ehegatte" | "kind";
+  person_index: number | null;
+  applicant_vorname: string;
+  applicant_name: string;
+};
+
+function collectPersonsWithOwnMembership(payload: Record<string, unknown>): PersonDesired[] {
+  const out: PersonDesired[] = [];
+  const eh = payload.ehegatte as Record<string, unknown> | undefined;
+  if (eh && eh.eigeneMitgliedschaft === true) {
+    const vor = typeof eh.vorname === "string" ? eh.vorname.trim() : "";
+    const nam = typeof eh.name === "string" ? eh.name.trim() : "";
+    if (vor || nam) {
+      out.push({ person_role: "ehegatte", person_index: null, applicant_vorname: vor.slice(0, 120), applicant_name: nam.slice(0, 120) });
+    }
+  }
+  const kinder = Array.isArray(payload.kinder) ? (payload.kinder as Array<Record<string, unknown>>) : [];
+  kinder.forEach((k, i) => {
+    if (k && k.eigeneMitgliedschaft === true) {
+      const vor = typeof k.vorname === "string" ? k.vorname.trim() : "";
+      const nam = typeof k.name === "string" ? k.name.trim() : "";
+      if (vor || nam) {
+        out.push({ person_role: "kind", person_index: i + 1, applicant_vorname: vor.slice(0, 120), applicant_name: nam.slice(0, 120) });
+      }
+    }
+  });
+  return out;
+}
+
+function buildSubAntragsform(baseAntragsform: string | null, p: PersonDesired): string {
+  const label = p.person_role === "ehegatte"
+    ? "Ehegatte"
+    : `Kind ${p.person_index ?? ""}`.trim();
+  const personName = [p.applicant_vorname, p.applicant_name].filter(Boolean).join(" ");
+  const suffix = personName ? `${label}: ${personName}` : label;
+  const base = baseAntragsform ?? "";
+  return (base ? `${base} (${suffix})` : suffix).slice(0, 80);
+}
+
+async function syncSubEntries(args: {
+  admin: ReturnType<typeof createClient>;
+  parentId: string;
+  userId: string;
+  krankenkasse: string;
+  vertriebspartner: string | null;
+  antragsform: string | null;
+  ctHex: string;
+  ivHex: string;
+  hash: string;
+  payload: Record<string, unknown>;
+}): Promise<void> {
+  const { admin, parentId, userId, krankenkasse, vertriebspartner, antragsform, ctHex, ivHex, hash, payload } = args;
+
+  const desired = collectPersonsWithOwnMembership(payload);
+  const { data: existing } = await admin
+    .from("applications")
+    .select("id, person_role, person_index")
+    .eq("parent_application_id", parentId);
+
+  const existingMap = new Map<string, { id: string }>();
+  (existing ?? []).forEach((r) => {
+    const key = `${r.person_role}#${r.person_index ?? ""}`;
+    existingMap.set(key, { id: r.id });
+  });
+
+  const desiredKeys = new Set<string>();
+  for (const p of desired) {
+    const key = `${p.person_role}#${p.person_index ?? ""}`;
+    desiredKeys.add(key);
+    const sub = {
+      user_id: userId,
+      krankenkasse,
+      payload_encrypted: ctHex,
+      payload_iv: ivHex,
+      payload_hash: hash,
+      vertriebspartner,
+      applicant_name: p.applicant_name || null,
+      applicant_vorname: p.applicant_vorname || null,
+      antragsform: buildSubAntragsform(antragsform, p),
+      parent_application_id: parentId,
+      person_role: p.person_role,
+      person_index: p.person_index,
+    };
+    const existingRow = existingMap.get(key);
+    if (existingRow) {
+      await admin.from("applications").update(sub).eq("id", existingRow.id);
+    } else {
+      await admin.from("applications").insert(sub);
+    }
+  }
+
+  const stale = (existing ?? []).filter((r) => !desiredKeys.has(`${r.person_role}#${r.person_index ?? ""}`));
+  if (stale.length) {
+    await admin.from("applications").delete().in("id", stale.map((s) => s.id));
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
