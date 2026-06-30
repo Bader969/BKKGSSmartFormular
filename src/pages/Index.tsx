@@ -157,10 +157,28 @@ const Index = () => {
       return k.beschaeftigung === 'beschaeftigt';
     };
 
+    const initEigen = (
+      vorname: string,
+      name: string,
+    ) => ({
+      versicherungsstatus: formData.bigVersicherungsstatus,
+      hoeheEuro: formData.bigHoeheEuro,
+      versicherungsarten: { ...formData.bigVersicherungsarten },
+      bank: {
+        ...formData.bigBank,
+        kontoinhaberVorname: vorname,
+        kontoinhaberNachname: name,
+        kontoinhaber: [vorname, name].filter(Boolean).join(' ').trim(),
+      },
+    });
+
     const newEh = {
       ...formData.ehegatte,
       eigeneMitgliedschaft: spouseOwn,
       bisherigArt: spouseOwn ? ('mitgliedschaft' as const) : ('familienversicherung' as const),
+      eigenePlusbonus: spouseOwn
+        ? (formData.ehegatte.eigenePlusbonus ?? initEigen(formData.ehegatte.vorname, formData.ehegatte.name))
+        : formData.ehegatte.eigenePlusbonus,
     };
     const newKinder = formData.kinder.map(k => {
       const own = childOwn(k);
@@ -168,6 +186,9 @@ const Index = () => {
         ...k,
         eigeneMitgliedschaft: own,
         bisherigArt: own ? ('mitgliedschaft' as const) : ('familienversicherung' as const),
+        eigenePlusbonus: own
+          ? (k.eigenePlusbonus ?? initEigen(k.vorname, k.name))
+          : k.eigenePlusbonus,
       };
     });
 
