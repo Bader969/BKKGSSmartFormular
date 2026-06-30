@@ -304,7 +304,7 @@ Deno.serve(async (req) => {
     if (action === "list") {
       const { data, error } = await admin
         .from("applications")
-        .select("id, user_id, krankenkasse, status, pdf_count, exported_at, last_opened_at, created_at, updated_at, vertriebspartner, applicant_name, applicant_vorname, antragsform")
+        .select("id, user_id, krankenkasse, status, pdf_count, exported_at, last_opened_at, created_at, updated_at, vertriebspartner, applicant_name, applicant_vorname, antragsform, parent_application_id, person_role, person_index")
         .order("updated_at", { ascending: false })
         .limit(500);
       if (error) return json(500, { error: "db_list_failed" });
