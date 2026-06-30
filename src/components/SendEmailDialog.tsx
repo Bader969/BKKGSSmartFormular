@@ -50,7 +50,8 @@ async function filesToFileForPdf(files: File[]): Promise<FileForPdf[]> {
   );
 }
 
-type Attachment = CapturedFile & { include: boolean };
+type AttachmentKind = 'auto' | 'shared' | 'group';
+type Attachment = CapturedFile & { include: boolean; kind: AttachmentKind; groupId?: string };
 
 type SendGroup = {
   id: string;
@@ -124,8 +125,10 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
   const [bcc, setBcc] = useState('');
   const [body, setBody] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [uploadedDocs, setUploadedDocs] = useState<File[]>([]);
-  const [combiningDocs, setCombiningDocs] = useState(false);
+  const [sharedDocs, setSharedDocs] = useState<File[]>([]);
+  const [groupDocs, setGroupDocs] = useState<Record<string, File[]>>({});
+  const [combiningShared, setCombiningShared] = useState(false);
+  const [combiningGroup, setCombiningGroup] = useState<Record<string, boolean>>({});
   const [subjTpl, setSubjTpl] = useState<string>(DEFAULT_SUBJECT_TEMPLATE);
   const [groupSubjects, setGroupSubjects] = useState<Record<string, string>>({});
 
@@ -134,8 +137,8 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
   // Berechne Sende-Gruppen basierend auf Anhängen + Variante-B Personen
   const groups: SendGroup[] = useMemo(() => {
     if (loadingAttachments) return [];
-    const docsIndices = attachments
-      .map((a, i) => (a.filename.toLowerCase().endsWith('_dokumente.pdf') ? i : -1))
+    const sharedIndices = attachments
+      .map((a, i) => (a.kind === 'shared' ? i : -1))
       .filter((i) => i >= 0);
 
     const result: SendGroup[] = [];
@@ -143,15 +146,19 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
     // Hauptmitglied: FamVers + alle Plusbonus-PDFs des Mitglieds + Dokumente
     const mainIdx: number[] = [];
     attachments.forEach((a, i) => {
+      if (a.kind !== 'auto') return;
       const fn = a.filename.toLowerCase();
       if (fn.startsWith('zusammenfassung_familienversicherung')) mainIdx.push(i);
       else if (fn.startsWith('antrag plusbonus') && fileBelongsToPerson(a.filename, formData.mitgliedVorname, formData.mitgliedName)) mainIdx.push(i);
-      else if (formData.selectedKrankenkasse !== 'big_plusbonus' && !fn.endsWith('_dokumente.pdf')) {
+      else if (formData.selectedKrankenkasse !== 'big_plusbonus') {
         // Für nicht-BIG: alle Antrags-PDFs gehören zum Hauptmitglied
         mainIdx.push(i);
       }
     });
-    const mainAttIdx = Array.from(new Set([...mainIdx, ...docsIndices]));
+    const mainGroupIdx = attachments
+      .map((a, i) => (a.kind === 'group' && a.groupId === 'main' ? i : -1))
+      .filter((i) => i >= 0);
+    const mainAttIdx = Array.from(new Set([...mainIdx, ...sharedIndices, ...mainGroupIdx]));
     const mainKey = 'main';
     const mainVars = buildTemplateVarsForPerson(
       formData,
@@ -183,10 +190,14 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
       for (const p of persons) {
         const idx: number[] = [];
         attachments.forEach((a, i) => {
+          if (a.kind !== 'auto') return;
           const fn = a.filename.toLowerCase();
           if (fn.startsWith('antrag plusbonus') && fileBelongsToPerson(a.filename, p.vorname, p.name)) idx.push(i);
         });
-        const attIdx = Array.from(new Set([...idx, ...docsIndices]));
+        const groupSpecific = attachments
+          .map((a, i) => (a.kind === 'group' && a.groupId === p.id ? i : -1))
+          .filter((i) => i >= 0);
+        const attIdx = Array.from(new Set([...idx, ...sharedIndices, ...groupSpecific]));
         const pVars = buildTemplateVarsForPerson(
           formData,
           { vorname: p.vorname, name: p.name, geburtsdatum: p.geb },
@@ -213,7 +224,8 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
     if (!open) return;
     let cancelled = false;
     setLoadingAttachments(true);
-    setUploadedDocs([]);
+    setSharedDocs([]);
+    setGroupDocs({});
 
     (async () => {
       try {
@@ -256,7 +268,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
         // Capture PDFs
         const captured = await captureDownloads(() => runAllExports(formData));
         if (!cancelled) {
-          setAttachments(captured.map((c) => ({ ...c, include: true })));
+          setAttachments(captured.map((c) => ({ ...c, include: true, kind: 'auto' as AttachmentKind })));
         }
       } catch (e) {
         console.error('Anhänge konnten nicht erzeugt werden', e);
@@ -270,45 +282,82 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const handleAddDocs = async (files: FileList | null) => {
-    if (!files || !files.length) return;
-    const arr = Array.from(files);
-    setUploadedDocs((p) => [...p, ...arr]);
-    setCombiningDocs(true);
-    try {
-      const all = [...uploadedDocs, ...arr];
-      const forPdf = await filesToFileForPdf(all);
+  // Build attachments for a list of files: PDFs kept individually with original name;
+  // images combined into a single "Dokumente.pdf".
+  const buildDocAttachments = async (
+    files: File[],
+    kind: AttachmentKind,
+    groupId?: string,
+  ): Promise<Attachment[]> => {
+    const pdfs = files.filter((f) => f.type === 'application/pdf');
+    const images = files.filter((f) => f.type.startsWith('image/'));
+    const out: Attachment[] = [];
+    for (const p of pdfs) {
+      out.push({ filename: p.name, blob: p, include: true, kind, groupId });
+    }
+    if (images.length > 0) {
+      const forPdf = await filesToFileForPdf(images);
       const blob = await createCombinedPdf(forPdf);
-      const filename = `${baseFilename(formData)}_Dokumente.pdf`;
-      setAttachments((prev) => {
-        const withoutDocs = prev.filter((a) => !a.filename.endsWith('_Dokumente.pdf'));
-        return [...withoutDocs, { filename, blob, include: true }];
-      });
+      out.push({ filename: 'Dokumente.pdf', blob, include: true, kind, groupId });
+    }
+    return out;
+  };
+
+  const rebuildShared = async (files: File[]) => {
+    setCombiningShared(true);
+    try {
+      const built = await buildDocAttachments(files, 'shared');
+      setAttachments((prev) => [...prev.filter((a) => a.kind !== 'shared'), ...built]);
     } catch (e) {
       console.error(e);
-      toast.error('Dokumente konnten nicht zu PDF zusammengefasst werden.');
+      toast.error('Dokumente konnten nicht zusammengefasst werden.');
     } finally {
-      setCombiningDocs(false);
+      setCombiningShared(false);
     }
   };
 
-  const removeUploadedDoc = async (idx: number) => {
-    const next = uploadedDocs.filter((_, i) => i !== idx);
-    setUploadedDocs(next);
-    if (!next.length) {
-      setAttachments((prev) => prev.filter((a) => !a.filename.endsWith('_Dokumente.pdf')));
-      return;
-    }
-    setCombiningDocs(true);
+  const rebuildGroup = async (gid: string, files: File[]) => {
+    setCombiningGroup((s) => ({ ...s, [gid]: true }));
     try {
-      const forPdf = await filesToFileForPdf(next);
-      const blob = await createCombinedPdf(forPdf);
-      const filename = `${baseFilename(formData)}_Dokumente.pdf`;
-      setAttachments((prev) => {
-        const withoutDocs = prev.filter((a) => !a.filename.endsWith('_Dokumente.pdf'));
-        return [...withoutDocs, { filename, blob, include: true }];
-      });
-    } finally { setCombiningDocs(false); }
+      const built = await buildDocAttachments(files, 'group', gid);
+      setAttachments((prev) => [
+        ...prev.filter((a) => !(a.kind === 'group' && a.groupId === gid)),
+        ...built,
+      ]);
+    } catch (e) {
+      console.error(e);
+      toast.error('Dokumente konnten nicht zusammengefasst werden.');
+    } finally {
+      setCombiningGroup((s) => ({ ...s, [gid]: false }));
+    }
+  };
+
+  const handleAddSharedDocs = async (files: FileList | null) => {
+    if (!files || !files.length) return;
+    const arr = Array.from(files);
+    const next = [...sharedDocs, ...arr];
+    setSharedDocs(next);
+    await rebuildShared(next);
+  };
+
+  const removeSharedDoc = async (idx: number) => {
+    const next = sharedDocs.filter((_, i) => i !== idx);
+    setSharedDocs(next);
+    await rebuildShared(next);
+  };
+
+  const handleAddGroupDocs = async (gid: string, files: FileList | null) => {
+    if (!files || !files.length) return;
+    const arr = Array.from(files);
+    const next = [...(groupDocs[gid] || []), ...arr];
+    setGroupDocs((s) => ({ ...s, [gid]: next }));
+    await rebuildGroup(gid, next);
+  };
+
+  const removeGroupDoc = async (gid: string, idx: number) => {
+    const next = (groupDocs[gid] || []).filter((_, i) => i !== idx);
+    setGroupDocs((s) => ({ ...s, [gid]: next }));
+    await rebuildGroup(gid, next);
   };
 
   const totalSize = attachments.filter((a) => a.include).reduce((s, a) => s + a.blob.size, 0);
@@ -455,24 +504,50 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
                     <p className={`text-xs ${groupTooLarge ? 'text-destructive' : 'text-muted-foreground'}`}>
                       Größe: {(groupSize / 1024 / 1024).toFixed(2)} MB {groupTooLarge && '· >24 MB'}
                     </p>
+                    <div className="border-t border-border/40 pt-2 mt-1">
+                      <Label className="flex items-center gap-2 text-xs">
+                        <Upload className="h-3 w-3" /> Nur für diese E-Mail (Bilder/PDF)
+                      </Label>
+                      <Input
+                        type="file"
+                        multiple
+                        accept="image/*,application/pdf"
+                        onChange={(e) => handleAddGroupDocs(g.id, e.target.files)}
+                        className="mt-1 h-8 text-xs"
+                      />
+                      {combiningGroup[g.id] && <p className="text-xs text-muted-foreground mt-1">Kombiniere…</p>}
+                      {(groupDocs[g.id]?.length ?? 0) > 0 && (
+                        <ul className="mt-1 space-y-1">
+                          {(groupDocs[g.id] || []).map((f, i) => (
+                            <li key={f.name + i} className="flex items-center gap-2 text-xs">
+                              <span className="flex-1 truncate">{f.name}</span>
+                              <button onClick={() => removeGroupDoc(g.id, i)} className="text-muted-foreground hover:text-destructive">
+                                <X className="h-3 w-3" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
                 );
               })
             )}
           </div>
 
-          {/* (Alte zentrale Anhängeliste entfernt — wird jetzt pro Gruppe angezeigt) */}
-
           <div className="border-t border-border/60 pt-3">
             <Label className="flex items-center gap-2"><Upload className="h-4 w-4" /> Zusätzliche Dokumente (Bilder/PDF → "Dokumente.pdf")</Label>
-            <Input type="file" multiple accept="image/*,application/pdf" onChange={(e) => handleAddDocs(e.target.files)} className="mt-2" />
-            {combiningDocs && <p className="text-xs text-muted-foreground mt-1">Kombiniere…</p>}
-            {uploadedDocs.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Wird an alle E-Mails angehängt. PDFs behalten ihren Originalnamen; mehrere Bilder werden zu „Dokumente.pdf" zusammengefasst.
+            </p>
+            <Input type="file" multiple accept="image/*,application/pdf" onChange={(e) => handleAddSharedDocs(e.target.files)} className="mt-2" />
+            {combiningShared && <p className="text-xs text-muted-foreground mt-1">Kombiniere…</p>}
+            {sharedDocs.length > 0 && (
               <ul className="mt-2 space-y-1">
-                {uploadedDocs.map((f, i) => (
+                {sharedDocs.map((f, i) => (
                   <li key={f.name + i} className="flex items-center gap-2 text-xs">
                     <span className="flex-1 truncate">{f.name}</span>
-                    <button onClick={() => removeUploadedDoc(i)} className="text-muted-foreground hover:text-destructive">
+                    <button onClick={() => removeSharedDoc(i)} className="text-muted-foreground hover:text-destructive">
                       <X className="h-3 w-3" />
                     </button>
                   </li>
