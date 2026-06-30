@@ -316,42 +316,58 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
 
   const handleSend = async () => {
     if (!to.trim()) { toast.error('Bitte Empfänger angeben.'); return; }
-    if (!subject.trim()) { toast.error('Betreff darf nicht leer sein.'); return; }
-    const active = attachments.filter((a) => a.include);
-    if (!active.length) { toast.error('Mindestens ein Anhang erforderlich.'); return; }
-    if (tooLarge) { toast.error('Anhänge überschreiten 24 MB (Gmail-Limit).'); return; }
+    if (!groups.length) { toast.error('Keine Sende-Gruppen.'); return; }
+    for (const g of groups) {
+      if (!g.subject.trim()) { toast.error(`Betreff für "${g.label}" fehlt.`); return; }
+      const active = g.attachmentIndices.map((i) => attachments[i]).filter((a) => a && a.include);
+      if (!active.length) { toast.error(`Mindestens ein Anhang für "${g.label}" erforderlich.`); return; }
+      const size = active.reduce((s, a) => s + a.blob.size, 0);
+      if (size > 24 * 1024 * 1024) { toast.error(`"${g.label}" überschreitet 24 MB.`); return; }
+    }
 
     setSending(true);
+    let okCount = 0;
+    let failCount = 0;
     try {
-      const encoded = await Promise.all(
-        active.map(async (a) => ({
-          filename: a.filename,
-          mimeType: a.blob.type || 'application/pdf',
-          base64: await blobToBase64(a.blob),
-        })),
-      );
-      const { data, error } = await supabase.functions.invoke('send-application-email', {
-        body: {
-          application_id: applicationId,
-          to: to.trim(),
-          cc: cc.trim() || undefined,
-          bcc: bcc.trim() || undefined,
-          subject: subject.trim(),
-          body,
-          attachments: encoded,
-        },
-      });
-      if (error) throw new Error(error.message);
-      if (data?.error === 'gmail_scope_missing') {
-        toast.error('Gmail-Verbindung erlaubt kein Senden. Bitte Verbindung mit Scope "gmail.send" neu autorisieren.');
-        return;
+      for (const g of groups) {
+        try {
+          const active = g.attachmentIndices.map((i) => attachments[i]).filter((a) => a && a.include);
+          const encoded = await Promise.all(
+            active.map(async (a) => ({
+              filename: a.filename,
+              mimeType: a.blob.type || 'application/pdf',
+              base64: await blobToBase64(a.blob),
+            })),
+          );
+          const { data, error } = await supabase.functions.invoke('send-application-email', {
+            body: {
+              application_id: applicationId,
+              to: to.trim(),
+              cc: cc.trim() || undefined,
+              bcc: bcc.trim() || undefined,
+              subject: g.subject.trim(),
+              body: g.body,
+              attachments: encoded,
+            },
+          });
+          if (error) throw new Error(error.message);
+          if (data?.error === 'gmail_scope_missing') {
+            toast.error('Gmail-Verbindung erlaubt kein Senden. Bitte Verbindung mit Scope "gmail.send" neu autorisieren.');
+            failCount++;
+            continue;
+          }
+          if (data?.error) throw new Error(data.error);
+          okCount++;
+        } catch (e) {
+          failCount++;
+          toast.error(`"${g.label}" fehlgeschlagen: ${(e as Error).message}`);
+        }
       }
-      if (data?.error) throw new Error(data.error);
-      toast.success('E-Mail versendet.');
-      onSent?.();
-      onOpenChange(false);
-    } catch (e) {
-      toast.error(`Versand fehlgeschlagen: ${(e as Error).message}`);
+      if (okCount) toast.success(`${okCount} E-Mail(s) versendet.`);
+      if (okCount && !failCount) {
+        onSent?.();
+        onOpenChange(false);
+      }
     } finally {
       setSending(false);
     }
