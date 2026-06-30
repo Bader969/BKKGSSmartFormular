@@ -42,6 +42,30 @@ export const pickSignatureFont = (seed: string | null | undefined): string => {
   return SIGNATURE_FONTS[fnv1a(s) % SIGNATURE_FONTS.length];
 };
 
+/**
+ * Wählt eine Signatur-Schrift deterministisch nach Seed, springt aber zur
+ * nächsten in der Liste, falls die bevorzugte Schrift im Browser (noch)
+ * nicht geladen ist (`document.fonts.check`). Verhindert „Tofu"-Rendering
+ * mit Frage­zeichen-Kästchen, wenn die Webfont-Datei noch im Swap-Status ist.
+ */
+export const pickLoadedSignatureFont = (
+  seed: string | null | undefined,
+  testText: string = 'Abc',
+): string => {
+  const preferred = pickSignatureFont(seed);
+  if (typeof document === 'undefined' || !('fonts' in document)) return preferred;
+  const startIdx = SIGNATURE_FONTS.indexOf(preferred);
+  for (let i = 0; i < SIGNATURE_FONTS.length; i++) {
+    const f = SIGNATURE_FONTS[(startIdx + i) % SIGNATURE_FONTS.length];
+    try {
+      if ((document as any).fonts.check(`64px "${f}"`, testText)) return f;
+    } catch {
+      // ignore – einige Browser werfen bei ungültigen Specs
+    }
+  }
+  return preferred;
+};
+
 export interface SignatureOptions {
   width?: number;
   height?: number;
