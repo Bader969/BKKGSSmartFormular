@@ -31,6 +31,21 @@ export const applyKrankenkassenMapping = (
         mitgliedHausnummer: extractedData.mitgliedHausnummer || currentFormData.mitgliedHausnummer,
         mitgliedPlz: extractedData.mitgliedPlz || currentFormData.mitgliedPlz,
         ort: extractedData.ort || currentFormData.ort,
+        bigBank: (() => {
+          const ex = extractedData.bigBank || {};
+          const cur = currentFormData.bigBank;
+          const vor = ex.kontoinhaberVorname || cur.kontoinhaberVorname;
+          const nach = ex.kontoinhaberNachname || cur.kontoinhaberNachname;
+          return {
+            ...cur,
+            kontoinhaberVorname: vor,
+            kontoinhaberNachname: nach,
+            kontoinhaber: [vor, nach].filter(Boolean).join(' ').trim() || cur.kontoinhaber,
+            kreditinstitut: ex.kreditinstitut || cur.kreditinstitut,
+            iban: (ex.iban || cur.iban || '').toString().replace(/\s+/g, '').toUpperCase(),
+            bic: (ex.bic || cur.bic || '').toString().toUpperCase(),
+          };
+        })(),
         ehegatte: extractedData.ehegatte
           ? {
               ...currentFormData.ehegatte,
