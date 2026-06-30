@@ -208,10 +208,28 @@ export const BigPlusbonusSection: React.FC<Props> = ({ formData, updateFormData,
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             type="text"
-            id="big-kontoinhaber"
-            label="Kontoinhaber*in"
-            value={formData.bigBank.kontoinhaber}
-            onChange={(v) => updateBank({ kontoinhaber: v })}
+            id="big-kontoinhaber-vorname"
+            label="Kontoinhaber*in — Vorname"
+            value={formData.bigBank.kontoinhaberVorname}
+            onChange={(v) =>
+              updateBank({
+                kontoinhaberVorname: v,
+                kontoinhaber: [v, formData.bigBank.kontoinhaberNachname].filter(Boolean).join(' ').trim(),
+              })
+            }
+            required
+          />
+          <FormField
+            type="text"
+            id="big-kontoinhaber-nachname"
+            label="Kontoinhaber*in — Nachname"
+            value={formData.bigBank.kontoinhaberNachname}
+            onChange={(v) =>
+              updateBank({
+                kontoinhaberNachname: v,
+                kontoinhaber: [formData.bigBank.kontoinhaberVorname, v].filter(Boolean).join(' ').trim(),
+              })
+            }
             required
           />
           <FormField
