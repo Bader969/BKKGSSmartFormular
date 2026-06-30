@@ -1,5 +1,5 @@
 import { PDFDocument, PDFTextField, PDFCheckBox } from 'pdf-lib';
-import { FormData } from '@/types/form';
+import { FormData, EigenePlusbonusDaten } from '@/types/form';
 import {
   getAutoSignatures,
   ensureSignatureFontReady,
@@ -117,6 +117,8 @@ const buildPlusbonusPdfsForPerson = async (
   templateBytes: ArrayBuffer,
   person: Antragsperson,
   includeMitversicherte: boolean = false,
+  overrides?: EigenePlusbonusDaten,
+  personSignatureDataUrl?: string,
 ): Promise<void> => {
   const mv = includeMitversicherte ? formData.bigMitversicherte : [];
   const chunkSize = 3;
@@ -148,28 +150,32 @@ const buildPlusbonusPdfsForPerson = async (
   setCheck(form, 'weiblich', person.geschlecht === 'weiblich');
   setCheck(form, 'divers', person.geschlecht === 'divers');
 
-  // Bankdaten
-  setText(form, 'Kontoinhaberin', formData.bigBank.kontoinhaber);
-  setText(form, 'Kreditinstitut', formData.bigBank.kreditinstitut);
-  setText(form, 'IBAN Internationale Bankkontonummer', formData.bigBank.iban);
-  setText(form, 'BIC', formData.bigBank.bic);
-  setText(form, 'Ort_2', formData.bigBank.ort);
-  setText(form, 'Datum TTMMJJ', toDDMMJJ(formData.bigBank.datum));
+  // Bankdaten — pro Person Overrides erlauben
+  const bank = overrides?.bank ?? formData.bigBank;
+  const kontoinhaberFull = bank.kontoinhaber
+    || [bank.kontoinhaberVorname, bank.kontoinhaberNachname].filter(Boolean).join(' ').trim();
+  setText(form, 'Kontoinhaberin', kontoinhaberFull);
+  setText(form, 'Kreditinstitut', bank.kreditinstitut);
+  setText(form, 'IBAN Internationale Bankkontonummer', bank.iban);
+  setText(form, 'BIC', bank.bic);
+  setText(form, 'Ort_2', bank.ort);
+  setText(form, 'Datum TTMMJJ', toDDMMJJ(bank.datum));
 
   // Untere Bestätigungs-Felder (Hiermit wird die Richtigkeit der o.a. Daten bestätigt)
   setText(form, 'Ort_3', formData.ort);
   setText(form, 'Datum TTMMJJ_2', toDDMMJJ(formData.datum));
 
-  // Versicherungsstatus
-  setCheck(form, 'Neuabschluss', formData.bigVersicherungsstatus === 'neuabschluss');
-  setCheck(form, 'bestehende Zusatzversicherung', formData.bigVersicherungsstatus === 'bestehend');
-  setText(form, 'Euro', formData.bigHoeheEuro);
-
-  // Versicherungsarten (Checkboxen) – Originalname aus CSV mit doppelten Spaces
-  setCheck(form, 'private Zusatzversicherung im Sinne von  22 sowie  16', formData.bigVersicherungsarten.privateZusatz);
-  setCheck(form, 'Berufsunfähigkeitsversicherung', formData.bigVersicherungsarten.berufsunfaehigkeit);
-  setCheck(form, 'Unfallversicherung', formData.bigVersicherungsarten.unfall);
-  setCheck(form, 'Grundfähigkeitsversicherung', formData.bigVersicherungsarten.grundfaehigkeit);
+  // Versicherungsstatus — pro Person Overrides erlauben
+  const status = overrides?.versicherungsstatus ?? formData.bigVersicherungsstatus;
+  const hoehe = overrides?.hoeheEuro ?? formData.bigHoeheEuro;
+  const arten = overrides?.versicherungsarten ?? formData.bigVersicherungsarten;
+  setCheck(form, 'Neuabschluss', status === 'neuabschluss');
+  setCheck(form, 'bestehende Zusatzversicherung', status === 'bestehend');
+  setText(form, 'Euro', hoehe);
+  setCheck(form, 'private Zusatzversicherung im Sinne von  22 sowie  16', arten.privateZusatz);
+  setCheck(form, 'Berufsunfähigkeitsversicherung', arten.berufsunfaehigkeit);
+  setCheck(form, 'Unfallversicherung', arten.unfall);
+  setCheck(form, 'Grundfähigkeitsversicherung', arten.grundfaehigkeit);
 
   // Mitversicherte Angehörige – bis zu 3 pro PDF (aktueller Chunk)
   if (chunk[0]) {
@@ -186,13 +192,13 @@ const buildPlusbonusPdfsForPerson = async (
   }
 
   // Unterschrift Kontoinhaber als Bild über Signatur16-Widget
-  // Widget-Rect (PDF-Koordinaten, Ursprung unten links): [301, 406, 562, 418]
-  if (formData.unterschrift) {
+  const sigUrl = personSignatureDataUrl || formData.unterschrift;
+  if (sigUrl) {
     try {
-      const base64 = formData.unterschrift.split(',')[1];
+      const base64 = sigUrl.split(',')[1];
       if (base64) {
         const sigBytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-        const img = formData.unterschrift.includes('image/png')
+        const img = sigUrl.includes('image/png')
           ? await pdfDoc.embedPng(sigBytes)
           : await pdfDoc.embedJpg(sigBytes);
         const page = pdfDoc.getPages()[0];
