@@ -504,24 +504,50 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
                     <p className={`text-xs ${groupTooLarge ? 'text-destructive' : 'text-muted-foreground'}`}>
                       Größe: {(groupSize / 1024 / 1024).toFixed(2)} MB {groupTooLarge && '· >24 MB'}
                     </p>
+                    <div className="border-t border-border/40 pt-2 mt-1">
+                      <Label className="flex items-center gap-2 text-xs">
+                        <Upload className="h-3 w-3" /> Nur für diese E-Mail (Bilder/PDF)
+                      </Label>
+                      <Input
+                        type="file"
+                        multiple
+                        accept="image/*,application/pdf"
+                        onChange={(e) => handleAddGroupDocs(g.id, e.target.files)}
+                        className="mt-1 h-8 text-xs"
+                      />
+                      {combiningGroup[g.id] && <p className="text-xs text-muted-foreground mt-1">Kombiniere…</p>}
+                      {(groupDocs[g.id]?.length ?? 0) > 0 && (
+                        <ul className="mt-1 space-y-1">
+                          {(groupDocs[g.id] || []).map((f, i) => (
+                            <li key={f.name + i} className="flex items-center gap-2 text-xs">
+                              <span className="flex-1 truncate">{f.name}</span>
+                              <button onClick={() => removeGroupDoc(g.id, i)} className="text-muted-foreground hover:text-destructive">
+                                <X className="h-3 w-3" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
                 );
               })
             )}
           </div>
 
-          {/* (Alte zentrale Anhängeliste entfernt — wird jetzt pro Gruppe angezeigt) */}
-
           <div className="border-t border-border/60 pt-3">
             <Label className="flex items-center gap-2"><Upload className="h-4 w-4" /> Zusätzliche Dokumente (Bilder/PDF → "Dokumente.pdf")</Label>
-            <Input type="file" multiple accept="image/*,application/pdf" onChange={(e) => handleAddDocs(e.target.files)} className="mt-2" />
-            {combiningDocs && <p className="text-xs text-muted-foreground mt-1">Kombiniere…</p>}
-            {uploadedDocs.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Wird an alle E-Mails angehängt. PDFs behalten ihren Originalnamen; mehrere Bilder werden zu „Dokumente.pdf" zusammengefasst.
+            </p>
+            <Input type="file" multiple accept="image/*,application/pdf" onChange={(e) => handleAddSharedDocs(e.target.files)} className="mt-2" />
+            {combiningShared && <p className="text-xs text-muted-foreground mt-1">Kombiniere…</p>}
+            {sharedDocs.length > 0 && (
               <ul className="mt-2 space-y-1">
-                {uploadedDocs.map((f, i) => (
+                {sharedDocs.map((f, i) => (
                   <li key={f.name + i} className="flex items-center gap-2 text-xs">
                     <span className="flex-1 truncate">{f.name}</span>
-                    <button onClick={() => removeUploadedDoc(i)} className="text-muted-foreground hover:text-destructive">
+                    <button onClick={() => removeSharedDoc(i)} className="text-muted-foreground hover:text-destructive">
                       <X className="h-3 w-3" />
                     </button>
                   </li>
