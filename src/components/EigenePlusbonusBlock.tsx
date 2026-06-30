@@ -19,8 +19,6 @@ interface Props {
 
 export const EigenePlusbonusBlock: React.FC<Props> = ({ personLabel, value, onChange, idPrefix }) => {
   const v: EigenePlusbonusDaten = value ?? createEmptyEigenePlusbonus();
-  const updateBank = (u: Partial<EigenePlusbonusDaten['bank']>) =>
-    onChange({ ...v, bank: { ...v.bank, ...u } });
   const updateArt = (k: keyof EigenePlusbonusDaten['versicherungsarten'], on: boolean) =>
     onChange({ ...v, versicherungsarten: { ...v.versicherungsarten, [k]: on } });
 
@@ -75,37 +73,10 @@ export const EigenePlusbonusBlock: React.FC<Props> = ({ personLabel, value, onCh
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            type="text"
-            id={`${idPrefix}-ki-vn`}
-            label="Kontoinhaber*in — Vorname"
-            value={v.bank.kontoinhaberVorname}
-            onChange={(val) => updateBank({
-              kontoinhaberVorname: val,
-              kontoinhaber: [val, v.bank.kontoinhaberNachname].filter(Boolean).join(' ').trim(),
-            })}
-            required
-          />
-          <FormField
-            type="text"
-            id={`${idPrefix}-ki-nn`}
-            label="Kontoinhaber*in — Nachname"
-            value={v.bank.kontoinhaberNachname}
-            onChange={(val) => updateBank({
-              kontoinhaberNachname: val,
-              kontoinhaber: [v.bank.kontoinhaberVorname, val].filter(Boolean).join(' ').trim(),
-            })}
-            required
-          />
-          <FormField type="text" id={`${idPrefix}-kreditinstitut`} label="Kreditinstitut" value={v.bank.kreditinstitut} onChange={(val) => updateBank({ kreditinstitut: val })} />
-          <FormField type="text" id={`${idPrefix}-iban`} label="IBAN" value={v.bank.iban} onChange={(val) => updateBank({ iban: val.toUpperCase() })} required />
-          <FormField type="text" id={`${idPrefix}-bic`} label="BIC" value={v.bank.bic} onChange={(val) => updateBank({ bic: val.toUpperCase() })} />
-          <FormField type="text" id={`${idPrefix}-ort`} label="Ort (Unterschrift)" value={v.bank.ort} onChange={(val) => updateBank({ ort: val })} required />
-          <FormField type="date" id={`${idPrefix}-datum`} label="Datum" value={v.bank.datum} onChange={(val) => updateBank({ datum: val })} required />
-        </div>
         <p className="text-sm text-muted-foreground">
-          Die Unterschrift wird automatisch aus dem Nachnamen des Kontoinhabers erzeugt.
+          Bankdaten / SEPA-Lastschriftmandat sowie Unterschrift werden zentral
+          aus dem Hauptantrag (Abschnitt <em>Zahlungsempfänger*in</em>) übernommen
+          und gelten für alle Plusbonus-Anträge.
         </p>
       </div>
     </FormSection>

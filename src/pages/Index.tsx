@@ -34,6 +34,7 @@ import { Link } from 'react-router-dom';
 import { useApplicationPersistence } from '@/hooks/useApplicationPersistence';
 import { useUserRole } from '@/hooks/useUserRole';
 import { VERTRIEBSPARTNER_OPTIONS, VP_STORAGE_KEY, CUSTOM_VP_VALUE } from '@/utils/vertriebspartner';
+import { randomPoliceBetrag, parseEuro } from '@/utils/bigRandom';
 import { Input } from '@/components/ui/input';
 
 const Index = () => {
@@ -100,21 +101,28 @@ const Index = () => {
   useEffect(() => {
     if (formData.selectedKrankenkasse !== 'big_plusbonus') return;
     if (!formData.bigFamilienversicherung) return;
+    // Mitversicherte-Liste = nur Familienversicherte. Personen mit
+    // eigener Mitgliedschaft erscheinen NICHT in diesem Block, weil
+    // sie einen eigenen Plusbonus-Antrag erhalten.
     const entries: { name: string; vorname: string }[] = [];
-    if (formData.ehegatte && (formData.ehegatte.name || formData.ehegatte.vorname)) {
-      entries.push({ name: formData.ehegatte.name, vorname: formData.ehegatte.vorname });
+    const eh = formData.ehegatte;
+    if (eh && (eh.name || eh.vorname) && !eh.eigeneMitgliedschaft) {
+      entries.push({ name: eh.name, vorname: eh.vorname });
     }
     for (const k of formData.kinder) {
-      if (k.name || k.vorname) entries.push({ name: k.name, vorname: k.vorname });
+      if ((k.name || k.vorname) && !k.eigeneMitgliedschaft) {
+        entries.push({ name: k.name, vorname: k.vorname });
+      }
     }
     const next = entries.map((e, i) => ({
       nameVorname: [e.name, e.vorname].filter(Boolean).join(', '),
-      hoehePolice: formData.bigMitversicherte[i]?.hoehePolice ?? '',
+      // Police-Betrag: bestehenden Wert beibehalten, sonst zufällig 200–245.
+      hoehePolice: formData.bigMitversicherte[i]?.hoehePolice || randomPoliceBetrag(),
     }));
     const prev = formData.bigMitversicherte;
     const changed =
       prev.length !== next.length ||
-      next.some((n, i) => n.nameVorname !== prev[i]?.nameVorname);
+      next.some((n, i) => n.nameVorname !== prev[i]?.nameVorname || n.hoehePolice !== prev[i]?.hoehePolice);
     if (changed) {
       setFormData(p => ({ ...p, bigMitversicherte: next }));
     }
@@ -124,7 +132,35 @@ const Index = () => {
     formData.bigFamilienversicherung,
     formData.ehegatte?.name,
     formData.ehegatte?.vorname,
-    JSON.stringify(formData.kinder.map(k => [k.name, k.vorname])),
+    formData.ehegatte?.eigeneMitgliedschaft,
+    JSON.stringify(formData.kinder.map(k => [k.name, k.vorname, k.eigeneMitgliedschaft])),
+  ]);
+
+  // BIG: „Höhe in Euro" automatisch summieren = Summe aller Policen der
+  // Mitversicherten + Eigenanteil-Random (200–245) des Hauptmitglieds.
+  useEffect(() => {
+    if (formData.selectedKrankenkasse !== 'big_plusbonus') return;
+    let self = formData.bigHoeheEuroSelfRandom;
+    let updates: Partial<FormData> = {};
+    if (!self) {
+      self = randomPoliceBetrag();
+      updates.bigHoeheEuroSelfRandom = self;
+    }
+    const policeSum = formData.bigMitversicherte.reduce(
+      (acc, m) => acc + parseEuro(m.hoehePolice),
+      0,
+    );
+    const total = policeSum + parseEuro(self);
+    const totalStr = String(Math.round(total));
+    if (totalStr !== formData.bigHoeheEuro || updates.bigHoeheEuroSelfRandom) {
+      updates.bigHoeheEuro = totalStr;
+      setFormData(p => ({ ...p, ...updates }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    formData.selectedKrankenkasse,
+    formData.bigHoeheEuroSelfRandom,
+    JSON.stringify(formData.bigMitversicherte.map(m => m.hoehePolice)),
   ]);
 
   // BIG Variante B: Beschäftigungsstatus + Alter steuern eigene Mitgliedschaft
@@ -158,18 +194,12 @@ const Index = () => {
     };
 
     const initEigen = (
-      vorname: string,
-      name: string,
+      _vorname: string,
+      _name: string,
     ) => ({
       versicherungsstatus: formData.bigVersicherungsstatus,
       hoeheEuro: formData.bigHoeheEuro,
       versicherungsarten: { ...formData.bigVersicherungsarten },
-      bank: {
-        ...formData.bigBank,
-        kontoinhaberVorname: vorname,
-        kontoinhaberNachname: name,
-        kontoinhaber: [vorname, name].filter(Boolean).join(' ').trim(),
-      },
     });
 
     const newEh = {
