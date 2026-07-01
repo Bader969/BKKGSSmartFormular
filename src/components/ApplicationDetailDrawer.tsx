@@ -56,7 +56,7 @@ export function ApplicationDetailDrawer({
   const handleDelete = async () => {
     if (!application) return;
     if (isSub) {
-      toast.error("Untereinträge können nicht einzeln gelöscht werden. Bitte den Hauptantrag löschen oder die eigene Mitgliedschaft im Formular entfernen.");
+      toast.error("Untereinträge können nicht einzeln gelöscht werden. Öffne den Hauptantrag im Editor, entferne dort die 'eigene Mitgliedschaft' bei der Person und speichere erneut.");
       return;
     }
     if (!confirm("Antrag wirklich löschen? Diese Aktion ist nicht umkehrbar.")) return;
@@ -66,8 +66,9 @@ export function ApplicationDetailDrawer({
       toast.success("Antrag gelöscht.");
       onClose();
       onChanged();
-    } catch {
-      toast.error("Konnte nicht löschen.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Konnte nicht löschen: ${msg}`);
     } finally {
       setBusy(false);
     }
@@ -113,8 +114,16 @@ export function ApplicationDetailDrawer({
 
               <div className="flex gap-2">
                 <Button onClick={handleLoad} disabled={busy} className="flex-1">In Editor laden</Button>
-                <Button onClick={handleDelete} disabled={busy || isSub} variant="destructive">Löschen</Button>
+                {!isSub && (
+                  <Button onClick={handleDelete} disabled={busy} variant="destructive">Löschen</Button>
+                )}
               </div>
+
+              {isSub && (
+                <p className="text-xs text-muted-foreground">
+                  Um diesen Untereintrag zu entfernen: Hauptantrag im Editor laden, bei der jeweiligen Person das Häkchen „eigene Mitgliedschaft" entfernen und speichern.
+                </p>
+              )}
 
               <div>
                 <h3 className="font-display text-sm font-semibold mb-3 mt-6">Verlauf</h3>
