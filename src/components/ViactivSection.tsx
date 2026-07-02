@@ -4,7 +4,7 @@ import { FormField } from './FormField';
 import { FormData, VIACTIV_GESCHLECHT_OPTIONS, VIACTIV_BESCHAEFTIGUNG_OPTIONS, VIACTIV_VERSICHERUNGSART_OPTIONS, ArbeitgeberDaten, FamilyMember, createEmptyFamilyMember } from '@/types/form';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
-import { validateName, validateStrasse, validateHausnummer, validatePlz, validateOrt, validateSelect } from '@/utils/validation';
+import { validateName, validateStrasse, validateHausnummer, validatePlz, validateOrt, validateSelect, validateVersichertennummer } from '@/utils/validation';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -459,6 +459,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                 onChange={(value) => updateEhegatte({ versichertennummer: normalizeInsuranceNumber(value) })}
                 placeholder="Versichertennummer"
                 required
+                validate={validateVersichertennummer}
               />
             </div>
 
@@ -637,6 +638,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                         onChange={(value) => updateKind(index, { versichertennummer: normalizeInsuranceNumber(value) })}
                         placeholder="Versichertennummer"
                         required
+                        validate={validateVersichertennummer}
                       />
                     </div>
 
