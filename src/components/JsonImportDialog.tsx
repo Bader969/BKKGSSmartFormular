@@ -549,8 +549,9 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
 
   const handleImport = () => {
     try {
-      const rawParsed = JSON.parse(jsonInput) as FormData;
-      const { data: parsed, warnings: numberWarnings } = normalizeInsuranceNumberData(rawParsed as unknown as Record<string, unknown>);
+      const rawParsed = JSON.parse(jsonInput) as Partial<FormData> & Record<string, unknown>;
+      const { data: parsed, warnings: numberWarnings } = normalizeInsuranceNumberData(rawParsed);
+      const parsedFormData = parsed as Partial<FormData>;
       
       if (typeof parsed !== 'object' || parsed === null) {
         throw new Error('Ungültiges JSON-Format');
@@ -562,17 +563,17 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       const todayForInput = formatDateForInput(new Date());
       
       // Bei Kindern immer bisherigBestehtWeiter = true, bisherigBestehtWeiterBei bleibt leer (wird dynamisch in UI gesetzt)
-      const processedKinder = parsed.kinder?.map(kind => ({
+      const processedKinder = parsedFormData.kinder?.map(kind => ({
         ...kind,
         bisherigBestehtWeiter: true,
         bisherigBestehtWeiterBei: kind.bisherigBestehtWeiterBei || '',
       })) || formData.kinder;
       
       // Synchronisierung: mitgliedVersichertennummer = mitgliedKvNummer
-      const mitgliedVersichertennummer = parsed.mitgliedKvNummer || parsed.mitgliedVersichertennummer || formData.mitgliedVersichertennummer;
+      const mitgliedVersichertennummer = parsedFormData.mitgliedKvNummer || parsedFormData.mitgliedVersichertennummer || formData.mitgliedVersichertennummer;
       
       // Synchronisierung: ehegatteKrankenkasse → vom mitgliedKrankenkasse falls nicht gesetzt
-      const ehegatteKrankenkasse = parsed.ehegatteKrankenkasse || parsed.mitgliedKrankenkasse || formData.ehegatteKrankenkasse;
+      const ehegatteKrankenkasse = parsedFormData.ehegatteKrankenkasse || parsedFormData.mitgliedKrankenkasse || formData.ehegatteKrankenkasse;
       
       const mappedData = applyKrankenkassenMapping(parsed, activeKrankenkasse as Krankenkasse, formData);
 
@@ -582,10 +583,10 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
         datum: todayForInput, // Immer heutiges Datum
         mitgliedVersichertennummer: mitgliedVersichertennummer,
         ehegatteKrankenkasse: ehegatteKrankenkasse,
-        ehegatte: parsed.ehegatte ? { ...formData.ehegatte, ...parsed.ehegatte } : formData.ehegatte,
+        ehegatte: parsedFormData.ehegatte ? { ...formData.ehegatte, ...parsedFormData.ehegatte } : formData.ehegatte,
         kinder: processedKinder,
-        rundumSicherPaket: parsed.rundumSicherPaket
-          ? { ...formData.rundumSicherPaket, ...parsed.rundumSicherPaket }
+        rundumSicherPaket: parsedFormData.rundumSicherPaket
+          ? { ...formData.rundumSicherPaket, ...parsedFormData.rundumSicherPaket }
           : formData.rundumSicherPaket,
       });
       

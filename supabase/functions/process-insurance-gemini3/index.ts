@@ -6,6 +6,92 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const MAIN_NUMBER_ALIASES = [
+  'mitgliedKvNummer', 'mitgliedVersichertennummer', 'kvnr', 'kvNummer', 'kv_nummer',
+  'versichertennummer', 'versicherungsnummer', 'mitgliedsnummer',
+  'krankenversichertennummer', 'krankenversicherungsnummer', 'egkNummer', 'eGKNummer',
+];
+
+const PERSON_NUMBER_ALIASES = [
+  'versichertennummer', 'versichertenNummer', 'versicherungsnummer', 'mitgliedsnummer',
+  'kvnr', 'kvNummer', 'kv_nummer', 'krankenversichertennummer', 'krankenversicherungsnummer',
+  'egkNummer', 'eGKNummer',
+];
+
+const FIRST_LETTER_CORRECTIONS: Record<string, string> = { '0': 'O', '1': 'I', '5': 'S', '8': 'B' };
+const DIGIT_CORRECTIONS: Record<string, string> = { O: '0', Q: '0', D: '0', I: '1', L: '1', Z: '2', S: '5', B: '8', G: '9' };
+
+const stripKnownLabels = (value: string) => value.replace(
+  /\b(?:KVNR|KV\s*-?\s*NR|KV\s*-?\s*NUMMER|VERSICHERTEN\s*-?\s*NR|VERSICHERTEN\s*-?\s*NUMMER|VERSICHERUNGS\s*-?\s*NR|VERSICHERUNGS\s*-?\s*NUMMER|MITGLIEDS\s*-?\s*NR|MITGLIEDS\s*-?\s*NUMMER|EGK\s*-?\s*NUMMER)\b/gi,
+  '',
+);
+
+const normalizeCandidate = (candidate: string): string => {
+  if (candidate.length !== 10) return '';
+  const first = FIRST_LETTER_CORRECTIONS[candidate[0]] ?? candidate[0];
+  if (!/^[A-Z]$/.test(first)) return '';
+  const digits = candidate.slice(1).split('').map((char) => DIGIT_CORRECTIONS[char] ?? char).join('');
+  return /^\d{9}$/.test(digits) ? `${first}${digits}` : '';
+};
+
+const normalizeInsuranceNumber = (value: unknown): string => {
+  if (value === null || value === undefined) return '';
+  const compact = stripKnownLabels(String(value)).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (!compact) return '';
+  const exact = normalizeCandidate(compact);
+  if (exact) return exact;
+  for (let index = 0; index <= compact.length - 10; index += 1) {
+    const normalized = normalizeCandidate(compact.slice(index, index + 10));
+    if (normalized) return normalized;
+  }
+  return compact;
+};
+
+const isValidInsuranceNumber = (value: unknown): boolean => /^[A-Z]\d{9}$/.test(normalizeInsuranceNumber(value));
+
+const findInsuranceNumberAlias = (source: unknown, aliases: string[]): string => {
+  if (!source || typeof source !== 'object') return '';
+  const record = source as Record<string, unknown>;
+  for (const alias of aliases) {
+    const normalized = normalizeInsuranceNumber(record[alias]);
+    if (isValidInsuranceNumber(normalized)) return normalized;
+  }
+  for (const [key, value] of Object.entries(record)) {
+    const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (
+      normalizedKey.includes('kvnr') ||
+      normalizedKey.includes('kvnummer') ||
+      normalizedKey.includes('versichertennummer') ||
+      normalizedKey.includes('versicherungsnummer') ||
+      normalizedKey.includes('mitgliedsnummer') ||
+      normalizedKey.includes('egknummer')
+    ) {
+      const normalized = normalizeInsuranceNumber(value);
+      if (isValidInsuranceNumber(normalized)) return normalized;
+    }
+  }
+  return '';
+};
+
+const normalizeInsuranceNumbersInPayload = (payload: Record<string, unknown>) => {
+  const mainNumber = findInsuranceNumberAlias(payload, MAIN_NUMBER_ALIASES);
+  if (mainNumber) {
+    payload.mitgliedKvNummer = mainNumber;
+    payload.mitgliedVersichertennummer = mainNumber;
+  }
+
+  const normalizePerson = (person: unknown) => {
+    if (!person || typeof person !== 'object') return;
+    const record = person as Record<string, unknown>;
+    const number = findInsuranceNumberAlias(record, PERSON_NUMBER_ALIASES);
+    if (number) record.versichertennummer = number;
+  };
+
+  normalizePerson(payload.ehegatte);
+  if (Array.isArray(payload.kinder)) payload.kinder.forEach(normalizePerson);
+  return payload;
+};
+
 // VIACTIV Schema - Beitrittserklärung + Familienversicherung
 const viactivSchema = `{
   "mitgliedVorname": "", 
@@ -132,7 +218,8 @@ const bigSchema = `{
     "geburtsname": "",
     "geburtsort": "",
     "geburtsland": "ISO-Code",
-    "staatsangehoerigkeit": "ISO-Code"
+    "staatsangehoerigkeit": "ISO-Code",
+    "versichertennummer": ""
   },
   "kinder": [{
     "vorname": "",
@@ -143,6 +230,7 @@ const bigSchema = `{
     "geburtsort": "",
     "geburtsland": "ISO-Code",
     "staatsangehoerigkeit": "ISO-Code",
+    "versichertennummer": "",
     "verwandtschaft": "leiblich|stief|pflege|adoptiert"
   }]
 }`;
@@ -335,7 +423,7 @@ SEPA / BANKKARTE (PFLICHT wenn auf Dokument/Bankkarte vorhanden — in "bigBank"
 
 EHEGATTE / KINDER (falls vorhanden): Vorname, Name, Geburtsdatum, Geschlecht, Geburtsname,
 Geburtsort, Geburtsland (ISO-Code), Staatsangehörigkeit (ISO-Code), bei Kindern Verwandtschaft.
-Falls für Ehegatte/Kinder ebenfalls eine eGK vorliegt, deren KV-Nummer + Krankenkasse mit übernehmen.`
+Falls für Ehegatte/Kinder ebenfalls eine eGK vorliegt, deren KV-Nummer zwingend in versichertennummer übernehmen.`
       };
 
     case 'novitas':
@@ -471,6 +559,11 @@ Wichtig:
 - Verwende deutsche Datumsformate (TT.MM.JJJJ) außer für das "datum" Feld (JJJJ-MM-TT)
 - Falls Daten auf den Bildern/im Text fehlen, setze ""
 - Achte auf korrekte Schreibweisen und Formatierungen
+- Versichertennummer/KVNR immer im Format 1 Großbuchstabe + 9 Ziffern zurückgeben (z.B. A123456789), ohne Leerzeichen oder Bindestriche
+- Hauptmitglied: jede KVNR/eGK-Nummer ausschließlich in mitgliedKvNummer schreiben
+- Ehegatte/Kinder: eigene KVNR/eGK-Nummern ausschließlich in versichertennummer schreiben
+- Verwechsle KVNR/eGK-Nummern niemals mit IBAN, BIC, Kartennummern oder Vertragsnummern
+- Wenn mehrere Karten vorhanden sind, ordne die Nummer über den Namen auf der Karte der richtigen Person zu
 - Antworte NUR mit dem JSON`;
 
     // Build messages array based on input type
@@ -530,6 +623,7 @@ Wichtig:
         // Always use gemini-2.5-pro for visual content (supports images and PDFs)
         model: hasVisualContent ? 'google/gemini-2.5-pro' : 'google/gemini-2.5-flash',
         messages,
+        max_tokens: 8192,
       }),
     });
 
@@ -554,6 +648,10 @@ Wichtig:
     }
 
     const data = await response.json();
+    const finishReason = data.choices?.[0]?.finish_reason || data.stop_reason;
+    if (finishReason === 'length' || finishReason === 'max_tokens') {
+      throw new Error('KI-Antwort wurde abgeschnitten. Bitte mit weniger Dokumenten erneut versuchen.');
+    }
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
@@ -578,6 +676,8 @@ Wichtig:
         throw new Error('Kein gültiges JSON in der KI-Antwort gefunden');
       }
     }
+
+    normalizeInsuranceNumbersInPayload(extractedJson);
 
     console.log('Extraction complete, top-level fields:', Object.keys(extractedJson).length);
 

@@ -209,8 +209,9 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
 
   const handleImport = () => {
     try {
-      const rawParsed = JSON.parse(jsonInput);
+      const rawParsed = JSON.parse(jsonInput) as Partial<FormData> & Record<string, unknown>;
       const { data: parsed, warnings: numberWarnings } = normalizeInsuranceNumberData(rawParsed);
+      const parsedFormData = parsed as Partial<FormData>;
       
       if (typeof parsed !== 'object' || parsed === null) {
         throw new Error('Ungültiges JSON-Format');
@@ -221,10 +222,10 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
       const mappedData = applyKrankenkassenMapping(parsed, activeKrankenkasse as Krankenkasse, formData);
       
       // Synchronisierung: mitgliedVersichertennummer = mitgliedKvNummer
-      const mitgliedVersichertennummer = parsed.mitgliedKvNummer || parsed.mitgliedVersichertennummer || formData.mitgliedVersichertennummer;
+      const mitgliedVersichertennummer = parsedFormData.mitgliedKvNummer || parsedFormData.mitgliedVersichertennummer || formData.mitgliedVersichertennummer;
       
       // Synchronisierung: ehegatteKrankenkasse → vom mitgliedKrankenkasse falls nicht gesetzt
-      const ehegatteKrankenkasse = parsed.ehegatteKrankenkasse || parsed.mitgliedKrankenkasse || formData.ehegatteKrankenkasse;
+      const ehegatteKrankenkasse = parsedFormData.ehegatteKrankenkasse || parsedFormData.mitgliedKrankenkasse || formData.ehegatteKrankenkasse;
       
       setFormData({
         ...formData,
