@@ -11,6 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { createCombinedPdf, downloadBlob } from '@/utils/pdfUtils';
 import { formatDateForInput } from '@/utils/dateUtils';
 import { applyKrankenkassenMapping } from '@/utils/krankenkassenMapping';
+import { collectMissingInsuranceNumberWarnings, normalizeInsuranceNumberData } from '@/utils/insuranceNumbers';
 
 /**
  * Convert a File to base64 string (without data URL prefix)
@@ -503,7 +504,8 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       setAnalysisProgress(100);
 
       // Extract the actual form data (exclude improvedImages if present)
-      const { improvedImages, ...formDataFromAi } = data;
+      const { improvedImages, ...rawFormDataFromAi } = data;
+      const { data: formDataFromAi, warnings: numberWarnings } = normalizeInsuranceNumberData(rawFormDataFromAi);
       
       // Apply Krankenkassen-specific mapping
       const activeKrankenkasse = selectedKrankenkasse || formData.selectedKrankenkasse || '';
@@ -524,7 +526,13 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
         ehegatteKrankenkasse: ehegatteKrankenkasse,
       });
       
-      toast.success('Daten erfolgreich extrahiert und importiert!');
+      const missingWarnings = collectMissingInsuranceNumberWarnings(formDataFromAi, activeKrankenkasse as Krankenkasse, true);
+      const allNumberWarnings = [...numberWarnings, ...missingWarnings];
+      if (allNumberWarnings.length > 0) {
+        toast.warning(`Bitte prüfen: ${allNumberWarnings.join(' ')}`);
+      } else {
+        toast.success('Daten erfolgreich extrahiert und importiert!');
+      }
       setOpen(false);
       setJsonInput('');
       uploadedFiles.forEach(f => URL.revokeObjectURL(f.preview));
@@ -541,12 +549,15 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
 
   const handleImport = () => {
     try {
-      const parsed = JSON.parse(jsonInput) as FormData;
+      const rawParsed = JSON.parse(jsonInput) as FormData;
+      const { data: parsed, warnings: numberWarnings } = normalizeInsuranceNumberData(rawParsed as unknown as Record<string, unknown>);
       
       if (typeof parsed !== 'object' || parsed === null) {
         throw new Error('Ungültiges JSON-Format');
       }
       
+      const activeKrankenkasse = selectedKrankenkasse || formData.selectedKrankenkasse || '';
+
       // Immer heutiges Datum für Unterschrift setzen
       const todayForInput = formatDateForInput(new Date());
       
@@ -563,9 +574,11 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       // Synchronisierung: ehegatteKrankenkasse → vom mitgliedKrankenkasse falls nicht gesetzt
       const ehegatteKrankenkasse = parsed.ehegatteKrankenkasse || parsed.mitgliedKrankenkasse || formData.ehegatteKrankenkasse;
       
+      const mappedData = applyKrankenkassenMapping(parsed, activeKrankenkasse as Krankenkasse, formData);
+
       setFormData({
         ...formData,
-        ...parsed,
+        ...mappedData,
         datum: todayForInput, // Immer heutiges Datum
         mitgliedVersichertennummer: mitgliedVersichertennummer,
         ehegatteKrankenkasse: ehegatteKrankenkasse,
@@ -576,7 +589,13 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
           : formData.rundumSicherPaket,
       });
       
-      toast.success('JSON erfolgreich importiert!');
+      const missingWarnings = collectMissingInsuranceNumberWarnings(parsed, activeKrankenkasse as Krankenkasse, true);
+      const allNumberWarnings = [...numberWarnings, ...missingWarnings];
+      if (allNumberWarnings.length > 0) {
+        toast.warning(`JSON importiert. Bitte prüfen: ${allNumberWarnings.join(' ')}`);
+      } else {
+        toast.success('JSON erfolgreich importiert!');
+      }
       setOpen(false);
       setJsonInput('');
       uploadedFiles.forEach(f => URL.revokeObjectURL(f.preview));

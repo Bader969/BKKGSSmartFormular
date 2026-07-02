@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
 import { applyKrankenkassenMapping } from '@/utils/krankenkassenMapping';
+import { collectMissingInsuranceNumberWarnings, normalizeInsuranceNumberData } from '@/utils/insuranceNumbers';
 
 interface CopyBlockData {
   copyBlockMitglied: string;
@@ -177,7 +178,8 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
       toast.success('Daten erfolgreich extrahiert!');
 
       // Extract the actual form data (exclude improvedImages if present)
-      const { improvedImages, ...formDataFromAi } = data;
+      const { improvedImages, ...rawFormDataFromAi } = data;
+      const { data: formDataFromAi, warnings: numberWarnings } = normalizeInsuranceNumberData(rawFormDataFromAi);
       
       // Build copy blocks
       const mitgliedBlock = buildCopyBlock(data, 'mitglied');
@@ -188,6 +190,12 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
         copyBlockEhegatte: ehegatteBlock
       });
       
+      const missingWarnings = collectMissingInsuranceNumberWarnings(formDataFromAi, activeKrankenkasse as Krankenkasse, true);
+      const allNumberWarnings = [...numberWarnings, ...missingWarnings];
+      if (allNumberWarnings.length > 0) {
+        toast.warning(`Bitte prüfen: ${allNumberWarnings.join(' ')}`);
+      }
+
       setJsonInput(JSON.stringify(formDataFromAi, null, 2));
       
     } catch (error) {
@@ -201,7 +209,8 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
 
   const handleImport = () => {
     try {
-      const parsed = JSON.parse(jsonInput);
+      const rawParsed = JSON.parse(jsonInput);
+      const { data: parsed, warnings: numberWarnings } = normalizeInsuranceNumberData(rawParsed);
       
       if (typeof parsed !== 'object' || parsed === null) {
         throw new Error('Ungültiges JSON-Format');
@@ -224,7 +233,13 @@ export const FreitextImportDialog: React.FC<FreitextImportDialogProps> = ({ form
         ehegatteKrankenkasse: ehegatteKrankenkasse,
       });
       
-      toast.success('JSON erfolgreich importiert!');
+      const missingWarnings = collectMissingInsuranceNumberWarnings(parsed, activeKrankenkasse as Krankenkasse, true);
+      const allNumberWarnings = [...numberWarnings, ...missingWarnings];
+      if (allNumberWarnings.length > 0) {
+        toast.warning(`JSON importiert. Bitte prüfen: ${allNumberWarnings.join(' ')}`);
+      } else {
+        toast.success('JSON erfolgreich importiert!');
+      }
       setOpen(false);
       setJsonInput('');
       setFreitextInput('');

@@ -1,4 +1,15 @@
 import { FormData, Krankenkasse, FamilyMember, createEmptyFamilyMember } from '@/types/form';
+import { findInsuranceNumberAlias, normalizeInsuranceNumber } from '@/utils/insuranceNumbers';
+
+const useExtractedNumber = (extracted: unknown, current = '') => {
+  const normalized = normalizeInsuranceNumber(extracted);
+  return /^[A-Z]\d{9}$/.test(normalized) ? normalized : current;
+};
+
+const getPersonNumber = (person: unknown, current = '') => {
+  const normalized = findInsuranceNumberAlias(person);
+  return normalized || current;
+};
 
 /**
  * Applies Krankenkassen-specific mapping to extracted OCR data
@@ -13,7 +24,8 @@ export const applyKrankenkassenMapping = (
   const baseMapping: Partial<FormData> = {
     mitgliedVorname: extractedData.mitgliedVorname || currentFormData.mitgliedVorname,
     mitgliedName: extractedData.mitgliedName || currentFormData.mitgliedName,
-    mitgliedKvNummer: extractedData.mitgliedKvNummer || currentFormData.mitgliedKvNummer,
+    mitgliedKvNummer: useExtractedNumber(findInsuranceNumberAlias(extractedData), currentFormData.mitgliedKvNummer),
+    mitgliedVersichertennummer: useExtractedNumber(findInsuranceNumberAlias(extractedData), currentFormData.mitgliedVersichertennummer),
     mitgliedKrankenkasse: extractedData.mitgliedKrankenkasse || currentFormData.mitgliedKrankenkasse,
     familienstand: extractedData.familienstand || currentFormData.familienstand,
     telefon: extractedData.telefon || currentFormData.telefon,
@@ -50,6 +62,7 @@ export const applyKrankenkassenMapping = (
           ? {
               ...currentFormData.ehegatte,
               ...extractedData.ehegatte,
+              versichertennummer: getPersonNumber(extractedData.ehegatte, currentFormData.ehegatte.versichertennummer),
               bisherigBestehtWeiter: true,
               bisherigBestehtWeiterBei: 'BIG direkt gesund',
             }
@@ -58,6 +71,7 @@ export const applyKrankenkassenMapping = (
           ? extractedData.kinder.map((kind: Partial<FamilyMember>) => ({
               ...createEmptyFamilyMember(),
               ...kind,
+              versichertennummer: getPersonNumber(kind),
               bisherigBestehtWeiter: true,
               bisherigBestehtWeiterBei: 'BIG direkt gesund',
             }))
@@ -93,7 +107,7 @@ export const applyKrankenkassenMapping = (
           ? {
               ...currentFormData.ehegatte,
               ...extractedData.ehegatte,
-              versichertennummer: extractedData.ehegatte.versichertennummer || currentFormData.ehegatte.versichertennummer || '',
+              versichertennummer: getPersonNumber(extractedData.ehegatte, currentFormData.ehegatte.versichertennummer),
               bisherigBestehtWeiter: true,
             }
           : currentFormData.ehegatte,
@@ -102,7 +116,7 @@ export const applyKrankenkassenMapping = (
           ? extractedData.kinder.map((kind: Partial<FamilyMember>) => ({
               ...createEmptyFamilyMember(),
               ...kind,
-              versichertennummer: kind.versichertennummer || '',
+              versichertennummer: getPersonNumber(kind),
               bisherigBestehtWeiter: true,
               bisherigBestehtWeiterBei: '',
             }))
@@ -117,6 +131,7 @@ export const applyKrankenkassenMapping = (
           ? {
               ...currentFormData.ehegatte,
               ...extractedData.ehegatte,
+              versichertennummer: getPersonNumber(extractedData.ehegatte, currentFormData.ehegatte.versichertennummer),
               bisherigBestehtWeiter: true,
               bisherigVorname: extractedData.ehegatte.bisherigVorname || currentFormData.mitgliedVorname,
               bisherigNachname: extractedData.ehegatte.bisherigNachname || currentFormData.mitgliedName,
@@ -126,6 +141,7 @@ export const applyKrankenkassenMapping = (
           ? extractedData.kinder.map((kind: Partial<FamilyMember>) => ({
               ...createEmptyFamilyMember(),
               ...kind,
+              versichertennummer: getPersonNumber(kind),
               bisherigBestehtWeiter: true,
               bisherigBestehtWeiterBei: '',
             }))
@@ -144,6 +160,7 @@ export const applyKrankenkassenMapping = (
           ? {
               ...currentFormData.ehegatte,
               ...extractedData.ehegatte,
+              versichertennummer: getPersonNumber(extractedData.ehegatte, currentFormData.ehegatte.versichertennummer),
               bisherigBestehtWeiter: true,
             }
           : currentFormData.ehegatte,
@@ -151,6 +168,7 @@ export const applyKrankenkassenMapping = (
           ? extractedData.kinder.map((kind: Partial<FamilyMember>) => ({
               ...createEmptyFamilyMember(),
               ...kind,
+              versichertennummer: getPersonNumber(kind),
               bisherigBestehtWeiter: true,
               bisherigBestehtWeiterBei: '',
             }))
@@ -174,6 +192,7 @@ export const applyKrankenkassenMapping = (
           ? {
               ...currentFormData.ehegatte,
               ...extractedData.ehegatte,
+              versichertennummer: getPersonNumber(extractedData.ehegatte, currentFormData.ehegatte.versichertennummer),
               bisherigBestehtWeiter: true,
             }
           : currentFormData.ehegatte,
@@ -181,6 +200,7 @@ export const applyKrankenkassenMapping = (
           ? extractedData.kinder.map((kind: Partial<FamilyMember>) => ({
               ...createEmptyFamilyMember(),
               ...kind,
+              versichertennummer: getPersonNumber(kind),
               bisherigBestehtWeiter: true,
               bisherigBestehtWeiterBei: '',
             }))
