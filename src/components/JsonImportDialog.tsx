@@ -562,13 +562,6 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
       // Immer heutiges Datum für Unterschrift setzen
       const todayForInput = formatDateForInput(new Date());
       
-      // Bei Kindern immer bisherigBestehtWeiter = true, bisherigBestehtWeiterBei bleibt leer (wird dynamisch in UI gesetzt)
-      const processedKinder = parsedFormData.kinder?.map(kind => ({
-        ...kind,
-        bisherigBestehtWeiter: true,
-        bisherigBestehtWeiterBei: kind.bisherigBestehtWeiterBei || '',
-      })) || formData.kinder;
-      
       // Synchronisierung: mitgliedVersichertennummer = mitgliedKvNummer
       const mitgliedVersichertennummer = parsedFormData.mitgliedKvNummer || parsedFormData.mitgliedVersichertennummer || formData.mitgliedVersichertennummer;
       
@@ -583,8 +576,6 @@ export const JsonImportDialog: React.FC<JsonImportDialogProps> = ({ formData, se
         datum: todayForInput, // Immer heutiges Datum
         mitgliedVersichertennummer: mitgliedVersichertennummer,
         ehegatteKrankenkasse: ehegatteKrankenkasse,
-        ehegatte: parsedFormData.ehegatte ? { ...formData.ehegatte, ...parsedFormData.ehegatte } : formData.ehegatte,
-        kinder: processedKinder,
         rundumSicherPaket: parsedFormData.rundumSicherPaket
           ? { ...formData.rundumSicherPaket, ...parsedFormData.rundumSicherPaket }
           : formData.rundumSicherPaket,
