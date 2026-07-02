@@ -1,5 +1,7 @@
 // Validierungsregeln für das Formular
 
+import { isValidInsuranceNumber, normalizeInsuranceNumber } from './insuranceNumbers';
+
 export interface ValidationResult {
   isValid: boolean;
   message?: string;
@@ -76,12 +78,8 @@ export const validateKvNummer = (value: string): ValidationResult => {
   if (!value.trim()) {
     return { isValid: false, message: 'Dieses Feld ist erforderlich' };
   }
-  // Entferne Leerzeichen für die Validierung
-  const cleanValue = value.replace(/\s/g, '');
-  // Mindestens 8 Zeichen, alphanumerisch
-  const regex = /^[A-Za-z0-9]{8,15}$/;
-  if (!regex.test(cleanValue)) {
-    return { isValid: false, message: 'KV-Nummer: 8-15 alphanumerische Zeichen' };
+  if (!isValidInsuranceNumber(value)) {
+    return { isValid: false, message: 'Format: 1 Buchstabe + 9 Ziffern (z.B. A123456789)' };
   }
   return { isValid: true };
 };
@@ -91,11 +89,8 @@ export const validateVersichertennummer = (value: string): ValidationResult => {
   if (!value.trim()) {
     return { isValid: false, message: 'Dieses Feld ist erforderlich' };
   }
-  const cleanValue = value.replace(/\s/g, '');
-  // Typisches Format: Buchstabe + 9 Ziffern
-  const regex = /^[A-Za-z][0-9]{9}$/;
-  if (!regex.test(cleanValue)) {
-    return { isValid: false, message: 'Format: 1 Buchstabe + 9 Ziffern (z.B. A123456789)' };
+  if (!isValidInsuranceNumber(value)) {
+    return { isValid: false, message: `Format: 1 Buchstabe + 9 Ziffern (erkannt: ${normalizeInsuranceNumber(value) || 'leer'})` };
   }
   return { isValid: true };
 };
