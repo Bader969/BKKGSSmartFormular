@@ -11,6 +11,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { NATIONALITY_OPTIONS, COUNTRY_OPTIONS } from '@/utils/countries';
 import { calculateDates } from '@/utils/dateUtils';
 import { ViactivBeschaeftigung } from '@/types/form';
+import { normalizeInsuranceNumber } from '@/utils/insuranceNumbers';
 
 interface ViactivSectionProps {
   formData: FormData;
@@ -455,7 +456,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                 label="Versichertennummer"
                 id="viactiv-ehegatte-versichertennummer"
                 value={formData.ehegatte.versichertennummer}
-                onChange={(value) => updateEhegatte({ versichertennummer: value })}
+                onChange={(value) => updateEhegatte({ versichertennummer: normalizeInsuranceNumber(value) })}
                 placeholder="Versichertennummer"
                 required
               />
@@ -633,7 +634,7 @@ export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, update
                         label="Versichertennummer"
                         id={`viactiv-kind${index}-versichertennummer`}
                         value={kind.versichertennummer}
-                        onChange={(value) => updateKind(index, { versichertennummer: value })}
+                        onChange={(value) => updateKind(index, { versichertennummer: normalizeInsuranceNumber(value) })}
                         placeholder="Versichertennummer"
                         required
                       />

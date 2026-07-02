@@ -36,6 +36,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { VERTRIEBSPARTNER_OPTIONS, VP_STORAGE_KEY, CUSTOM_VP_VALUE } from '@/utils/vertriebspartner';
 import { randomPoliceBetrag, parseEuro } from '@/utils/bigRandom';
 import { Input } from '@/components/ui/input';
+import { normalizeInsuranceNumber } from '@/utils/insuranceNumbers';
 
 const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
@@ -267,7 +268,9 @@ const Index = () => {
       
       // Automatische Synchronisierung der KV-Nummer zur Mitglied-Versichertennummer
       if ('mitgliedKvNummer' in updates) {
-        newData.mitgliedVersichertennummer = updates.mitgliedKvNummer as string;
+        const normalizedKvNumber = normalizeInsuranceNumber(updates.mitgliedKvNummer);
+        newData.mitgliedKvNummer = normalizedKvNumber;
+        newData.mitgliedVersichertennummer = normalizedKvNumber;
       }
       
       // Automatische Synchronisierung des Bonus-Kontoinhabers mit Hauptmitglied-Name

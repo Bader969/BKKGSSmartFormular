@@ -3,6 +3,7 @@ import { FormField } from './FormField';
 import { FamilyMember, Krankenkasse } from '@/types/form';
 import { calculateDates } from '@/utils/dateUtils';
 import { COUNTRY_OPTIONS, NATIONALITY_OPTIONS } from '@/utils/countries';
+import { normalizeInsuranceNumber } from '@/utils/insuranceNumbers';
 import { 
   validateName, 
   validateGeburtsdatum, 
@@ -162,7 +163,7 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
             label="Versichertennummer"
             id={`${prefix}-versichertennummer`}
             value={member.versichertennummer}
-            onChange={(value) => updateMember({ versichertennummer: value })}
+            onChange={(value) => updateMember({ versichertennummer: normalizeInsuranceNumber(value) })}
             placeholder="Versichertennummer"
             required
             validate={validateVersichertennummer}

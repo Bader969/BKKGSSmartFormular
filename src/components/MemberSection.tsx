@@ -4,6 +4,7 @@ import { FormField } from './FormField';
 import { FormData } from '@/types/form';
 import { CopyBlockButton } from './CopyBlockButton';
 import { countries } from '@/utils/countries';
+import { normalizeInsuranceNumber } from '@/utils/insuranceNumbers';
 import { 
   validateName, 
   validateGeburtsdatum, 
@@ -167,8 +168,8 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           id="mitgliedKvNummer"
           value={formData.mitgliedKvNummer}
           onChange={(value) => updateFormData({ 
-            mitgliedKvNummer: value,
-            mitgliedVersichertennummer: value  // Synchronisiert mit Versichertennr. im Rundum-Sicher-Paket
+            mitgliedKvNummer: normalizeInsuranceNumber(value),
+            mitgliedVersichertennummer: normalizeInsuranceNumber(value)  // Synchronisiert mit Versichertennr. im Rundum-Sicher-Paket
           })}
           placeholder="Krankenversicherungsnummer"
           required
