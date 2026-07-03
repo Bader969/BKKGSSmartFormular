@@ -314,6 +314,7 @@ async function callOcr(
             selectedKrankenkasse: krankenkasse,
             text: contextText,
             images: batch,
+            fastOcr: true,
           }),
           signal: ctl.signal,
         });
@@ -529,6 +530,24 @@ Deno.serve(async (req) => {
     "";
   if (!INTAKE_SECRET || secret !== INTAKE_SECRET) {
     return json(401, { error: "unauthorized" });
+  }
+
+  if (url.searchParams.get("rescan_block_id")) {
+    const targetBlockId = url.searchParams.get("rescan_block_id")!;
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+    const { data: blockRows, error: blockErr } = await admin
+      .from("whatsapp_inbox_messages")
+      .select("id, wa_message_id, type, text, media_url, media_mime, received_at, block_id, processed_at")
+      .eq("block_id", targetBlockId)
+      .order("received_at", { ascending: true });
+
+    if (blockErr) return json(500, { error: "rescan_read_failed" });
+    const contentRows = ((blockRows ?? []) as BufferRow[]).filter((r) => r.type !== "dot");
+    if (!contentRows.length) return json(404, { error: "block_not_found" });
+
+    const freshBlockId = crypto.randomUUID();
+    const res = await processRowsAsBlock(admin, contentRows[0].chat_id ?? ALLOWED_CHAT_ID, contentRows, [], freshBlockId, false);
+    return json(200, { ok: true, rescan: true, previousBlockId: targetBlockId, ...res });
   }
 
   let raw: unknown;
