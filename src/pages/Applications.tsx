@@ -233,6 +233,9 @@ export default function Applications() {
                 <TableRow key={r.id} className={`cursor-pointer ${isSub ? "bg-muted/30" : ""}`} onClick={() => setSelected(r)}>
                   <TableCell>
                     <Badge variant={isSub ? "outline" : "secondary"} className="text-xs">{typLabel}</Badge>
+                    {!isSub && r.source === "whatsapp" && (
+                      <Badge variant="outline" className="text-xs ml-1 border-green-500 text-green-700 dark:text-green-400">WhatsApp</Badge>
+                    )}
                   </TableCell>
                   <TableCell className={`font-medium ${isSub ? "pl-6" : ""}`}>{r.krankenkasse}</TableCell>
                   <TableCell>
