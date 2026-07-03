@@ -1,0 +1,1 @@
+DROP TRIGGER IF EXISTS application_events_no_delete ON public.application_events;
