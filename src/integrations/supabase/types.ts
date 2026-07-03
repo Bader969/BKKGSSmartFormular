@@ -144,6 +144,7 @@ export type Database = {
           created_at: string
           exported_at: string | null
           id: string
+          intake_meta: Json
           krankenkasse: string
           last_opened_at: string | null
           parent_application_id: string | null
@@ -153,6 +154,7 @@ export type Database = {
           pdf_count: number
           person_index: number | null
           person_role: string | null
+          source: string
           status: string
           updated_at: string
           user_id: string
@@ -165,6 +167,7 @@ export type Database = {
           created_at?: string
           exported_at?: string | null
           id?: string
+          intake_meta?: Json
           krankenkasse: string
           last_opened_at?: string | null
           parent_application_id?: string | null
@@ -174,6 +177,7 @@ export type Database = {
           pdf_count?: number
           person_index?: number | null
           person_role?: string | null
+          source?: string
           status?: string
           updated_at?: string
           user_id: string
@@ -186,6 +190,7 @@ export type Database = {
           created_at?: string
           exported_at?: string | null
           id?: string
+          intake_meta?: Json
           krankenkasse?: string
           last_opened_at?: string | null
           parent_application_id?: string | null
@@ -195,6 +200,7 @@ export type Database = {
           pdf_count?: number
           person_index?: number | null
           person_role?: string | null
+          source?: string
           status?: string
           updated_at?: string
           user_id?: string
@@ -282,6 +288,48 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_inbox_messages: {
+        Row: {
+          block_id: string | null
+          chat_id: string
+          created_at: string
+          id: string
+          media_mime: string | null
+          media_url: string | null
+          processed_at: string | null
+          received_at: string
+          text: string | null
+          type: string
+          wa_message_id: string
+        }
+        Insert: {
+          block_id?: string | null
+          chat_id: string
+          created_at?: string
+          id?: string
+          media_mime?: string | null
+          media_url?: string | null
+          processed_at?: string | null
+          received_at?: string
+          text?: string | null
+          type: string
+          wa_message_id: string
+        }
+        Update: {
+          block_id?: string | null
+          chat_id?: string
+          created_at?: string
+          id?: string
+          media_mime?: string | null
+          media_url?: string | null
+          processed_at?: string | null
+          received_at?: string
+          text?: string | null
+          type?: string
+          wa_message_id?: string
         }
         Relationships: []
       }
