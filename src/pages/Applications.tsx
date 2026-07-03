@@ -24,6 +24,7 @@ export default function Applications() {
   const [search, setSearch] = useState("");
   const [kkFilter, setKkFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [selected, setSelected] = useState<ApplicationRow | null>(null);
 
   const reload = () => {
@@ -43,6 +44,7 @@ export default function Applications() {
     if (kkFilter !== "all" && r.krankenkasse !== kkFilter) return false;
     // Status filter applies only to parent entries; sub-entries follow parent.
     if (statusFilter !== "all" && !r.parent_application_id && r.status !== statusFilter) return false;
+    if (sourceFilter !== "all" && !r.parent_application_id && (r.source ?? "manual") !== sourceFilter) return false;
     if (search) {
       const s = search.toLowerCase();
       const haystacks = [
@@ -57,7 +59,7 @@ export default function Applications() {
       if (!haystacks.some((h) => h.toLowerCase().includes(s))) return false;
     }
     return true;
-  }), [rows, kkFilter, statusFilter, search, emails, displayNames]);
+  }), [rows, kkFilter, statusFilter, sourceFilter, search, emails, displayNames]);
 
   // Group sub-entries under their parent, preserving the existing top-level sort order.
   const grouped = useMemo(() => {
@@ -172,6 +174,17 @@ export default function Applications() {
                 <SelectItem value="all">Alle</SelectItem>
                 <SelectItem value="draft">Entwurf</SelectItem>
                 <SelectItem value="exported">Exportiert</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full md:w-40">
+            <label className="text-xs text-muted-foreground">Herkunft</label>
+            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle</SelectItem>
+                <SelectItem value="manual">Manuell</SelectItem>
+                <SelectItem value="whatsapp">WhatsApp</SelectItem>
               </SelectContent>
             </Select>
           </div>
