@@ -410,10 +410,23 @@ async function processBlock(
 // ---------- HTTP handler ----------
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  // Health check for WHAPI "Check webhook" and browser pings
+  if (req.method === "GET" || req.method === "HEAD") {
+    return json(200, { ok: true, service: "whatsapp-intake" });
+  }
   if (req.method !== "POST") return json(405, { error: "method_not_allowed" });
 
-  const secret = req.headers.get("x-intake-secret") ?? "";
-  if (!INTAKE_SECRET || secret !== INTAKE_SECRET) return json(401, { error: "unauthorized" });
+  // Accept secret via header (preferred) or query param (?s=... fallback for tools
+  // that can't set custom headers on the health check).
+  const url = new URL(req.url);
+  const secret =
+    req.headers.get("x-intake-secret") ??
+    url.searchParams.get("s") ??
+    url.searchParams.get("secret") ??
+    "";
+  if (!INTAKE_SECRET || secret !== INTAKE_SECRET) {
+    return json(401, { error: "unauthorized" });
+  }
 
   let raw: unknown;
   try { raw = await req.json(); } catch { return json(400, { error: "invalid_json" }); }
