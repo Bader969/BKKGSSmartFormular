@@ -459,6 +459,29 @@ async function processRowsAsBlock(
       email: (emailRow?.text ?? "").trim() || ocr.email || "",
     };
 
+    // ---------- Auto-Ableitungen aus Familienerkennung ----------
+    const eh = payload.ehegatte as Record<string, unknown> | undefined;
+    const kinder = Array.isArray(payload.kinder) ? (payload.kinder as unknown[]) : [];
+    const hasSpouse = !!(eh && (eh.vorname || eh.name));
+    const hasChildren = kinder.length > 0;
+    const hasFamily = hasSpouse || hasChildren;
+
+    if (hasSpouse && !payload.familienstand) {
+      payload.familienstand = "verheiratet";
+    }
+
+    const kk = payload.selectedKrankenkasse;
+    if (hasFamily) {
+      if (kk === "big_plusbonus") {
+        payload.bigFamilienversicherung = true;
+        if (!payload.bigMitgliedBeschaeftigt) payload.bigMitgliedBeschaeftigt = "beschaeftigt";
+      } else if (kk === "viactiv") {
+        payload.viactivFamilienangehoerigeMitversichern = true;
+      } else if (kk === "bkk_gs" && !payload.mode) {
+        payload.mode = "familienversicherung_und_rundum";
+      }
+    }
+
     const { ivHex, ctHex, hash } = await encryptPayload(payload);
     const antragsform = parsed.krankenkasseLabel || parsed.krankenkasse || "WhatsApp-Intake";
     const applicantName = String(payload.mitgliedName ?? "").slice(0, 120) || null;
