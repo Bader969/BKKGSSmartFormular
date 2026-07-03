@@ -12,6 +12,7 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ENC_SECRET = Deno.env.get("APPLICATIONS_ENCRYPTION_KEY")!;
 const INTAKE_SECRET = Deno.env.get("WHATSAPP_INTAKE_SECRET")!;
 const WHAPI_TOKEN = Deno.env.get("WHAPI_TOKEN") ?? "";
+const ALLOWED_CHAT_ID = Deno.env.get("WHATSAPP_ALLOWED_CHAT_ID") ?? "";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
