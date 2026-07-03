@@ -140,6 +140,7 @@ function extractMessages(payload: unknown): IntakeMsg[] {
 // Ein Block ist alles zwischen zwei Trenner-Gruppen.
 type BufferRow = {
   id: string;
+  chat_id?: string;
   wa_message_id: string;
   type: MsgType;
   text: string | null;
@@ -282,6 +283,7 @@ async function resolveOwnerUserId(admin: ReturnType<typeof createClient>): Promi
 // ---------- Block processing ----------
 async function callOcr(
   krankenkasse: string,
+  contextText: string,
   images: Array<{ base64: string; mimeType: string }>,
   warnings: string[],
 ): Promise<Record<string, unknown>> {
@@ -308,7 +310,13 @@ async function callOcr(
             Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ mode: "member", selectedKrankenkasse: krankenkasse, images: batch }),
+          body: JSON.stringify({
+            mode: "member",
+            selectedKrankenkasse: krankenkasse,
+            text: contextText,
+            images: batch,
+            fastOcr: true,
+          }),
           signal: ctl.signal,
         });
         lastStatus = r.status;
@@ -335,13 +343,20 @@ async function callOcr(
   return merged;
 }
 
-// Split rows into per-header groups. Images/pdfs go with the CURRENT header
-// (the last header seen at that point). phone/email are block-wide (shared).
-// If no header appears yet, media falls into the first header's group.
+// Split rows into per-header groups. If all media appears before multiple headers,
+// treat it as shared evidence and process it for every person. Otherwise media goes
+// with the current header (the last header seen at that point).
 function splitByHeader(rows: BufferRow[]): Array<{ header: BufferRow; media: BufferRow[] }> {
   const headers = rows.filter((r) => r.type === "header");
   if (!headers.length) return [];
   const groups = headers.map((h) => ({ header: h, media: [] as BufferRow[] }));
+  const mediaRows = rows.filter((r) => r.type === "image" || r.type === "pdf");
+  const firstHeaderIndex = rows.findIndex((r) => r.type === "header");
+  const lastMediaIndex = rows.map((r, i) => ({ r, i })).filter(({ r }) => r.type === "image" || r.type === "pdf").at(-1)?.i ?? -1;
+  if (headers.length > 1 && mediaRows.length > 0 && lastMediaIndex < firstHeaderIndex) {
+    for (const group of groups) group.media.push(...mediaRows);
+    return groups;
+  }
   let curIdx = 0;
   let seenHeader = false;
   for (const r of rows) {
@@ -357,35 +372,38 @@ function splitByHeader(rows: BufferRow[]): Array<{ header: BufferRow; media: Buf
   return groups;
 }
 
-async function processBlock(
+async function processRowsAsBlock(
   admin: ReturnType<typeof createClient>,
   chatId: string,
   rows: BufferRow[],
   separatorIds: string[],
+  blockId = crypto.randomUUID(),
+  claimRows = true,
 ) {
-  const blockId = crypto.randomUUID();
   const warnings: string[] = [];
 
   // Atomically claim ALL block rows (content + separators) by setting block_id
   // ONLY where block_id is still null. If another concurrent invocation already
   // claimed them, we get 0 updated rows and bail out — prevents duplicate drafts.
   const allIds = [...rows.map((r) => r.id), ...separatorIds];
-  const { data: claimed, error: claimErr } = await admin
-    .from("whatsapp_inbox_messages")
-    .update({ block_id: blockId })
-    .in("id", allIds)
-    .is("block_id", null)
-    .select("id");
-  if (claimErr) {
-    console.error("claim failed", claimErr.message);
-    return { blockId, warnings: ["claim failed"], applicationIds: [] as string[] };
-  }
-  if (!claimed || claimed.length < allIds.length) {
-    console.log("block already claimed by another invocation, skipping", {
-      expected: allIds.length,
-      claimed: claimed?.length ?? 0,
-    });
-    return { blockId, warnings: ["already claimed"], applicationIds: [] as string[] };
+  if (claimRows) {
+    const { data: claimed, error: claimErr } = await admin
+      .from("whatsapp_inbox_messages")
+      .update({ block_id: blockId })
+      .in("id", allIds)
+      .is("block_id", null)
+      .select("id");
+    if (claimErr) {
+      console.error("claim failed", claimErr.message);
+      return { blockId, warnings: ["claim failed"], applicationIds: [] as string[] };
+    }
+    if (!claimed || claimed.length < allIds.length) {
+      console.log("block already claimed by another invocation, skipping", {
+        expected: allIds.length,
+        claimed: claimed?.length ?? 0,
+      });
+      return { blockId, warnings: ["already claimed"], applicationIds: [] as string[] };
+    }
   }
 
   const phoneRow = rows.find((r) => r.type === "phone");
@@ -417,7 +435,15 @@ async function processBlock(
       else personWarnings.push("Bild konnte nicht geladen werden.");
     }
 
-    const ocr = await callOcr(parsed.krankenkasse, images, personWarnings);
+    const contextText = [
+      `Zielperson: ${parsed.vorname} ${parsed.name}`.trim(),
+      parsed.datum ? `Antragsdatum: ${parsed.datum}` : "",
+      parsed.krankenkasseLabel ? `Krankenkasse/Zielantrag: ${parsed.krankenkasseLabel}` : "",
+      parsed.vertriebspartner ? `Vertriebspartner: ${parsed.vertriebspartner}` : "",
+      phoneRow?.text ? `Telefon: ${phoneRow.text.trim()}` : "",
+      emailRow?.text ? `Email: ${emailRow.text.trim()}` : "",
+    ].filter(Boolean).join("\n");
+    const ocr = await callOcr(parsed.krankenkasse, contextText, images, personWarnings);
 
     const payload: Record<string, unknown> = {
       ...ocr,
@@ -481,12 +507,23 @@ async function processBlock(
   }
 
   // Mark buffer rows as processed
-  await admin
-    .from("whatsapp_inbox_messages")
-    .update({ processed_at: new Date().toISOString() })
-    .in("id", allIds);
+  if (claimRows) {
+    await admin
+      .from("whatsapp_inbox_messages")
+      .update({ processed_at: new Date().toISOString() })
+      .in("id", allIds);
+  }
 
   return { blockId, warnings, applicationIds };
+}
+
+async function processBlock(
+  admin: ReturnType<typeof createClient>,
+  chatId: string,
+  rows: BufferRow[],
+  separatorIds: string[],
+) {
+  return processRowsAsBlock(admin, chatId, rows, separatorIds);
 }
 
 // ---------- HTTP handler ----------
@@ -508,6 +545,24 @@ Deno.serve(async (req) => {
     "";
   if (!INTAKE_SECRET || secret !== INTAKE_SECRET) {
     return json(401, { error: "unauthorized" });
+  }
+
+  if (url.searchParams.get("rescan_block_id")) {
+    const targetBlockId = url.searchParams.get("rescan_block_id")!;
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+    const { data: blockRows, error: blockErr } = await admin
+      .from("whatsapp_inbox_messages")
+      .select("id, wa_message_id, type, text, media_url, media_mime, received_at, block_id, processed_at")
+      .eq("block_id", targetBlockId)
+      .order("received_at", { ascending: true });
+
+    if (blockErr) return json(500, { error: "rescan_read_failed" });
+    const contentRows = ((blockRows ?? []) as BufferRow[]).filter((r) => r.type !== "dot");
+    if (!contentRows.length) return json(404, { error: "block_not_found" });
+
+    const freshBlockId = crypto.randomUUID();
+    const res = await processRowsAsBlock(admin, contentRows[0].chat_id ?? ALLOWED_CHAT_ID, contentRows, [], freshBlockId, false);
+    return json(200, { ok: true, rescan: true, previousBlockId: targetBlockId, ...res });
   }
 
   let raw: unknown;

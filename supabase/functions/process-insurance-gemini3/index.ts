@@ -493,7 +493,7 @@ serve(async (req) => {
   }
 
   try {
-    // Require authenticated caller
+    // Require authenticated caller, or trusted server-to-server calls from internal intake functions.
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
@@ -501,22 +501,27 @@ serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
     const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const isTrustedServerCall = Boolean(serviceRoleKey && token === serviceRoleKey);
+
+    if (!isTrustedServerCall) {
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_ANON_KEY')!,
+        { global: { headers: { Authorization: authHeader } } }
       );
+      const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+      if (claimsError || !claimsData?.claims) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     const body = await req.json();
-    const { text, images, mode, selectedKrankenkasse } = body;
+    const { text, images, mode, selectedKrankenkasse, fastOcr } = body;
     
     // Validate input - either text or images required
     if ((!text || typeof text !== 'string') && (!images || !Array.isArray(images) || images.length === 0)) {
@@ -600,7 +605,12 @@ Wichtig:
         { 
           role: 'user', 
           content: [
-            { type: 'text', text: 'Analysiere diese Dokumente (Bilder und/oder PDFs) und extrahiere alle Versicherungsdaten:' },
+            {
+              type: 'text',
+              text: `${typeof text === 'string' && text.trim()
+                ? `Kontext zur Zielperson und zum Antrag:\n${text.trim()}\n\n`
+                : ''}Analysiere diese Dokumente (Bilder und/oder PDFs) und extrahiere alle Versicherungsdaten für genau diese Zielperson. Wenn mehrere Personen sichtbar sind, ordne die Daten anhand des Kontextes zu:`
+            },
             ...fileContents
           ]
         }
@@ -620,8 +630,8 @@ Wichtig:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        // Always use gemini-2.5-pro for visual content (supports images and PDFs)
-        model: hasVisualContent ? 'google/gemini-2.5-pro' : 'google/gemini-2.5-flash',
+        // WhatsApp intake uses fast OCR to avoid backend timeouts on multi-image blocks.
+        model: hasVisualContent && !fastOcr ? 'google/gemini-2.5-pro' : 'google/gemini-2.5-flash',
         messages,
         max_tokens: 8192,
       }),
