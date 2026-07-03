@@ -84,8 +84,8 @@ export function ApplicationDetailDrawer({
     if (!application) return;
     setBusy(true);
     try {
-      const { payload } = await decrypt(application.id) as { payload: Record<string, unknown> };
-      const f = payload as Record<string, unknown>;
+      const { payload } = await decrypt(application.id);
+      const f = payload as unknown as Record<string, unknown>;
       const bank = (f.bigBank as Record<string, string> | undefined) ?? {};
       const eh = (f.ehegatte as Record<string, string> | undefined) ?? {};
       const kinder = (f.kinder as Array<Record<string, string>> | undefined) ?? [];
