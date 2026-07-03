@@ -282,6 +282,7 @@ async function resolveOwnerUserId(admin: ReturnType<typeof createClient>): Promi
 // ---------- Block processing ----------
 async function callOcr(
   krankenkasse: string,
+  contextText: string,
   images: Array<{ base64: string; mimeType: string }>,
   warnings: string[],
 ): Promise<Record<string, unknown>> {
@@ -308,7 +309,12 @@ async function callOcr(
             Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ mode: "member", selectedKrankenkasse: krankenkasse, images: batch }),
+          body: JSON.stringify({
+            mode: "member",
+            selectedKrankenkasse: krankenkasse,
+            text: contextText,
+            images: batch,
+          }),
           signal: ctl.signal,
         });
         lastStatus = r.status;
@@ -335,13 +341,20 @@ async function callOcr(
   return merged;
 }
 
-// Split rows into per-header groups. Images/pdfs go with the CURRENT header
-// (the last header seen at that point). phone/email are block-wide (shared).
-// If no header appears yet, media falls into the first header's group.
+// Split rows into per-header groups. If all media appears before multiple headers,
+// treat it as shared evidence and process it for every person. Otherwise media goes
+// with the current header (the last header seen at that point).
 function splitByHeader(rows: BufferRow[]): Array<{ header: BufferRow; media: BufferRow[] }> {
   const headers = rows.filter((r) => r.type === "header");
   if (!headers.length) return [];
   const groups = headers.map((h) => ({ header: h, media: [] as BufferRow[] }));
+  const mediaRows = rows.filter((r) => r.type === "image" || r.type === "pdf");
+  const firstHeaderIndex = rows.findIndex((r) => r.type === "header");
+  const lastMediaIndex = rows.map((r, i) => ({ r, i })).filter(({ r }) => r.type === "image" || r.type === "pdf").at(-1)?.i ?? -1;
+  if (headers.length > 1 && mediaRows.length > 0 && lastMediaIndex < firstHeaderIndex) {
+    for (const group of groups) group.media.push(...mediaRows);
+    return groups;
+  }
   let curIdx = 0;
   let seenHeader = false;
   for (const r of rows) {
@@ -417,7 +430,15 @@ async function processBlock(
       else personWarnings.push("Bild konnte nicht geladen werden.");
     }
 
-    const ocr = await callOcr(parsed.krankenkasse, images, personWarnings);
+    const contextText = [
+      `Zielperson: ${parsed.vorname} ${parsed.name}`.trim(),
+      parsed.datum ? `Antragsdatum: ${parsed.datum}` : "",
+      parsed.krankenkasseLabel ? `Krankenkasse/Zielantrag: ${parsed.krankenkasseLabel}` : "",
+      parsed.vertriebspartner ? `Vertriebspartner: ${parsed.vertriebspartner}` : "",
+      phoneRow?.text ? `Telefon: ${phoneRow.text.trim()}` : "",
+      emailRow?.text ? `Email: ${emailRow.text.trim()}` : "",
+    ].filter(Boolean).join("\n");
+    const ocr = await callOcr(parsed.krankenkasse, contextText, images, personWarnings);
 
     const payload: Record<string, unknown> = {
       ...ocr,
