@@ -1,48 +1,56 @@
+## Ziel
 
-## Was ist passiert (Analyse der letzten Aufnahme)
+Nach WhatsApp-OCR sollen erkannte Familienmitglieder direkt korrekt im Editor landen — inkl. „Ja" bei Ehegatten-Frage und aktivierter Antragsvariante „Familienversicherung" (BIG). OCR/KI-Prompts werden verstärkt, damit Rollen (Mitglied / Ehegatte / Vater / Mutter / Kinder) und Familienstand zuverlässig erkannt werden.
 
-Aus DB + Edge-Logs für Block `80fc6010…` (heute 14:10–14:14):
+## 1. Rollen-Erkennung im OCR-Prompt verstärken (alle Kassen)
 
-- **Block korrekt geschlossen** zwischen den zwei „...“-Trennern. 8 Bilder + 1 Telefon + 1 E-Mail + **2 Header** (Fatema, Mahmoud) wurden gepuffert und atomar geclaimed.
-- **OCR ist NICHT durchgelaufen.** Der Aufruf an `process-insurance-gemini3` lieferte HTTP **504 (Gateway Timeout)**. Warnings im `intake_meta`: `"OCR fehlgeschlagen (Status 504)."` Es kam also **kein JSON** aus dem Modell zurück — nichts wurde per OCR in Felder eingetragen.
-- **Nur 1 Entwurf statt 2 gespeichert.** Der Code liest im Block nur den **ersten** Header (`rows.find(type==="header")`) und erzeugt genau eine `applications`-Zeile. Fatema wurde gespeichert, **Mahmoud ignoriert**, obwohl klar ein zweiter Header + eigener Bildersatz drin war.
-- **Gespeichert wurde nur der Header:** Vorname, Name, Datum, Krankenkasse (`big_plusbonus`), Vertriebspartner (Gh Blitzvox), Telefon, E-Mail — payload ist nur ~255 Bytes.
-- **Zweiter, älterer Draft** (`3846f7f0…`, 14:09) stammt aus einem früheren Versand vor dem Deduplizierungs-Fix und hat ebenfalls ein OCR-504.
+`supabase/functions/process-insurance-gemini3/index.ts`
 
-## Warum lädt der Antrag nicht in den Editor?
+Gemeinsame Rollen-Heuristik als Prompt-Baustein an jeden Kassen-Prompt anhängen:
+- Zielperson (Mitglied) steht im WhatsApp-Header — jene Person hat i. d. R. die eGK / Personalausweis
+- Erwachsene mit gleicher Adresse & abweichendem Nachnamen/gleichem Nachnamen + Geburtsdatum-Nähe → Ehegatte/Lebenspartner
+- Minderjährige (Geburtsdatum < 18 J. vor heute) mit gleicher Adresse → Kinder, Verwandtschaft `leiblich` als Default
+- Aus Ausweis-Feld „Familienstand" oder Heiratsurkunde → `familienstand` setzen; wenn Ehegatte erkannt aber Feld fehlt → `familienstand: verheiratet`
+- Geschlecht aus Anrede/Vorname/Ausweis
+- Vater = männlicher erwachsener Elternteil, Mutter = weiblicher — für Kinder in `verwandtschaft` `leiblich` bleibt Default; Elternrolle wird über Geschlecht + Familienstand des Mitglieds abgebildet, nicht über eigenes Feld
+- Explizit: „Wenn mehrere Personen erkennbar, IMMER alle in `ehegatte` bzw. `kinder[]` befüllen, niemals nur das Mitglied."
 
-Der Load-Pfad (`ApplicationDetailDrawer.handleLoad` → `decrypt` → `sessionStorage` → `Index.tsx` Hydrate) ist grundsätzlich intakt. Bei einem Payload mit nur den Header-Feldern *sollte* der Editor die Krankenkasse setzen und die Namensfelder füllen. Ich muss vor dem Fix noch einmal live prüfen, ob (a) `decrypt` bereits einen Fehler wirft, oder (b) das Payload zwar landet, aber im UI leer wirkt, weil außer Name/KK nichts drin ist. Beides fixe ich unten.
+Zusätzlich Modell-Wechsel: aktueller Fast-Modus nutzt `flash`. Ergänzen: wenn `images.length <= 4` oder Rescan-Modus → `gemini-2.5-pro` für maximale Qualität; sonst `flash` (Timeout-Schutz bleibt).
 
-## Plan
+## 2. Payload-Post-Processing im Intake
 
-### 1. Mehr-Personen-Block: pro Header 1 Antrag
-`whatsapp-intake/index.ts → processBlock`:
-- Header-Zeilen einsammeln (`headers = rows.filter(type==="header")`) statt nur die erste.
-- Bilder chronologisch den Headern zuordnen: alle Bilder vor Header[1] gehören zu Header[0], usw. (Telefon/E-Mail bleiben blockweit gemeinsam, weil im Screenshot nur einmal gesendet).
-- OCR + Insert pro Header ausführen, jeweils eigenen `applications`-Eintrag; alle teilen `intake_meta.block_id`.
-- Wenn nur 1 Header vorhanden: Verhalten unverändert.
+`supabase/functions/whatsapp-intake/index.ts` → `processBlock`, direkt vor `encryptPayload`:
 
-### 2. OCR-Timeout robuster machen
-`whatsapp-intake/index.ts`:
-- Timeout auf den OCR-Fetch (AbortController, ~110 s) und **einmaliges Retry** bei 5xx/Timeout.
-- Bei Bild-Batches >6 Bilder: OCR in Chunks von 6 Bildern splitten und die JSON-Ergebnisse feldweise mergen — verhindert die 504-Timeouts, die aktuell jedes Mal alles verwerfen.
-- Warnings so schreiben, dass klar wird, ob 504 vor oder nach Retry auftrat.
+Nach OCR anhand des Payloads Ableitungen setzen:
+- Wenn `ocr.ehegatte?.vorname` oder `ocr.ehegatte?.name` vorhanden **oder** `ocr.kinder?.length > 0` → `familienstand ||= 'verheiratet'` (nur wenn OCR keinen anderen Wert lieferte)
+- Für `selectedKrankenkasse === 'big_plusbonus'`:
+  - `payload.bigFamilienversicherung = true`, wenn Ehegatte oder Kinder erkannt
+  - `payload.bigMitgliedBeschaeftigt ||= 'beschaeftigt'` (Default für Variante A, wenn Familie erkannt)
+- Für `viactiv`: `payload.viactivFamilienangehoerigeMitversichern = true`, wenn Ehegatte oder Kinder erkannt
+- BKK GS: `payload.mode ||= 'familienversicherung_und_rundum'` wenn Familie erkannt
 
-### 3. Load-Pfad hart machen
-`ApplicationDetailDrawer.handleLoad`:
-- Fehlerdetails im Toast + `console.error`, damit ein zukünftiger Ladefehler diagnostizierbar ist statt still.
-`Index.tsx` Hydrate:
-- Wenn `payload.selectedKrankenkasse` gesetzt ist, sicherstellen, dass abhängige Sichtbarkeits-States (z. B. Big-Variante A/B) sinnvoll starten (Variante A default), damit ein „mageres“ Payload nicht wie ein leeres Formular aussieht.
+Damit landen die Flags direkt im verschlüsselten Payload und stehen beim Laden im Editor bereit.
 
-### 4. Aufräumen der aktuellen 2 Test-Drafts
-Beide bestehenden WhatsApp-Drafts (`3846f7f0`, `029de8ce`) via `DELETE FROM applications WHERE source='whatsapp'` entfernen; Buffer bleibt geleert. So können wir sauber neu testen.
+## 3. Editor: „Ja" bei Ehegatte automatisch vorselektieren
 
-### 5. Verifikation
-Nach Deploy: eine neue `.` senden — erwartet werden **2 Anträge** (Fatema + Mahmoud), jeweils mit OCR-JSON-Feldern (Adresse, Geburtsdatum, IBAN etc.), keine 504-Warning mehr, und „In Editor laden“ öffnet das Formular mit den Feldern gefüllt.
+`src/components/SpouseSection.tsx`
+
+`hasSpouse` von reinem `useState(null)` auf initial-aus-Payload umstellen:
+```
+const [hasSpouse, setHasSpouse] = useState<boolean | null>(
+  formData.ehegatte?.vorname || formData.ehegatte?.name ? true : null
+);
+```
+Zusätzlich `useEffect`, der bei Änderung von `formData.ehegatte.vorname/name` (z. B. nach „In Editor laden") auf `true` setzt, falls noch `null`.
+
+## 4. Verifikation
+
+- Rescan des vorhandenen Blocks über `rescan_block_id`
+- Erwartung: 2 Anträge, jeweils mit `bigFamilienversicherung=true` (falls Familie erkannt), `familienstand='verheiratet'`, korrekte Zuordnung Ehegatte/Kinder
+- Im Editor: „Ja" ist bei Ehegatte-Frage vorausgewählt, Ehegatten-Formular sofort sichtbar
 
 ## Technisch (kurz)
 
-- `findClosedBlocks` unverändert.
-- Bild-Zuordnung: Reihenfolge `rows` nach `received_at` sortiert (bereits so aus DB); Iteration über rows, ein „current header“-Zeiger; Bilder werden dem aktuellen Header zugeordnet, bei nächstem Header wechselt der Zeiger.
-- OCR-Chunking: `chunk(images, 6)`, jeweils `POST /process-insurance-gemini3`, Ergebnis mergen mit `Object.assign({}, ...ocrResults)` (letzter nicht-leerer Wert gewinnt pro Feld) — reicht, weil das Modell pro Chunk dieselben Zielfelder befüllt.
-- Retry: einmalig, 2 s Backoff, nur auf Status 502/503/504/timeout.
+- Keine Schemaänderungen an bestehenden `ehegatte`/`kinder`-Feldern nötig — nur zusätzliche Regeln im Prompt.
+- Ableitungen im Intake sind idempotent (nur setzen wenn leer).
+- `SpouseSection` bleibt lokal-state-basiert, aber lädt Initialwert aus Payload.
