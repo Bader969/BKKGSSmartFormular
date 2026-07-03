@@ -289,6 +289,28 @@ async function processBlock(
   const blockId = crypto.randomUUID();
   const warnings: string[] = [];
 
+  // Atomically claim ALL block rows (content + separators) by setting block_id
+  // ONLY where block_id is still null. If another concurrent invocation already
+  // claimed them, we get 0 updated rows and bail out — prevents duplicate drafts.
+  const allIds = [...rows.map((r) => r.id), ...separatorIds];
+  const { data: claimed, error: claimErr } = await admin
+    .from("whatsapp_inbox_messages")
+    .update({ block_id: blockId })
+    .in("id", allIds)
+    .is("block_id", null)
+    .select("id");
+  if (claimErr) {
+    console.error("claim failed", claimErr.message);
+    return { blockId, warnings: ["claim failed"], applicationId: null };
+  }
+  if (!claimed || claimed.length < allIds.length) {
+    console.log("block already claimed by another invocation, skipping", {
+      expected: allIds.length,
+      claimed: claimed?.length ?? 0,
+    });
+    return { blockId, warnings: ["already claimed"], applicationId: null };
+  }
+
   const headerRow = rows.find((r) => r.type === "header");
   const phoneRow = rows.find((r) => r.type === "phone");
   const emailRow = rows.find((r) => r.type === "email");
@@ -392,10 +414,9 @@ async function processBlock(
   }
 
   // Mark buffer rows as processed
-  const allIds = [...rows.map((r) => r.id), ...separatorIds];
   await admin
     .from("whatsapp_inbox_messages")
-    .update({ block_id: blockId, processed_at: new Date().toISOString() })
+    .update({ processed_at: new Date().toISOString() })
     .in("id", allIds);
 
   await admin.from("application_events").insert({
