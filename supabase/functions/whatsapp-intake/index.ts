@@ -434,9 +434,17 @@ Deno.serve(async (req) => {
 
   let msgs = extractMessages(raw);
 
+  console.log("intake batch", {
+    total: msgs.length,
+    chats: Array.from(new Set(msgs.map((m) => m.chat_id))),
+    types: msgs.map((m) => m.type),
+    allowed: ALLOWED_CHAT_ID || "(none)",
+  });
+
   if (ALLOWED_CHAT_ID) {
     msgs = msgs.filter((m) => m.chat_id === ALLOWED_CHAT_ID);
     if (!msgs.length) {
+      console.log("all messages filtered out (no chat matched allowed id)");
       return json(200, { ok: true, ingested: 0, filtered: true, blocks: [] });
     }
   }
