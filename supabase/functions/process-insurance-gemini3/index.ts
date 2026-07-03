@@ -521,7 +521,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { text, images, mode, selectedKrankenkasse } = body;
+    const { text, images, mode, selectedKrankenkasse, fastOcr } = body;
     
     // Validate input - either text or images required
     if ((!text || typeof text !== 'string') && (!images || !Array.isArray(images) || images.length === 0)) {
@@ -630,8 +630,8 @@ Wichtig:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        // Always use gemini-2.5-pro for visual content (supports images and PDFs)
-        model: hasVisualContent ? 'google/gemini-2.5-pro' : 'google/gemini-2.5-flash',
+        // WhatsApp intake uses fast OCR to avoid backend timeouts on multi-image blocks.
+        model: hasVisualContent && !fastOcr ? 'google/gemini-2.5-pro' : 'google/gemini-2.5-flash',
         messages,
         max_tokens: 8192,
       }),
