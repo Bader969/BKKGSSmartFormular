@@ -571,7 +571,7 @@ Deno.serve(async (req) => {
         console.log("processing block", { rowCount: b.rows.length });
         const res = await processBlock(admin, chatId, b.rows, b.separatorIds);
         console.log("block result", {
-          applicationId: res.applicationId,
+          applicationIds: res.applicationIds,
           warnings: res.warnings,
         });
       }
