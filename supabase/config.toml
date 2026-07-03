@@ -1,1 +1,4 @@
 project_id = "rjahqndpymxbtosppjbo"
+
+[functions.whatsapp-intake]
+verify_jwt = false
