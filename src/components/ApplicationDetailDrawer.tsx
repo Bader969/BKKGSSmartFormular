@@ -18,6 +18,7 @@ export type ApplicationRow = {
   parent_application_id: string | null;
   person_role: string | null;
   person_index: number | null;
+  source?: string | null;
 };
 
 export function ApplicationDetailDrawer({

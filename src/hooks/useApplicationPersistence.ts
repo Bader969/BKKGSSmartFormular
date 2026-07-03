@@ -51,6 +51,7 @@ export function useApplicationPersistence() {
       parent_application_id: string | null;
       person_role: string | null;
       person_index: number | null;
+      source: string | null;
     }>;
     isAdmin: boolean;
     userEmails: Record<string, string>;
