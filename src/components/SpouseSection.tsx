@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FormSection } from './FormSection';
 import { FamilyMemberForm } from './FamilyMemberForm';
 import { FormField } from './FormField';
@@ -17,7 +17,13 @@ interface SpouseSectionProps {
 }
 
 export const SpouseSection: React.FC<SpouseSectionProps> = ({ formData, updateFormData }) => {
-  const [hasSpouse, setHasSpouse] = useState<boolean | null>(null);
+  const hasSpouseData = !!(formData.ehegatte?.vorname || formData.ehegatte?.name);
+  const [hasSpouse, setHasSpouse] = useState<boolean | null>(hasSpouseData ? true : null);
+
+  // Wenn nach „In Editor laden" Ehegatten-Daten vorhanden sind, „Ja" vorauswählen.
+  useEffect(() => {
+    if (hasSpouseData && hasSpouse === null) setHasSpouse(true);
+  }, [hasSpouseData, hasSpouse]);
 
   const updateEhegatte = (updates: Partial<FamilyMember>) => {
     updateFormData({

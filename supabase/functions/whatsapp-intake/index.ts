@@ -315,7 +315,9 @@ async function callOcr(
             selectedKrankenkasse: krankenkasse,
             text: contextText,
             images: batch,
-            fastOcr: true,
+            // Small batches (≤4 Bilder) nutzen Gemini 2.5 Pro für maximale Qualität,
+            // größere Batches fallen auf flash zurück, um 504-Timeouts zu vermeiden.
+            fastOcr: batch.length > 4,
           }),
           signal: ctl.signal,
         });
@@ -456,6 +458,29 @@ async function processRowsAsBlock(
       telefon: (phoneRow?.text ?? "").trim() || ocr.telefon || "",
       email: (emailRow?.text ?? "").trim() || ocr.email || "",
     };
+
+    // ---------- Auto-Ableitungen aus Familienerkennung ----------
+    const eh = payload.ehegatte as Record<string, unknown> | undefined;
+    const kinder = Array.isArray(payload.kinder) ? (payload.kinder as unknown[]) : [];
+    const hasSpouse = !!(eh && (eh.vorname || eh.name));
+    const hasChildren = kinder.length > 0;
+    const hasFamily = hasSpouse || hasChildren;
+
+    if (hasSpouse && !payload.familienstand) {
+      payload.familienstand = "verheiratet";
+    }
+
+    const kk = payload.selectedKrankenkasse;
+    if (hasFamily) {
+      if (kk === "big_plusbonus") {
+        payload.bigFamilienversicherung = true;
+        if (!payload.bigMitgliedBeschaeftigt) payload.bigMitgliedBeschaeftigt = "beschaeftigt";
+      } else if (kk === "viactiv") {
+        payload.viactivFamilienangehoerigeMitversichern = true;
+      } else if (kk === "bkk_gs" && !payload.mode) {
+        payload.mode = "familienversicherung_und_rundum";
+      }
+    }
 
     const { ivHex, ctHex, hash } = await encryptPayload(payload);
     const antragsform = parsed.krankenkasseLabel || parsed.krankenkasse || "WhatsApp-Intake";
