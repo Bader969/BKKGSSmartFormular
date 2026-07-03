@@ -280,6 +280,83 @@ async function resolveOwnerUserId(admin: ReturnType<typeof createClient>): Promi
 }
 
 // ---------- Block processing ----------
+async function callOcr(
+  krankenkasse: string,
+  images: Array<{ base64: string; mimeType: string }>,
+  warnings: string[],
+): Promise<Record<string, unknown>> {
+  if (!images.length || !krankenkasse) {
+    if (!images.length) warnings.push("Keine Bilder für OCR.");
+    return {};
+  }
+  // Chunk to keep gateway under 60s limit (main cause of 504s)
+  const CHUNK = 6;
+  const chunks: Array<typeof images> = [];
+  for (let i = 0; i < images.length; i += CHUNK) chunks.push(images.slice(i, i + CHUNK));
+  const merged: Record<string, unknown> = {};
+  for (let ci = 0; ci < chunks.length; ci++) {
+    const batch = chunks[ci];
+    let lastStatus = 0;
+    let ok = false;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const ctl = new AbortController();
+      const to = setTimeout(() => ctl.abort(), 110_000);
+      try {
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/process-insurance-gemini3`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ mode: "member", selectedKrankenkasse: krankenkasse, images: batch }),
+          signal: ctl.signal,
+        });
+        lastStatus = r.status;
+        if (r.ok) {
+          const data = await r.json().catch(() => ({}));
+          const { improvedImages: _drop, ...rest } = (data ?? {}) as Record<string, unknown>;
+          for (const [k, v] of Object.entries(rest)) {
+            if (v === undefined || v === null || v === "") continue;
+            merged[k] = v;
+          }
+          ok = true;
+          break;
+        }
+        if (![502, 503, 504].includes(r.status)) break;
+      } catch (e) {
+        warnings.push(`OCR-Fehler (Chunk ${ci + 1}/${chunks.length}, Versuch ${attempt + 1}): ${(e as Error).message}`);
+      } finally {
+        clearTimeout(to);
+      }
+      if (attempt === 0) await new Promise((res) => setTimeout(res, 2000));
+    }
+    if (!ok) warnings.push(`OCR fehlgeschlagen (Chunk ${ci + 1}/${chunks.length}, Status ${lastStatus}).`);
+  }
+  return merged;
+}
+
+// Split rows into per-header groups. Images/pdfs go with the CURRENT header
+// (the last header seen at that point). phone/email are block-wide (shared).
+// If no header appears yet, media falls into the first header's group.
+function splitByHeader(rows: BufferRow[]): Array<{ header: BufferRow; media: BufferRow[] }> {
+  const headers = rows.filter((r) => r.type === "header");
+  if (!headers.length) return [];
+  const groups = headers.map((h) => ({ header: h, media: [] as BufferRow[] }));
+  let curIdx = 0;
+  let seenHeader = false;
+  for (const r of rows) {
+    if (r.type === "header") {
+      curIdx = headers.indexOf(r);
+      seenHeader = true;
+      continue;
+    }
+    if (r.type !== "image" && r.type !== "pdf") continue;
+    if (!seenHeader) groups[0].media.push(r);
+    else groups[curIdx].media.push(r);
+  }
+  return groups;
+}
+
 async function processBlock(
   admin: ReturnType<typeof createClient>,
   chatId: string,
@@ -301,116 +378,106 @@ async function processBlock(
     .select("id");
   if (claimErr) {
     console.error("claim failed", claimErr.message);
-    return { blockId, warnings: ["claim failed"], applicationId: null };
+    return { blockId, warnings: ["claim failed"], applicationIds: [] as string[] };
   }
   if (!claimed || claimed.length < allIds.length) {
     console.log("block already claimed by another invocation, skipping", {
       expected: allIds.length,
       claimed: claimed?.length ?? 0,
     });
-    return { blockId, warnings: ["already claimed"], applicationId: null };
+    return { blockId, warnings: ["already claimed"], applicationIds: [] as string[] };
   }
 
-  const headerRow = rows.find((r) => r.type === "header");
   const phoneRow = rows.find((r) => r.type === "phone");
   const emailRow = rows.find((r) => r.type === "email");
-  const mediaRows = rows.filter((r) => r.type === "image" || r.type === "pdf");
-
-  const parsed = headerRow?.text ? parseHeader(headerRow.text) : {
-    vorname: "", name: "", datum: "", krankenkasse: "", krankenkasseLabel: "", vertriebspartner: "", betrag: "", warnings: ["Kein Header im Block."],
-  };
-  warnings.push(...parsed.warnings);
-
-  // Download media (images only for OCR; PDFs skipped for now, still referenced)
-  const images: Array<{ base64: string; mimeType: string }> = [];
-  for (const mr of mediaRows) {
-    if (mr.type !== "image" || !mr.media_url) continue;
-    const m = await fetchMediaAsBase64(mr.media_url);
-    if (m) images.push(m);
-    else warnings.push("Bild konnte nicht geladen werden.");
+  const groups = splitByHeader(rows);
+  if (!groups.length) {
+    warnings.push("Kein Header im Block.");
+    return { blockId, warnings, applicationIds: [] as string[] };
   }
-
-  // Call OCR function (invoke via service_role)
-  let ocr: Record<string, unknown> = {};
-  if (images.length > 0 && parsed.krankenkasse) {
-    try {
-      const r = await fetch(`${SUPABASE_URL}/functions/v1/process-insurance-gemini3`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          mode: "member",
-          selectedKrankenkasse: parsed.krankenkasse,
-          images,
-        }),
-      });
-      if (r.ok) {
-        const data = await r.json().catch(() => ({}));
-        const { improvedImages: _drop, ...rest } = data ?? {};
-        ocr = rest as Record<string, unknown>;
-      } else {
-        warnings.push(`OCR fehlgeschlagen (Status ${r.status}).`);
-      }
-    } catch (e) {
-      warnings.push(`OCR-Fehler: ${(e as Error).message}`);
-    }
-  } else if (!images.length) {
-    warnings.push("Keine Bilder für OCR im Block.");
-  }
-
-  // Assemble payload — WhatsApp header wins over OCR for Name/Datum/VP/Telefon/E-Mail
-  const payload: Record<string, unknown> = {
-    ...ocr,
-    selectedKrankenkasse: parsed.krankenkasse || (ocr.selectedKrankenkasse ?? ""),
-    mitgliedVorname: parsed.vorname || ocr.mitgliedVorname || "",
-    mitgliedName: parsed.name || ocr.mitgliedName || "",
-    datum: toIsoDate(parsed.datum) || ocr.datum || "",
-    signaturDatum: toIsoDate(parsed.datum) || ocr.signaturDatum || "",
-    vertriebspartner: parsed.vertriebspartner || ocr.vertriebspartner || "",
-    telefon: (phoneRow?.text ?? "").trim() || ocr.telefon || "",
-    email: (emailRow?.text ?? "").trim() || ocr.email || "",
-  };
 
   const ownerId = await resolveOwnerUserId(admin);
   if (!ownerId) {
     warnings.push("Kein Admin-User als Owner gefunden — Antrag nicht gespeichert.");
-    return { blockId, warnings, applicationId: null };
+    return { blockId, warnings, applicationIds: [] as string[] };
   }
 
-  const { ivHex, ctHex, hash } = await encryptPayload(payload);
-  const antragsform = parsed.krankenkasseLabel || parsed.krankenkasse || "WhatsApp-Intake";
-  const applicantName = String(payload.mitgliedName ?? "").slice(0, 120) || null;
-  const applicantVorname = String(payload.mitgliedVorname ?? "").slice(0, 120) || null;
+  const applicationIds: string[] = [];
+  for (let gi = 0; gi < groups.length; gi++) {
+    const g = groups[gi];
+    const personWarnings: string[] = [];
+    const parsed = parseHeader(g.header.text ?? "");
+    personWarnings.push(...parsed.warnings);
 
-  const { data: appRow, error } = await admin
-    .from("applications")
-    .insert({
+    const images: Array<{ base64: string; mimeType: string }> = [];
+    for (const mr of g.media) {
+      if (mr.type !== "image" || !mr.media_url) continue;
+      const m = await fetchMediaAsBase64(mr.media_url);
+      if (m) images.push(m);
+      else personWarnings.push("Bild konnte nicht geladen werden.");
+    }
+
+    const ocr = await callOcr(parsed.krankenkasse, images, personWarnings);
+
+    const payload: Record<string, unknown> = {
+      ...ocr,
+      selectedKrankenkasse: parsed.krankenkasse || (ocr.selectedKrankenkasse ?? ""),
+      mitgliedVorname: parsed.vorname || ocr.mitgliedVorname || "",
+      mitgliedName: parsed.name || ocr.mitgliedName || "",
+      datum: toIsoDate(parsed.datum) || ocr.datum || "",
+      signaturDatum: toIsoDate(parsed.datum) || ocr.signaturDatum || "",
+      vertriebspartner: parsed.vertriebspartner || ocr.vertriebspartner || "",
+      telefon: (phoneRow?.text ?? "").trim() || ocr.telefon || "",
+      email: (emailRow?.text ?? "").trim() || ocr.email || "",
+    };
+
+    const { ivHex, ctHex, hash } = await encryptPayload(payload);
+    const antragsform = parsed.krankenkasseLabel || parsed.krankenkasse || "WhatsApp-Intake";
+    const applicantName = String(payload.mitgliedName ?? "").slice(0, 120) || null;
+    const applicantVorname = String(payload.mitgliedVorname ?? "").slice(0, 120) || null;
+
+    const { data: appRow, error } = await admin
+      .from("applications")
+      .insert({
+        user_id: ownerId,
+        krankenkasse: parsed.krankenkasse || "unselected",
+        payload_encrypted: ctHex,
+        payload_iv: ivHex,
+        payload_hash: hash,
+        vertriebspartner: parsed.vertriebspartner || null,
+        applicant_name: applicantName,
+        applicant_vorname: applicantVorname,
+        antragsform,
+        source: "whatsapp",
+        intake_meta: {
+          chat_id: chatId,
+          block_id: blockId,
+          person_index: gi,
+          person_count: groups.length,
+          message_ids: [g.header.wa_message_id, ...g.media.map((r) => r.wa_message_id)],
+          warnings: personWarnings,
+          betrag: parsed.betrag || null,
+          ocr_fields: Object.keys(ocr).length,
+          image_count: images.length,
+        },
+      })
+      .select("id")
+      .single();
+
+    if (error || !appRow) {
+      console.error("insert failed", error?.message);
+      warnings.push(`Person ${gi + 1}: insert failed`);
+      continue;
+    }
+    applicationIds.push(appRow.id);
+    warnings.push(...personWarnings.map((w) => `P${gi + 1}: ${w}`));
+
+    await admin.from("application_events").insert({
+      application_id: appRow.id,
       user_id: ownerId,
-      krankenkasse: parsed.krankenkasse || "unselected",
-      payload_encrypted: ctHex,
-      payload_iv: ivHex,
-      payload_hash: hash,
-      vertriebspartner: parsed.vertriebspartner || null,
-      applicant_name: applicantName,
-      applicant_vorname: applicantVorname,
-      antragsform,
-      source: "whatsapp",
-      intake_meta: {
-        chat_id: chatId,
-        block_id: blockId,
-        message_ids: rows.map((r) => r.wa_message_id),
-        warnings,
-        betrag: parsed.betrag || null,
-      },
-    })
-    .select("id")
-    .single();
-
-  if (error || !appRow) {
-    console.error("insert failed", error?.message);
-    return { blockId, warnings, applicationId: null };
+      event_type: "whatsapp_intake",
+      meta: { block_id: blockId, chat_id: chatId, warnings: personWarnings, images: images.length, person_index: gi },
+    });
   }
 
   // Mark buffer rows as processed
@@ -419,14 +486,7 @@ async function processBlock(
     .update({ processed_at: new Date().toISOString() })
     .in("id", allIds);
 
-  await admin.from("application_events").insert({
-    application_id: appRow.id,
-    user_id: ownerId,
-    event_type: "whatsapp_intake",
-    meta: { block_id: blockId, chat_id: chatId, warnings, images: images.length },
-  });
-
-  return { blockId, warnings, applicationId: appRow.id };
+  return { blockId, warnings, applicationIds };
 }
 
 // ---------- HTTP handler ----------
@@ -511,7 +571,7 @@ Deno.serve(async (req) => {
         console.log("processing block", { rowCount: b.rows.length });
         const res = await processBlock(admin, chatId, b.rows, b.separatorIds);
         console.log("block result", {
-          applicationId: res.applicationId,
+          applicationIds: res.applicationIds,
           warnings: res.warnings,
         });
       }
