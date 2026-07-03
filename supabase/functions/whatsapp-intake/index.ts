@@ -12,6 +12,7 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ENC_SECRET = Deno.env.get("APPLICATIONS_ENCRYPTION_KEY")!;
 const INTAKE_SECRET = Deno.env.get("WHATSAPP_INTAKE_SECRET")!;
 const WHAPI_TOKEN = Deno.env.get("WHAPI_TOKEN") ?? "";
+const ALLOWED_CHAT_ID = Deno.env.get("WHATSAPP_ALLOWED_CHAT_ID") ?? "";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -431,7 +432,15 @@ Deno.serve(async (req) => {
   let raw: unknown;
   try { raw = await req.json(); } catch { return json(400, { error: "invalid_json" }); }
 
-  const msgs = extractMessages(raw);
+  let msgs = extractMessages(raw);
+
+  if (ALLOWED_CHAT_ID) {
+    msgs = msgs.filter((m) => m.chat_id === ALLOWED_CHAT_ID);
+    if (!msgs.length) {
+      return json(200, { ok: true, ingested: 0, filtered: true, blocks: [] });
+    }
+  }
+
   if (!msgs.length) return json(200, { ok: true, ingested: 0, blocks: [] });
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
