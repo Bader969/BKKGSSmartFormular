@@ -280,6 +280,21 @@ async function resolveOwnerUserId(admin: ReturnType<typeof createClient>): Promi
   return (data?.user_id as string | undefined) ?? null;
 }
 
+async function hasAdminAuthorization(admin: ReturnType<typeof createClient>, req: Request): Promise<boolean> {
+  const header = req.headers.get("authorization") ?? "";
+  const token = header.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return false;
+  const { data: userData, error: userErr } = await admin.auth.getUser(token);
+  if (userErr || !userData.user) return false;
+  const { data: role } = await admin
+    .from("user_roles")
+    .select("user_id")
+    .eq("user_id", userData.user.id)
+    .eq("role", "admin")
+    .maybeSingle();
+  return !!role;
+}
+
 // ---------- Block processing ----------
 async function callOcr(
   krankenkasse: string,
@@ -384,27 +399,47 @@ async function processRowsAsBlock(
 ) {
   const warnings: string[] = [];
 
-  // Atomically claim ALL block rows (content + separators) by setting block_id
-  // ONLY where block_id is still null. If another concurrent invocation already
-  // claimed them, we get 0 updated rows and bail out — prevents duplicate drafts.
-  const allIds = [...rows.map((r) => r.id), ...separatorIds];
+  // Atomically claim the CONTENT rows by setting block_id ONLY where block_id is
+  // still null. Separator dots can be shared by consecutive blocks, so they must
+  // not be part of the all-or-nothing claim; otherwise every block after the
+  // first one can be skipped because its opening separator was claimed earlier.
+  const contentIds = rows.map((r) => r.id);
+  const allIds = [...contentIds, ...separatorIds];
   if (claimRows) {
-    const { data: claimed, error: claimErr } = await admin
-      .from("whatsapp_inbox_messages")
-      .update({ block_id: blockId })
-      .in("id", allIds)
-      .is("block_id", null)
-      .select("id");
-    if (claimErr) {
-      console.error("claim failed", claimErr.message);
-      return { blockId, warnings: ["claim failed"], applicationIds: [] as string[] };
+    const existingBlockIds = Array.from(new Set(rows.map((r) => r.block_id).filter(Boolean))) as string[];
+    const allContentAlreadyClaimed = rows.length > 0 && rows.every((r) => !!r.block_id && !r.processed_at);
+    const newestReceived = Math.max(...rows.map((r) => Date.parse(r.received_at)).filter((n) => Number.isFinite(n)));
+    const staleClaim = allContentAlreadyClaimed && Number.isFinite(newestReceived) && newestReceived < Date.now() - 90_000;
+
+    if (existingBlockIds.length === 1 && staleClaim) {
+      blockId = existingBlockIds[0];
+      console.log("processing previously claimed stale block", { blockId, rowCount: rows.length });
+    } else {
+      const { data: claimed, error: claimErr } = await admin
+        .from("whatsapp_inbox_messages")
+        .update({ block_id: blockId })
+        .in("id", contentIds)
+        .is("block_id", null)
+        .select("id");
+      if (claimErr) {
+        console.error("claim failed", claimErr.message);
+        return { blockId, warnings: ["claim failed"], applicationIds: [] as string[] };
+      }
+      if (!claimed || claimed.length < contentIds.length) {
+        console.log("block already claimed by another invocation, skipping", {
+          expected: contentIds.length,
+          claimed: claimed?.length ?? 0,
+        });
+        return { blockId, warnings: ["already claimed"], applicationIds: [] as string[] };
+      }
     }
-    if (!claimed || claimed.length < allIds.length) {
-      console.log("block already claimed by another invocation, skipping", {
-        expected: allIds.length,
-        claimed: claimed?.length ?? 0,
-      });
-      return { blockId, warnings: ["already claimed"], applicationIds: [] as string[] };
+
+    if (separatorIds.length) {
+      await admin
+        .from("whatsapp_inbox_messages")
+        .update({ block_id: blockId })
+        .in("id", separatorIds)
+        .is("block_id", null);
     }
   }
 
@@ -568,13 +603,16 @@ Deno.serve(async (req) => {
     url.searchParams.get("s") ??
     url.searchParams.get("secret") ??
     "";
-  if (!INTAKE_SECRET || secret !== INTAKE_SECRET) {
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  const isSecretAuthorized = !!INTAKE_SECRET && secret === INTAKE_SECRET;
+  const isRescanRequest = !!url.searchParams.get("rescan_block_id") || url.searchParams.get("rescan_unprocessed") === "1";
+  const isAdminAuthorized = isRescanRequest ? await hasAdminAuthorization(admin, req) : false;
+  if (!isSecretAuthorized && !isAdminAuthorized) {
     return json(401, { error: "unauthorized" });
   }
 
   if (url.searchParams.get("rescan_block_id")) {
     const targetBlockId = url.searchParams.get("rescan_block_id")!;
-    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
     const { data: blockRows, error: blockErr } = await admin
       .from("whatsapp_inbox_messages")
       .select("id, wa_message_id, type, text, media_url, media_mime, received_at, block_id, processed_at")
@@ -588,6 +626,23 @@ Deno.serve(async (req) => {
     const freshBlockId = crypto.randomUUID();
     const res = await processRowsAsBlock(admin, contentRows[0].chat_id ?? ALLOWED_CHAT_ID, contentRows, [], freshBlockId, false);
     return json(200, { ok: true, rescan: true, previousBlockId: targetBlockId, ...res });
+  }
+
+  if (url.searchParams.get("rescan_unprocessed") === "1") {
+    const targetChatId = url.searchParams.get("chat_id") || ALLOWED_CHAT_ID;
+    if (!targetChatId) return json(400, { error: "missing_chat_id" });
+    const { data: bufRows } = await admin
+      .from("whatsapp_inbox_messages")
+      .select("id, wa_message_id, type, text, media_url, media_mime, received_at, block_id, processed_at")
+      .eq("chat_id", targetChatId)
+      .order("received_at", { ascending: true })
+      .limit(500);
+    const blocks = findClosedBlocks((bufRows ?? []) as BufferRow[]);
+    const results = [];
+    for (const b of blocks) {
+      results.push(await processBlock(admin, targetChatId, b.rows, b.separatorIds));
+    }
+    return json(200, { ok: true, rescan: true, blockCount: blocks.length, results });
   }
 
   let raw: unknown;
@@ -611,8 +666,6 @@ Deno.serve(async (req) => {
   }
 
   if (!msgs.length) return json(200, { ok: true, ingested: 0, blocks: [] });
-
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
   // Insert (ignore duplicates via unique index on wa_message_id)
   const inserts = msgs.map((m) => ({
