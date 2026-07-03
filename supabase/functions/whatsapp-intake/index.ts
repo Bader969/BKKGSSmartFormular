@@ -225,7 +225,7 @@ function parseHeader(text: string): ParsedHeader {
   for (const line of lines) {
     if (!datum) {
       const m = line.match(DATE_RE);
-      if (m) { datum = m[1].replace(/[-/]/g, "."); continue; }
+      if (m) datum = m[1].replace(/[-/]/g, ".");
     }
     if (!krankenkasse) {
       const kk = KRANKENKASSE_KEYWORDS.find((k) => k.re.test(line));
@@ -387,7 +387,11 @@ async function callOcr(
   // Chunk to keep gateway under 60s limit (main cause of 504s)
   const CHUNK = 6;
   const chunks: Array<typeof images> = [];
-  for (let i = 0; i < images.length; i += CHUNK) chunks.push(images.slice(i, i + CHUNK));
+  if (images.length) {
+    for (let i = 0; i < images.length; i += CHUNK) chunks.push(images.slice(i, i + CHUNK));
+  } else {
+    chunks.push([]);
+  }
   const merged: Record<string, unknown> = {};
   for (let ci = 0; ci < chunks.length; ci++) {
     const batch = chunks[ci];
@@ -583,7 +587,7 @@ async function processRowsAsBlock(
 
     const images: Array<{ base64: string; mimeType: string }> = [];
     for (const mr of g.media) {
-      if (mr.type !== "image" || !mr.media_url) continue;
+      if ((mr.type !== "image" && mr.type !== "pdf") || !mr.media_url) continue;
       const m = await fetchMediaAsBase64(mr.media_url);
       if (m) images.push(m);
       else personWarnings.push("Bild konnte nicht geladen werden.");
