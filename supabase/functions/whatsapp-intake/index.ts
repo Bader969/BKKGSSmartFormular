@@ -315,7 +315,9 @@ async function callOcr(
             selectedKrankenkasse: krankenkasse,
             text: contextText,
             images: batch,
-            fastOcr: true,
+            // Small batches (≤4 Bilder) nutzen Gemini 2.5 Pro für maximale Qualität,
+            // größere Batches fallen auf flash zurück, um 504-Timeouts zu vermeiden.
+            fastOcr: batch.length > 4,
           }),
           signal: ctl.signal,
         });
