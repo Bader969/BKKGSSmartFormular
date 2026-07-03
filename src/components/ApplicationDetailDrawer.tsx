@@ -5,7 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { useApplicationPersistence } from "@/hooks/useApplicationPersistence";
 import { ApplicationAuditTimeline } from "./ApplicationAuditTimeline";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import type { BigAutofillPayload } from "@/bookmarklets/bigAutofillSource";
+import { ExternalLink } from "lucide-react";
 
 export type ApplicationRow = {
   id: string; user_id: string; krankenkasse: string; status: string;
@@ -38,6 +40,7 @@ export function ApplicationDetailDrawer({
 
   const open = !!application;
   const isSub = !!application?.parent_application_id;
+  const isBig = application?.krankenkasse === "big_plusbonus" && !isSub;
 
   const handleLoad = async () => {
     if (!application) return;
@@ -72,6 +75,69 @@ export function ApplicationDetailDrawer({
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       toast.error(`Konnte nicht löschen: ${msg}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleBigOnlineAusfuellen = async () => {
+    if (!application) return;
+    setBusy(true);
+    try {
+      const { payload } = await decrypt(application.id);
+      const f = payload as unknown as Record<string, unknown>;
+      const bank = (f.bigBank as Record<string, string> | undefined) ?? {};
+      const eh = (f.ehegatte as Record<string, string> | undefined) ?? {};
+      const kinder = (f.kinder as Array<Record<string, string>> | undefined) ?? [];
+      const autofill: BigAutofillPayload = {
+        __type: "big-autofill/v1",
+        mitglied: {
+          vorname: String(f.mitgliedVorname ?? ""),
+          nachname: String(f.mitgliedName ?? ""),
+          geburtsname: "",
+          geburtsdatum: String(f.mitgliedGeburtsdatum ?? ""),
+          geburtsort: String(f.mitgliedGeburtsort ?? ""),
+          geburtsland: String(f.mitgliedGeburtsland ?? ""),
+          staatsangehoerigkeit: "",
+          geschlecht: (f.bigGeschlecht as BigAutofillPayload["mitglied"]["geschlecht"]) ?? "",
+          familienstand: String(f.familienstand ?? ""),
+          kvNummer: String(f.mitgliedKvNummer ?? ""),
+          bisherigeKrankenkasse: String(f.mitgliedKrankenkasse ?? ""),
+        },
+        adresse: {
+          strasse: String(f.mitgliedStrasse ?? ""),
+          hausnummer: String(f.mitgliedHausnummer ?? ""),
+          plz: String(f.mitgliedPlz ?? ""),
+          ort: String(f.ort ?? ""),
+        },
+        telefon: String(f.telefon ?? ""),
+        email: String(f.email ?? ""),
+        bank: {
+          kontoinhaber: String(bank.kontoinhaber ?? ""),
+          iban: String(bank.iban ?? ""),
+          bic: String(bank.bic ?? ""),
+          kreditinstitut: String(bank.kreditinstitut ?? ""),
+        },
+        ehegatte: eh && (eh.vorname || eh.name)
+          ? { vorname: String(eh.vorname ?? ""), nachname: String(eh.name ?? ""), geburtsdatum: String(eh.geburtsdatum ?? "") }
+          : null,
+        kinder: kinder.map((k) => ({
+          vorname: String(k.vorname ?? ""),
+          nachname: String(k.name ?? ""),
+          geburtsdatum: String(k.geburtsdatum ?? ""),
+        })),
+      };
+      await navigator.clipboard.writeText(JSON.stringify(autofill));
+      toast.success("Antragsdaten in Zwischenablage. Klicke im neuen Tab dein Lesezeichen 'BIG Autofill'.");
+      const vp = application.vertriebspartner || "8199db59-990d-464b-a851-afaa918b68cc";
+      window.open(
+        `https://www.big-direkt.de/de/mitglied-werden/online-mitglied-werden?distributionpartner=${encodeURIComponent(vp)}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Konnte nicht kopieren: ${msg}`);
     } finally {
       setBusy(false);
     }
@@ -121,6 +187,24 @@ export function ApplicationDetailDrawer({
                   <Button onClick={handleDelete} disabled={busy} variant="destructive">Löschen</Button>
                 )}
               </div>
+
+              {isBig && (
+                <div className="rounded-xl border border-border p-3 space-y-2 bg-muted/30">
+                  <div className="text-sm font-medium">BIG direkt — Online-Antrag</div>
+                  <p className="text-xs text-muted-foreground">
+                    Kopiert die Antragsdaten in die Zwischenablage und öffnet BIG. Auf der BIG-Seite dann dein
+                    Lesezeichen <b>„BIG Autofill"</b> klicken.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleBigOnlineAusfuellen} disabled={busy} className="flex-1 gap-1">
+                      <ExternalLink className="h-3 w-3" /> BIG online ausfüllen
+                    </Button>
+                    <Button size="sm" variant="outline" asChild>
+                      <Link to="/big-autofill-setup">Einrichten</Link>
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {isSub && (
                 <p className="text-xs text-muted-foreground">
