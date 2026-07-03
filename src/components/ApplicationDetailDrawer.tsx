@@ -47,8 +47,10 @@ export function ApplicationDetailDrawer({
       sessionStorage.setItem("loadedApplication", JSON.stringify({ id: application.id, payload }));
       toast.success("Antrag geladen. Wechsel zum Editor…");
       navigate("/");
-    } catch {
-      toast.error("Konnte Antrag nicht entschlüsseln.");
+    } catch (e: unknown) {
+      console.error("load application failed", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Konnte Antrag nicht laden: ${msg}`);
     } finally {
       setBusy(false);
     }
