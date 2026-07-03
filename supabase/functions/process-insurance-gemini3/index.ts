@@ -555,6 +555,15 @@ serve(async (req) => {
 
 ${kassePrompt}
 
+ROLLEN-ERKENNUNG (WICHTIG — für ALLE Kassen):
+- Die Zielperson (Mitglied) steht im Kontext-Text oben. Diese Person besitzt in der Regel die eGK/den Personalausweis und wird IMMER als "mitglied*" befüllt.
+- Weitere ERWACHSENE (Geburtsdatum >= 18 J. vor heute) mit gleicher Anschrift oder gleichem Nachnamen → gehören in "ehegatte" (Ehegatte/Lebenspartner). Geschlecht immer setzen (m/w/d) aus Anrede/Vorname/Ausweis.
+- MINDERJÄHRIGE (Geburtsdatum < 18 J. vor heute) mit gleicher Anschrift oder als Kind erkennbar → in "kinder[]" befüllen. Verwandtschaft standardmäßig "leiblich", außer im Dokument steht ausdrücklich anders.
+- Bei mehreren erkannten Personen IMMER alle in "ehegatte" bzw. "kinder[]" befüllen — NIEMALS nur das Mitglied zurückgeben.
+- Familienstand: aus Ausweis-Feld "Familienstand" oder Heiratsurkunde übernehmen. Wenn ein Ehegatte erkannt wurde und kein anderer Wert im Dokument steht → "familienstand" = "verheiratet".
+- Vater/Mutter: männlicher/weiblicher erwachsener Elternteil eines Kindes. Kein eigenes Feld — Elternrolle ergibt sich aus Geschlecht + verheiratet-Status.
+- Ordne KV-Nummern IMMER anhand des Namens auf der eGK der richtigen Person zu (Mitglied vs. Ehegatte vs. Kind).
+
 Extrahiere alle relevanten Daten und gib sie EXAKT in diesem JSON-Schema zurück:
 
 ${jsonSchema}
