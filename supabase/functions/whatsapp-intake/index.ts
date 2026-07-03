@@ -488,38 +488,39 @@ Deno.serve(async (req) => {
     .upsert(inserts, { onConflict: "wa_message_id", ignoreDuplicates: true });
   if (insErr) console.error("buffer insert failed", insErr.message);
 
-  // Look at unique chats touched by this batch and try to close blocks
+  // Respond 200 to WHAPI immediately; WHAPI has a short timeout and retries on
+  // hang, which would otherwise trigger duplicate OCR + duplicate drafts.
+  // Actual block scanning + OCR runs in the background.
   const chats = Array.from(new Set(msgs.map((m) => m.chat_id)));
-  const results: Array<{ chat_id: string; applicationId: string | null; warnings: string[] }> = [];
-
-  for (const chatId of chats) {
-    const { data: bufRows } = await admin
-      .from("whatsapp_inbox_messages")
-      .select("id, wa_message_id, type, text, media_url, media_mime, received_at, block_id, processed_at")
-      .eq("chat_id", chatId)
-      .order("received_at", { ascending: true })
-      .limit(500);
-    if (!bufRows) continue;
-    const blocks = findClosedBlocks(bufRows as BufferRow[]);
-    console.log("block scan", {
-      chat: chatId,
-      buffered: bufRows.length,
-      types: (bufRows as BufferRow[]).map((r) => r.type),
-      closedBlocks: blocks.length,
-    });
-    for (const b of blocks) {
-      console.log("processing block", {
-        rowTypes: b.rows.map((r) => r.type),
-        rowCount: b.rows.length,
+  const scan = (async () => {
+    for (const chatId of chats) {
+      const { data: bufRows } = await admin
+        .from("whatsapp_inbox_messages")
+        .select("id, wa_message_id, type, text, media_url, media_mime, received_at, block_id, processed_at")
+        .eq("chat_id", chatId)
+        .order("received_at", { ascending: true })
+        .limit(500);
+      if (!bufRows) continue;
+      const blocks = findClosedBlocks(bufRows as BufferRow[]);
+      console.log("block scan", {
+        chat: chatId,
+        buffered: bufRows.length,
+        closedBlocks: blocks.length,
       });
-      const res = await processBlock(admin, chatId, b.rows, b.separatorIds);
-      console.log("block result", {
-        applicationId: res.applicationId,
-        warnings: res.warnings,
-      });
-      results.push({ chat_id: chatId, applicationId: res.applicationId, warnings: res.warnings });
+      for (const b of blocks) {
+        console.log("processing block", { rowCount: b.rows.length });
+        const res = await processBlock(admin, chatId, b.rows, b.separatorIds);
+        console.log("block result", {
+          applicationId: res.applicationId,
+          warnings: res.warnings,
+        });
+      }
     }
-  }
+  })();
+  // deno-lint-ignore no-explicit-any
+  const rt = (globalThis as any).EdgeRuntime;
+  if (rt?.waitUntil) rt.waitUntil(scan);
+  else scan.catch((e) => console.error("bg scan failed", (e as Error).message));
 
-  return json(200, { ok: true, ingested: msgs.length, blocks: results });
+  return json(200, { ok: true, ingested: msgs.length, queued: true });
 });
