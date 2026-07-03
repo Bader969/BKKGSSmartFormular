@@ -280,6 +280,21 @@ async function resolveOwnerUserId(admin: ReturnType<typeof createClient>): Promi
   return (data?.user_id as string | undefined) ?? null;
 }
 
+async function hasAdminAuthorization(admin: ReturnType<typeof createClient>, req: Request): Promise<boolean> {
+  const header = req.headers.get("authorization") ?? "";
+  const token = header.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return false;
+  const { data: userData, error: userErr } = await admin.auth.getUser(token);
+  if (userErr || !userData.user) return false;
+  const { data: role } = await admin
+    .from("user_roles")
+    .select("user_id")
+    .eq("user_id", userData.user.id)
+    .eq("role", "admin")
+    .maybeSingle();
+  return !!role;
+}
+
 // ---------- Block processing ----------
 async function callOcr(
   krankenkasse: string,
@@ -588,13 +603,16 @@ Deno.serve(async (req) => {
     url.searchParams.get("s") ??
     url.searchParams.get("secret") ??
     "";
-  if (!INTAKE_SECRET || secret !== INTAKE_SECRET) {
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  const isSecretAuthorized = !!INTAKE_SECRET && secret === INTAKE_SECRET;
+  const isRescanRequest = !!url.searchParams.get("rescan_block_id") || url.searchParams.get("rescan_unprocessed") === "1";
+  const isAdminAuthorized = isRescanRequest ? await hasAdminAuthorization(admin, req) : false;
+  if (!isSecretAuthorized && !isAdminAuthorized) {
     return json(401, { error: "unauthorized" });
   }
 
   if (url.searchParams.get("rescan_block_id")) {
     const targetBlockId = url.searchParams.get("rescan_block_id")!;
-    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
     const { data: blockRows, error: blockErr } = await admin
       .from("whatsapp_inbox_messages")
       .select("id, wa_message_id, type, text, media_url, media_mime, received_at, block_id, processed_at")
@@ -608,6 +626,23 @@ Deno.serve(async (req) => {
     const freshBlockId = crypto.randomUUID();
     const res = await processRowsAsBlock(admin, contentRows[0].chat_id ?? ALLOWED_CHAT_ID, contentRows, [], freshBlockId, false);
     return json(200, { ok: true, rescan: true, previousBlockId: targetBlockId, ...res });
+  }
+
+  if (url.searchParams.get("rescan_unprocessed") === "1") {
+    const targetChatId = url.searchParams.get("chat_id") || ALLOWED_CHAT_ID;
+    if (!targetChatId) return json(400, { error: "missing_chat_id" });
+    const { data: bufRows } = await admin
+      .from("whatsapp_inbox_messages")
+      .select("id, wa_message_id, type, text, media_url, media_mime, received_at, block_id, processed_at")
+      .eq("chat_id", targetChatId)
+      .order("received_at", { ascending: true })
+      .limit(500);
+    const blocks = findClosedBlocks((bufRows ?? []) as BufferRow[]);
+    const results = [];
+    for (const b of blocks) {
+      results.push(await processBlock(admin, targetChatId, b.rows, b.separatorIds));
+    }
+    return json(200, { ok: true, rescan: true, blockCount: blocks.length, results });
   }
 
   let raw: unknown;
@@ -631,8 +666,6 @@ Deno.serve(async (req) => {
   }
 
   if (!msgs.length) return json(200, { ok: true, ingested: 0, blocks: [] });
-
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
   // Insert (ignore duplicates via unique index on wa_message_id)
   const inserts = msgs.map((m) => ({
