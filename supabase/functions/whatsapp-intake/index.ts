@@ -556,12 +556,14 @@ async function processRowsAsBlock(
         headerText: g.header.text ?? "",
         media: g.media,
         messageIds: [g.header.wa_message_id, ...g.media.map((r) => r.wa_message_id)],
+        reliableHeader: true,
       }))
     : fallbackHeaderText
       ? [{
           headerText: fallbackHeaderText,
           media: rows.filter((r) => r.type === "image" || r.type === "pdf"),
           messageIds: rows.filter((r) => r.type !== "dot").map((r) => r.wa_message_id),
+          reliableHeader: false,
         }]
       : [];
   if (!groups.length) {
@@ -608,8 +610,8 @@ async function processRowsAsBlock(
     const payload: Record<string, unknown> = {
       ...ocr,
       selectedKrankenkasse: parsed.krankenkasse || (ocr.selectedKrankenkasse ?? ""),
-      mitgliedVorname: parsed.vorname || ocr.mitgliedVorname || "",
-      mitgliedName: parsed.name || ocr.mitgliedName || "",
+      mitgliedVorname: g.reliableHeader ? (parsed.vorname || ocr.mitgliedVorname || "") : (ocr.mitgliedVorname || parsed.vorname || ""),
+      mitgliedName: g.reliableHeader ? (parsed.name || ocr.mitgliedName || "") : (ocr.mitgliedName || parsed.name || ""),
       datum: toIsoDate(parsed.datum) || ocr.datum || "",
       signaturDatum: toIsoDate(parsed.datum) || ocr.signaturDatum || "",
       vertriebspartner: parsed.vertriebspartner || ocr.vertriebspartner || "",
