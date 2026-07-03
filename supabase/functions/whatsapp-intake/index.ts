@@ -384,27 +384,47 @@ async function processRowsAsBlock(
 ) {
   const warnings: string[] = [];
 
-  // Atomically claim ALL block rows (content + separators) by setting block_id
-  // ONLY where block_id is still null. If another concurrent invocation already
-  // claimed them, we get 0 updated rows and bail out — prevents duplicate drafts.
-  const allIds = [...rows.map((r) => r.id), ...separatorIds];
+  // Atomically claim the CONTENT rows by setting block_id ONLY where block_id is
+  // still null. Separator dots can be shared by consecutive blocks, so they must
+  // not be part of the all-or-nothing claim; otherwise every block after the
+  // first one can be skipped because its opening separator was claimed earlier.
+  const contentIds = rows.map((r) => r.id);
+  const allIds = [...contentIds, ...separatorIds];
   if (claimRows) {
-    const { data: claimed, error: claimErr } = await admin
-      .from("whatsapp_inbox_messages")
-      .update({ block_id: blockId })
-      .in("id", allIds)
-      .is("block_id", null)
-      .select("id");
-    if (claimErr) {
-      console.error("claim failed", claimErr.message);
-      return { blockId, warnings: ["claim failed"], applicationIds: [] as string[] };
+    const existingBlockIds = Array.from(new Set(rows.map((r) => r.block_id).filter(Boolean))) as string[];
+    const allContentAlreadyClaimed = rows.length > 0 && rows.every((r) => !!r.block_id && !r.processed_at);
+    const newestReceived = Math.max(...rows.map((r) => Date.parse(r.received_at)).filter((n) => Number.isFinite(n)));
+    const staleClaim = allContentAlreadyClaimed && Number.isFinite(newestReceived) && newestReceived < Date.now() - 90_000;
+
+    if (existingBlockIds.length === 1 && staleClaim) {
+      blockId = existingBlockIds[0];
+      console.log("processing previously claimed stale block", { blockId, rowCount: rows.length });
+    } else {
+      const { data: claimed, error: claimErr } = await admin
+        .from("whatsapp_inbox_messages")
+        .update({ block_id: blockId })
+        .in("id", contentIds)
+        .is("block_id", null)
+        .select("id");
+      if (claimErr) {
+        console.error("claim failed", claimErr.message);
+        return { blockId, warnings: ["claim failed"], applicationIds: [] as string[] };
+      }
+      if (!claimed || claimed.length < contentIds.length) {
+        console.log("block already claimed by another invocation, skipping", {
+          expected: contentIds.length,
+          claimed: claimed?.length ?? 0,
+        });
+        return { blockId, warnings: ["already claimed"], applicationIds: [] as string[] };
+      }
     }
-    if (!claimed || claimed.length < allIds.length) {
-      console.log("block already claimed by another invocation, skipping", {
-        expected: allIds.length,
-        claimed: claimed?.length ?? 0,
-      });
-      return { blockId, warnings: ["already claimed"], applicationIds: [] as string[] };
+
+    if (separatorIds.length) {
+      await admin
+        .from("whatsapp_inbox_messages")
+        .update({ block_id: blockId })
+        .in("id", separatorIds)
+        .is("block_id", null);
     }
   }
 
