@@ -480,8 +480,22 @@ Deno.serve(async (req) => {
       .limit(500);
     if (!bufRows) continue;
     const blocks = findClosedBlocks(bufRows as BufferRow[]);
+    console.log("block scan", {
+      chat: chatId,
+      buffered: bufRows.length,
+      types: (bufRows as BufferRow[]).map((r) => r.type),
+      closedBlocks: blocks.length,
+    });
     for (const b of blocks) {
+      console.log("processing block", {
+        rowTypes: b.rows.map((r) => r.type),
+        rowCount: b.rows.length,
+      });
       const res = await processBlock(admin, chatId, b.rows, b.separatorIds);
+      console.log("block result", {
+        applicationId: res.applicationId,
+        warnings: res.warnings,
+      });
       results.push({ chat_id: chatId, applicationId: res.applicationId, warnings: res.warnings });
     }
   }
