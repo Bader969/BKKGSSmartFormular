@@ -85,7 +85,7 @@ const Index = () => {
     if (!raw) return;
     try {
       const { id, payload } = JSON.parse(raw) as { id: string; payload: FormData };
-      setFormData(payload);
+      setFormData({ ...createInitialFormData(), ...payload });
       setApplicationId(id);
       sessionStorage.removeItem('loadedApplication');
       toast.success('Antrag geladen.');
