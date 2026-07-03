@@ -140,6 +140,7 @@ function extractMessages(payload: unknown): IntakeMsg[] {
 // Ein Block ist alles zwischen zwei Trenner-Gruppen.
 type BufferRow = {
   id: string;
+  chat_id?: string;
   wa_message_id: string;
   type: MsgType;
   text: string | null;
@@ -371,35 +372,38 @@ function splitByHeader(rows: BufferRow[]): Array<{ header: BufferRow; media: Buf
   return groups;
 }
 
-async function processBlock(
+async function processRowsAsBlock(
   admin: ReturnType<typeof createClient>,
   chatId: string,
   rows: BufferRow[],
   separatorIds: string[],
+  blockId = crypto.randomUUID(),
+  claimRows = true,
 ) {
-  const blockId = crypto.randomUUID();
   const warnings: string[] = [];
 
   // Atomically claim ALL block rows (content + separators) by setting block_id
   // ONLY where block_id is still null. If another concurrent invocation already
   // claimed them, we get 0 updated rows and bail out — prevents duplicate drafts.
   const allIds = [...rows.map((r) => r.id), ...separatorIds];
-  const { data: claimed, error: claimErr } = await admin
-    .from("whatsapp_inbox_messages")
-    .update({ block_id: blockId })
-    .in("id", allIds)
-    .is("block_id", null)
-    .select("id");
-  if (claimErr) {
-    console.error("claim failed", claimErr.message);
-    return { blockId, warnings: ["claim failed"], applicationIds: [] as string[] };
-  }
-  if (!claimed || claimed.length < allIds.length) {
-    console.log("block already claimed by another invocation, skipping", {
-      expected: allIds.length,
-      claimed: claimed?.length ?? 0,
-    });
-    return { blockId, warnings: ["already claimed"], applicationIds: [] as string[] };
+  if (claimRows) {
+    const { data: claimed, error: claimErr } = await admin
+      .from("whatsapp_inbox_messages")
+      .update({ block_id: blockId })
+      .in("id", allIds)
+      .is("block_id", null)
+      .select("id");
+    if (claimErr) {
+      console.error("claim failed", claimErr.message);
+      return { blockId, warnings: ["claim failed"], applicationIds: [] as string[] };
+    }
+    if (!claimed || claimed.length < allIds.length) {
+      console.log("block already claimed by another invocation, skipping", {
+        expected: allIds.length,
+        claimed: claimed?.length ?? 0,
+      });
+      return { blockId, warnings: ["already claimed"], applicationIds: [] as string[] };
+    }
   }
 
   const phoneRow = rows.find((r) => r.type === "phone");
@@ -503,12 +507,23 @@ async function processBlock(
   }
 
   // Mark buffer rows as processed
-  await admin
-    .from("whatsapp_inbox_messages")
-    .update({ processed_at: new Date().toISOString() })
-    .in("id", allIds);
+  if (claimRows) {
+    await admin
+      .from("whatsapp_inbox_messages")
+      .update({ processed_at: new Date().toISOString() })
+      .in("id", allIds);
+  }
 
   return { blockId, warnings, applicationIds };
+}
+
+async function processBlock(
+  admin: ReturnType<typeof createClient>,
+  chatId: string,
+  rows: BufferRow[],
+  separatorIds: string[],
+) {
+  return processRowsAsBlock(admin, chatId, rows, separatorIds);
 }
 
 // ---------- HTTP handler ----------
