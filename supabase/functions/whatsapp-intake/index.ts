@@ -13,6 +13,7 @@ const ENC_SECRET = Deno.env.get("APPLICATIONS_ENCRYPTION_KEY")!;
 const INTAKE_SECRET = Deno.env.get("WHATSAPP_INTAKE_SECRET")!;
 const WHAPI_TOKEN = Deno.env.get("WHAPI_TOKEN") ?? "";
 const ALLOWED_CHAT_ID = Deno.env.get("WHATSAPP_ALLOWED_CHAT_ID") ?? "";
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") ?? "";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -73,7 +74,7 @@ const PHONE_RE = /^\s*(\+?\d[\d\s\-/()]{6,})\s*$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DATE_RE = /\b(\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4})\b/;
 
-type MsgType = "dot" | "phone" | "email" | "header" | "text" | "image" | "pdf";
+type MsgType = "dot" | "phone" | "email" | "header" | "text" | "image" | "pdf" | "audio";
 function classifyText(text: string): MsgType | null {
   const t = text.trim();
   if (!t) return null;
@@ -130,6 +131,18 @@ function extractMessages(payload: unknown): IntakeMsg[] {
         media_url: String(media.link ?? media.url ?? ""),
         media_mime: mime,
       });
+    } else if (["audio", "voice", "ptt"].includes(type)) {
+      const media = ((m.audio as Record<string, unknown>) ??
+        (m.voice as Record<string, unknown>) ??
+        (m.ptt as Record<string, unknown>) ??
+        m) as Record<string, unknown>;
+      out.push({
+        wa_message_id: id,
+        chat_id: chat,
+        type: "audio",
+        media_url: String(media.link ?? media.url ?? media.media_url ?? ""),
+        media_mime: String(media.mime_type ?? media.mime ?? "audio/ogg"),
+      });
     }
   }
   return out;
@@ -175,10 +188,10 @@ function findClosedBlocks(rows: BufferRow[]): Array<{ rows: BufferRow[]; separat
     for (let i = startAfter + 1; i <= endBefore; i++) {
       if (rows[i].type !== "dot") inner.push(rows[i]);
     }
-    // Only accept if there's at least one media + one header
-    const hasMedia = inner.some((r) => r.type === "image" || r.type === "pdf");
-    const hasHeader = inner.some((r) => r.type === "header");
-    if (!hasMedia || !hasHeader) continue;
+    // Only accept if there's something processable plus enough context. Audio can carry both.
+    const hasProcessableMedia = inner.some((r) => r.type === "image" || r.type === "pdf" || r.type === "audio");
+    const hasContext = inner.some((r) => r.type === "header" || r.type === "text" || r.type === "audio");
+    if (!hasProcessableMedia || !hasContext) continue;
     // Skip if any row in the block is already processed
     if (inner.some((r) => r.processed_at)) continue;
     const sepIds = [
@@ -212,7 +225,7 @@ function parseHeader(text: string): ParsedHeader {
   for (const line of lines) {
     if (!datum) {
       const m = line.match(DATE_RE);
-      if (m) { datum = m[1].replace(/[-/]/g, "."); continue; }
+      if (m) datum = m[1].replace(/[-/]/g, ".");
     }
     if (!krankenkasse) {
       const kk = KRANKENKASSE_KEYWORDS.find((k) => k.re.test(line));
@@ -273,6 +286,71 @@ async function fetchMediaAsBase64(url: string): Promise<{ base64: string; mimeTy
   }
 }
 
+function audioFormatFromMime(mimeType: string): string {
+  const clean = mimeType.toLowerCase().split(";")[0].trim();
+  if (clean.includes("mpeg") || clean.includes("mp3")) return "mp3";
+  if (clean.includes("mp4") || clean.includes("m4a")) return "m4a";
+  if (clean.includes("wav")) return "wav";
+  if (clean.includes("webm")) return "webm";
+  if (clean.includes("aac")) return "aac";
+  if (clean.includes("flac")) return "flac";
+  return "ogg";
+}
+
+async function transcribeAudio(
+  audio: { base64: string; mimeType: string },
+  warnings: string[],
+): Promise<string> {
+  if (!LOVABLE_API_KEY) {
+    warnings.push("Audio konnte nicht transkribiert werden: KI-Schlüssel fehlt.");
+    return "";
+  }
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Transkribiere diese WhatsApp-Sprachnachricht für einen Krankenkassen-Antrag wortgetreu auf Deutsch. Gib nur den gesprochenen Inhalt zurück, keine Erklärung.",
+              },
+              {
+                type: "input_audio",
+                input_audio: {
+                  data: audio.base64,
+                  format: audioFormatFromMime(audio.mimeType),
+                },
+              },
+            ],
+          },
+        ],
+        max_tokens: 2048,
+      }),
+    });
+    if (!response.ok) {
+      warnings.push(`Audio-Transkription fehlgeschlagen (Status ${response.status}).`);
+      return "";
+    }
+    const data = await response.json().catch(() => ({}));
+    return String(data?.choices?.[0]?.message?.content ?? "").trim();
+  } catch (error) {
+    warnings.push(`Audio-Transkription fehlgeschlagen: ${(error as Error).message}`);
+    return "";
+  }
+}
+
+function extractFirstMatch(text: string, re: RegExp): string {
+  return String(text.match(re)?.[0] ?? "").trim();
+}
+
 // ---------- Owner user for whatsapp intake ----------
 // Uses the first admin user as the owner of ingested drafts.
 async function resolveOwnerUserId(admin: ReturnType<typeof createClient>): Promise<string | null> {
@@ -302,14 +380,18 @@ async function callOcr(
   images: Array<{ base64: string; mimeType: string }>,
   warnings: string[],
 ): Promise<Record<string, unknown>> {
-  if (!images.length || !krankenkasse) {
-    if (!images.length) warnings.push("Keine Bilder für OCR.");
+  if ((!images.length && !contextText.trim()) || !krankenkasse) {
+    if (!images.length && !contextText.trim()) warnings.push("Keine Bilder oder Textdaten für die Erkennung.");
     return {};
   }
   // Chunk to keep gateway under 60s limit (main cause of 504s)
   const CHUNK = 6;
   const chunks: Array<typeof images> = [];
-  for (let i = 0; i < images.length; i += CHUNK) chunks.push(images.slice(i, i + CHUNK));
+  if (images.length) {
+    for (let i = 0; i < images.length; i += CHUNK) chunks.push(images.slice(i, i + CHUNK));
+  } else {
+    chunks.push([]);
+  }
   const merged: Record<string, unknown> = {};
   for (let ci = 0; ci < chunks.length; ci++) {
     const batch = chunks[ci];
@@ -407,12 +489,17 @@ async function processRowsAsBlock(
   const allIds = [...contentIds, ...separatorIds];
   if (claimRows) {
     const existingBlockIds = Array.from(new Set(rows.map((r) => r.block_id).filter(Boolean))) as string[];
-    const allContentAlreadyClaimed = rows.length > 0 && rows.every((r) => !!r.block_id && !r.processed_at);
+    const anyContentAlreadyClaimed = rows.length > 0 && rows.some((r) => !!r.block_id && !r.processed_at);
     const newestReceived = Math.max(...rows.map((r) => Date.parse(r.received_at)).filter((n) => Number.isFinite(n)));
-    const staleClaim = allContentAlreadyClaimed && Number.isFinite(newestReceived) && newestReceived < Date.now() - 90_000;
+    const staleClaim = anyContentAlreadyClaimed && Number.isFinite(newestReceived) && newestReceived < Date.now() - 90_000;
 
-    if (existingBlockIds.length === 1 && staleClaim) {
+    if (existingBlockIds.length >= 1 && staleClaim) {
       blockId = existingBlockIds[0];
+      await admin
+        .from("whatsapp_inbox_messages")
+        .update({ block_id: blockId })
+        .in("id", contentIds)
+        .is("block_id", null);
       console.log("processing previously claimed stale block", { blockId, rowCount: rows.length });
     } else {
       const { data: claimed, error: claimErr } = await admin
@@ -445,9 +532,42 @@ async function processRowsAsBlock(
 
   const phoneRow = rows.find((r) => r.type === "phone");
   const emailRow = rows.find((r) => r.type === "email");
-  const groups = splitByHeader(rows);
+  const audioRows = rows.filter((r) => r.type === "audio");
+  const audioTranscripts: string[] = [];
+  for (const ar of audioRows) {
+    if (!ar.media_url) {
+      warnings.push("Audio ohne Medien-Link empfangen.");
+      continue;
+    }
+    const audio = await fetchMediaAsBase64(ar.media_url);
+    if (!audio) {
+      warnings.push("Audio konnte nicht geladen werden.");
+      continue;
+    }
+    const transcript = await transcribeAudio(audio, warnings);
+    if (transcript) audioTranscripts.push(transcript);
+  }
+  const freeText = rows.filter((r) => r.type === "text").map((r) => r.text ?? "").filter(Boolean);
+  const audioContext = audioTranscripts.map((t, i) => `Sprachnachricht ${i + 1}: ${t}`).join("\n");
+  const fallbackHeaderText = [...freeText, ...audioTranscripts].join("\n").trim();
+  const headerGroups = splitByHeader(rows);
+  const groups = headerGroups.length
+    ? headerGroups.map((g) => ({
+        headerText: g.header.text ?? "",
+        media: g.media,
+        messageIds: [g.header.wa_message_id, ...g.media.map((r) => r.wa_message_id)],
+        reliableHeader: true,
+      }))
+    : fallbackHeaderText
+      ? [{
+          headerText: fallbackHeaderText,
+          media: rows.filter((r) => r.type === "image" || r.type === "pdf"),
+          messageIds: rows.filter((r) => r.type !== "dot").map((r) => r.wa_message_id),
+          reliableHeader: false,
+        }]
+      : [];
   if (!groups.length) {
-    warnings.push("Kein Header im Block.");
+    warnings.push("Kein Header oder auswertbarer Audio-/Textinhalt im Block.");
     return { blockId, warnings, applicationIds: [] as string[] };
   }
 
@@ -461,12 +581,15 @@ async function processRowsAsBlock(
   for (let gi = 0; gi < groups.length; gi++) {
     const g = groups[gi];
     const personWarnings: string[] = [];
-    const parsed = parseHeader(g.header.text ?? "");
+    const parsed = parseHeader(g.headerText);
     personWarnings.push(...parsed.warnings);
+    const combinedContextSource = [g.headerText, audioContext].filter(Boolean).join("\n");
+    const audioPhone = extractFirstMatch(combinedContextSource, /\+?\d[\d\s\-/()]{6,}/);
+    const audioEmail = extractFirstMatch(combinedContextSource, /[^\s@]+@[^\s@]+\.[^\s@]+/);
 
     const images: Array<{ base64: string; mimeType: string }> = [];
     for (const mr of g.media) {
-      if (mr.type !== "image" || !mr.media_url) continue;
+      if ((mr.type !== "image" && mr.type !== "pdf") || !mr.media_url) continue;
       const m = await fetchMediaAsBase64(mr.media_url);
       if (m) images.push(m);
       else personWarnings.push("Bild konnte nicht geladen werden.");
@@ -477,21 +600,23 @@ async function processRowsAsBlock(
       parsed.datum ? `Antragsdatum: ${parsed.datum}` : "",
       parsed.krankenkasseLabel ? `Krankenkasse/Zielantrag: ${parsed.krankenkasseLabel}` : "",
       parsed.vertriebspartner ? `Vertriebspartner: ${parsed.vertriebspartner}` : "",
-      phoneRow?.text ? `Telefon: ${phoneRow.text.trim()}` : "",
-      emailRow?.text ? `Email: ${emailRow.text.trim()}` : "",
+      phoneRow?.text || audioPhone ? `Telefon: ${(phoneRow?.text ?? audioPhone).trim()}` : "",
+      emailRow?.text || audioEmail ? `Email: ${(emailRow?.text ?? audioEmail).trim()}` : "",
+      audioContext,
+      freeText.length ? `Weitere Textnachrichten:\n${freeText.join("\n")}` : "",
     ].filter(Boolean).join("\n");
     const ocr = await callOcr(parsed.krankenkasse, contextText, images, personWarnings);
 
     const payload: Record<string, unknown> = {
       ...ocr,
       selectedKrankenkasse: parsed.krankenkasse || (ocr.selectedKrankenkasse ?? ""),
-      mitgliedVorname: parsed.vorname || ocr.mitgliedVorname || "",
-      mitgliedName: parsed.name || ocr.mitgliedName || "",
+      mitgliedVorname: g.reliableHeader ? (parsed.vorname || ocr.mitgliedVorname || "") : (ocr.mitgliedVorname || parsed.vorname || ""),
+      mitgliedName: g.reliableHeader ? (parsed.name || ocr.mitgliedName || "") : (ocr.mitgliedName || parsed.name || ""),
       datum: toIsoDate(parsed.datum) || ocr.datum || "",
       signaturDatum: toIsoDate(parsed.datum) || ocr.signaturDatum || "",
       vertriebspartner: parsed.vertriebspartner || ocr.vertriebspartner || "",
-      telefon: (phoneRow?.text ?? "").trim() || ocr.telefon || "",
-      email: (emailRow?.text ?? "").trim() || ocr.email || "",
+      telefon: (phoneRow?.text ?? audioPhone).trim() || ocr.telefon || "",
+      email: (emailRow?.text ?? audioEmail).trim() || ocr.email || "",
     };
 
     // ---------- Auto-Ableitungen aus Familienerkennung ----------
@@ -540,7 +665,7 @@ async function processRowsAsBlock(
           block_id: blockId,
           person_index: gi,
           person_count: groups.length,
-          message_ids: [g.header.wa_message_id, ...g.media.map((r) => r.wa_message_id)],
+          message_ids: g.messageIds,
           warnings: personWarnings,
           betrag: parsed.betrag || null,
           ocr_fields: Object.keys(ocr).length,
