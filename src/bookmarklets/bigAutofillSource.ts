@@ -74,15 +74,32 @@ const BOOKMARKLET_BODY = /* js */ `
 
   function norm(s){ return (s||"").toString().toLowerCase().replace(/[^a-z0-9]+/g," ").trim(); }
 
+  // Wortweises Matching gegen einen mit Leerzeichen normalisierten Text.
+  // Ein Muster kann aus mehreren durch Leerzeichen getrennten Tokens bestehen;
+  // alle Tokens müssen als eigenständige Wörter im Haystack vorkommen.
+  function hayHas(hay, pat){
+    if (!pat) return false;
+    var padded = " " + hay + " ";
+    var tokens = pat.split(" ").filter(Boolean);
+    for (var t=0; t<tokens.length; t++){
+      if (padded.indexOf(" " + tokens[t] + " ") === -1) return false;
+    }
+    return true;
+  }
+
   // Findet Input/Textarea/Select anhand einer Liste möglicher Label-/Placeholder-/Name-/Id-Muster.
+  // Zweistufig: erst Attribut-Match (formcontrolname/name/id/placeholder/aria-label/data-testid),
+  // dann Label/Wrapper-Text als Fallback. Vermeidet, dass z.B. "name" innerhalb "vorname" matcht.
   function findField(patterns){
     var pats = patterns.map(norm).filter(Boolean);
     var candidates = Array.prototype.slice.call(document.querySelectorAll("input, textarea, select"));
+    var attrMatch = null;
+    var labelMatch = null;
     for (var i=0; i<candidates.length; i++){
       var el = candidates[i];
       if (el.type === "hidden" || el.disabled) continue;
       if (el.offsetParent === null) continue; // unsichtbar
-      var haystack = [
+      var attrHay = [
         el.getAttribute("formcontrolname"),
         el.getAttribute("name"),
         el.id,
@@ -90,18 +107,77 @@ const BOOKMARKLET_BODY = /* js */ `
         el.getAttribute("aria-label"),
         el.getAttribute("data-testid"),
       ].map(norm).join(" ");
-      // Label über <label for="id"> oder umschließend
+      var labelHay = "";
       if (el.id){
         var lbl = document.querySelector('label[for="'+CSS.escape(el.id)+'"]');
-        if (lbl) haystack += " " + norm(lbl.textContent);
+        if (lbl) labelHay += " " + norm(lbl.textContent);
       }
       var wrap = el.closest("mat-form-field, .form-field, .field, label");
-      if (wrap) haystack += " " + norm(wrap.textContent).slice(0, 120);
+      if (wrap) labelHay += " " + norm(wrap.textContent).slice(0, 200);
       for (var p=0; p<pats.length; p++){
-        if (pats[p] && haystack.indexOf(pats[p]) !== -1) return el;
+        if (!attrMatch && hayHas(attrHay, pats[p])) { attrMatch = el; break; }
+      }
+      if (attrMatch) break;
+      if (!labelMatch){
+        for (var q=0; q<pats.length; q++){
+          if (hayHas(labelHay, pats[q])) { labelMatch = el; break; }
+        }
       }
     }
-    return null;
+    return attrMatch || labelMatch;
+  }
+
+  function wait(ms){ return new Promise(function(res){ setTimeout(res, ms); }); }
+
+  // Angular Material <mat-select> setzen: passendes Feld finden, Trigger klicken,
+  // Option im CDK-Overlay auswählen.
+  async function setMatSelect(patterns, optionTexts, label){
+    if (!optionTexts || !optionTexts.length) return { filled:false, skipped:true, label: label };
+    var pats = patterns.map(norm).filter(Boolean);
+    var opts = optionTexts.map(norm).filter(Boolean);
+    var selects = Array.prototype.slice.call(document.querySelectorAll("mat-select, [role='combobox']"));
+    var target = null;
+    for (var i=0; i<selects.length; i++){
+      var s = selects[i];
+      if (s.offsetParent === null) continue;
+      var hay = [
+        s.getAttribute("formcontrolname"),
+        s.getAttribute("name"),
+        s.id,
+        s.getAttribute("aria-label"),
+        s.getAttribute("placeholder"),
+      ].map(norm).join(" ");
+      var wrap = s.closest("mat-form-field, .form-field, .field, label");
+      if (wrap) hay += " " + norm(wrap.textContent).slice(0, 200);
+      for (var p=0; p<pats.length; p++){
+        if (hayHas(hay, pats[p])) { target = s; break; }
+      }
+      if (target) break;
+    }
+    if (!target) return { filled:false, missing:true, label: label };
+    var trigger = target.querySelector(".mat-mdc-select-trigger, .mat-select-trigger") || target;
+    trigger.click();
+    // Auf Overlay warten
+    var options = [];
+    for (var w=0; w<20; w++){
+      await wait(50);
+      options = Array.prototype.slice.call(document.querySelectorAll(".cdk-overlay-container mat-option, .cdk-overlay-container [role='option']"));
+      if (options.length) break;
+    }
+    if (!options.length) return { filled:false, missing:true, label: label };
+    for (var o=0; o<options.length; o++){
+      var ot = norm(options[o].textContent);
+      for (var t=0; t<opts.length; t++){
+        if (opts[t] && ot.indexOf(opts[t]) !== -1){
+          options[o].click();
+          await wait(30);
+          return { filled:true, label: label };
+        }
+      }
+    }
+    // Nichts passendes → Overlay schließen
+    document.body.click();
+    return { filled:false, missing:true, label: label };
   }
 
   function fill(patterns, value, label){
@@ -154,54 +230,70 @@ const BOOKMARKLET_BODY = /* js */ `
   var addr = data.adresse || {};
   var bank = data.bank || {};
 
-  // Anrede / Geschlecht
-  results.push(clickRadio(
-    ["anrede", "geschlecht"],
-    m.geschlecht === "weiblich" ? ["frau","weiblich"] : m.geschlecht === "maennlich" ? ["herr","männlich","mannlich"] : m.geschlecht === "divers" ? ["divers"] : [],
-    "Anrede / Geschlecht"
-  ));
+  // Anrede / Geschlecht — zuerst mat-select, dann Radio-Fallback
+  var anredeOpts = m.geschlecht === "weiblich" ? ["frau","weiblich"]
+    : m.geschlecht === "maennlich" ? ["herr","männlich","mannlich"]
+    : m.geschlecht === "divers" ? ["divers"]
+    : [];
+  var anredeRes = await setMatSelect(["anrede","geschlecht"], anredeOpts, "Anrede / Geschlecht");
+  if (!anredeRes.filled && !anredeRes.skipped){
+    anredeRes = clickRadio(["anrede","geschlecht"], anredeOpts, "Anrede / Geschlecht");
+  }
+  results.push(anredeRes);
 
-  // Namen
+  // Namen (kein bloßes "name" als Muster — matcht sonst innerhalb von "vorname")
   results.push(fill(["vorname"], m.vorname, "Vorname"));
-  results.push(fill(["nachname","name","familienname"], m.nachname, "Nachname"));
-  results.push(fill(["geburtsname"], m.geburtsname, "Geburtsname"));
+  results.push(fill(["nachname","familienname","surname","lastname"], m.nachname, "Nachname"));
+  results.push(fill(["geburtsname","birthname"], m.geburtsname, "Geburtsname"));
 
   // Geburt
   results.push(fill(["geburtsdatum","geboren am","geb datum"], m.geburtsdatum, "Geburtsdatum"));
   results.push(fill(["geburtsort"], m.geburtsort, "Geburtsort"));
-  results.push(fill(["geburtsland","land der geburt"], m.geburtsland, "Geburtsland"));
-  results.push(fill(["staatsangehoerigkeit","staatsangehörigkeit","nationalität"], m.staatsangehoerigkeit, "Staatsangehörigkeit"));
 
-  // Familienstand
-  results.push(clickRadio(
-    ["familienstand"],
-    m.familienstand === "verheiratet" ? ["verheiratet"] :
-    m.familienstand === "ledig" ? ["ledig"] :
-    m.familienstand === "geschieden" ? ["geschieden"] :
-    m.familienstand === "verwitwet" ? ["verwitwet"] :
-    m.familienstand === "getrennt" ? ["getrennt"] : [],
-    "Familienstand"
-  ));
+  var geburtslandRes = await setMatSelect(["geburtsland","land geburt"], [norm(m.geburtsland)], "Geburtsland");
+  if (!geburtslandRes.filled && !geburtslandRes.skipped){
+    geburtslandRes = fill(["geburtsland","land geburt"], m.geburtsland, "Geburtsland");
+  }
+  results.push(geburtslandRes);
+
+  var staatRes = await setMatSelect(["staatsangehoerigkeit","staatsangehörigkeit","nationalitaet","nationalität"], [norm(m.staatsangehoerigkeit)], "Staatsangehörigkeit");
+  if (!staatRes.filled && !staatRes.skipped){
+    staatRes = fill(["staatsangehoerigkeit","staatsangehörigkeit","nationalitaet","nationalität"], m.staatsangehoerigkeit, "Staatsangehörigkeit");
+  }
+  results.push(staatRes);
+
+  // Familienstand — mat-select bevorzugt
+  var famOpts = m.familienstand === "verheiratet" ? ["verheiratet"]
+    : m.familienstand === "ledig" ? ["ledig"]
+    : m.familienstand === "geschieden" ? ["geschieden"]
+    : m.familienstand === "verwitwet" ? ["verwitwet"]
+    : m.familienstand === "getrennt" ? ["getrennt"]
+    : [];
+  var famRes = await setMatSelect(["familienstand"], famOpts, "Familienstand");
+  if (!famRes.filled && !famRes.skipped){
+    famRes = clickRadio(["familienstand"], famOpts, "Familienstand");
+  }
+  results.push(famRes);
 
   // Adresse
-  results.push(fill(["strasse","straße"], addr.strasse, "Straße"));
-  results.push(fill(["hausnummer","hausnr","haus nr"], addr.hausnummer, "Hausnummer"));
-  results.push(fill(["plz","postleitzahl"], addr.plz, "PLZ"));
-  results.push(fill(["ort","wohnort","stadt"], addr.ort, "Ort"));
+  results.push(fill(["strasse","straße","street"], addr.strasse, "Straße"));
+  results.push(fill(["hausnummer","hausnr","haus nr","hnr"], addr.hausnummer, "Hausnummer"));
+  results.push(fill(["plz","postleitzahl","zip"], addr.plz, "PLZ"));
+  results.push(fill(["wohnort","stadt","city","ort"], addr.ort, "Ort"));
 
   // Kontakt
-  results.push(fill(["telefon","tel nr","rufnummer"], data.telefon, "Telefon"));
-  results.push(fill(["e-mail","email","e mail"], data.email, "E-Mail"));
+  results.push(fill(["telefon","telefonnummer","rufnummer","tel nr","mobil","handy","phone"], data.telefon, "Telefon"));
+  results.push(fill(["e mail","email","mail"], data.email, "E-Mail"));
 
   // KV-Nummer / Versichertennummer
-  results.push(fill(["versicherten","kv nummer","krankenversichertennummer","kvnr"], m.kvNummer, "Versichertennummer"));
-  results.push(fill(["bisherige krankenkasse","aktuelle krankenkasse","krankenkasse bisher","letzte krankenkasse"], m.bisherigeKrankenkasse, "Bisherige Krankenkasse"));
+  results.push(fill(["versichertennummer","krankenversichertennummer","kv nummer","kvnr"], m.kvNummer, "Versichertennummer"));
+  results.push(fill(["bisherige krankenkasse","aktuelle krankenkasse","krankenkasse bisher","letzte krankenkasse","vorherige krankenkasse"], m.bisherigeKrankenkasse, "Bisherige Krankenkasse"));
 
   // Bank
   results.push(fill(["kontoinhaber"], bank.kontoinhaber, "Kontoinhaber"));
   results.push(fill(["iban"], bank.iban, "IBAN"));
   results.push(fill(["bic","swift"], bank.bic, "BIC"));
-  results.push(fill(["kreditinstitut","bank"], bank.kreditinstitut, "Kreditinstitut"));
+  results.push(fill(["kreditinstitut","bankname"], bank.kreditinstitut, "Kreditinstitut"));
 
   // Ehegatte / Kinder → als Info (Formular hat oft mehrstufige Screens)
   var famInfo = "";
@@ -221,7 +313,7 @@ const BOOKMARKLET_BODY = /* js */ `
   if (missing.length) html += "<br><br><b>Nicht gefunden:</b><br>" + missing.map(function(x){return "• "+x;}).join("<br>");
   if (skipped.length) html += "<br><br><span style='opacity:.7'><b>Kein Wert vorhanden:</b><br>" + skipped.map(function(x){return "• "+x;}).join("<br>") + "</span>";
   if (famInfo) html += "<br><br><b>Familie (bitte manuell übertragen):</b><br>" + famInfo;
-  html += "<br><br><span style='opacity:.7;font-size:11px'>Nicht gefundene Felder erscheinen evtl. auf den nächsten Schritten. Nach 'Weiter' Bookmarklet erneut klicken.</span>";
+  html += "<br><br><span style='opacity:.7;font-size:11px'>Der BIG-Antrag ist ein mehrstufiger Assistent — die meisten „nicht gefundenen" Felder existieren erst auf den folgenden Schritten. Nach jedem „Weiter" das Bookmarklet erneut klicken.</span>";
 
   showOverlay(html);
 })();
