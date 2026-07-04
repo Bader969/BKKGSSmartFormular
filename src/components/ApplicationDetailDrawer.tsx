@@ -40,7 +40,12 @@ export function ApplicationDetailDrawer({
 
   const open = !!application;
   const isSub = !!application?.parent_application_id;
-  const isBig = application?.krankenkasse === "big_plusbonus" && !isSub;
+  const isBig = application?.krankenkasse === "big_plusbonus";
+  const subLabel = isSub
+    ? application?.person_role === "ehegatte"
+      ? "Ehegatte"
+      : `Kind ${application?.person_index ?? ""}`.trim()
+    : "";
 
   const handleLoad = async () => {
     if (!application) return;
@@ -89,46 +94,96 @@ export function ApplicationDetailDrawer({
       const bank = (f.bigBank as Record<string, string> | undefined) ?? {};
       const eh = (f.ehegatte as Record<string, string> | undefined) ?? {};
       const kinder = (f.kinder as Array<Record<string, string>> | undefined) ?? [];
+
+      // Adresse/Kontakt/Bank vom Hauptantrag (auch bei Untereinträgen genutzt).
+      const baseAdresse = {
+        strasse: String(f.mitgliedStrasse ?? ""),
+        hausnummer: String(f.mitgliedHausnummer ?? ""),
+        plz: String(f.mitgliedPlz ?? ""),
+        ort: String(f.ort ?? ""),
+      };
+      const baseBank = {
+        kontoinhaber: String(bank.kontoinhaber ?? ""),
+        iban: String(bank.iban ?? ""),
+        bic: String(bank.bic ?? ""),
+        kreditinstitut: String(bank.kreditinstitut ?? ""),
+      };
+      const baseTelefon = String(f.telefon ?? "");
+      const baseEmail = String(f.email ?? "");
+
+      // Person je nach Kontext bestimmen: Hauptantrag / Ehegatte / Kind[N].
+      let vorname = String(f.mitgliedVorname ?? "");
+      let nachname = String(f.mitgliedName ?? "");
+      let geburtsdatum = String(f.mitgliedGeburtsdatum ?? "");
+      let geburtsort = String(f.mitgliedGeburtsort ?? "");
+      let geburtsland = String(f.mitgliedGeburtsland ?? "");
+      let geschlecht = (f.bigGeschlecht as BigAutofillPayload["mitglied"]["geschlecht"]) ?? "";
+      let familienstand = String(f.familienstand ?? "");
+      let kvNummer = String(f.mitgliedKvNummer ?? "");
+      let bisherigeKrankenkasse = String(f.mitgliedKrankenkasse ?? "");
+
+      if (isSub && application.person_role === "ehegatte" && eh) {
+        vorname = String(eh.vorname ?? vorname);
+        nachname = String(eh.name ?? nachname);
+        geburtsdatum = String(eh.geburtsdatum ?? "");
+        geburtsort = String(eh.geburtsort ?? "");
+        geburtsland = String(eh.geburtsland ?? "");
+        kvNummer = String(eh.kvNummer ?? "");
+        bisherigeKrankenkasse = String(eh.krankenkasse ?? "");
+        familienstand = "verheiratet";
+      } else if (isSub && application.person_role === "kind") {
+        const idx = (application.person_index ?? 1) - 1;
+        const k = (kinder[idx] as Record<string, string> | undefined) ?? {};
+        vorname = String(k.vorname ?? "");
+        nachname = String(k.name ?? "");
+        geburtsdatum = String(k.geburtsdatum ?? "");
+        geburtsort = String(k.geburtsort ?? "");
+        geburtsland = String(k.geburtsland ?? "");
+        kvNummer = String(k.kvNummer ?? "");
+        bisherigeKrankenkasse = String(k.krankenkasse ?? "");
+        familienstand = "ledig";
+        geschlecht = "";
+      }
+
+      // Geburtsname = Nachname (Vorgabe: gilt für alle Anträge).
+      const geburtsname = nachname;
+
       const autofill: BigAutofillPayload = {
         __type: "big-autofill/v1",
         mitglied: {
-          vorname: String(f.mitgliedVorname ?? ""),
-          nachname: String(f.mitgliedName ?? ""),
-          geburtsname: "",
-          geburtsdatum: String(f.mitgliedGeburtsdatum ?? ""),
-          geburtsort: String(f.mitgliedGeburtsort ?? ""),
-          geburtsland: String(f.mitgliedGeburtsland ?? ""),
+          vorname,
+          nachname,
+          geburtsname,
+          geburtsdatum,
+          geburtsort,
+          geburtsland,
           staatsangehoerigkeit: "",
-          geschlecht: (f.bigGeschlecht as BigAutofillPayload["mitglied"]["geschlecht"]) ?? "",
-          familienstand: String(f.familienstand ?? ""),
-          kvNummer: String(f.mitgliedKvNummer ?? ""),
-          bisherigeKrankenkasse: String(f.mitgliedKrankenkasse ?? ""),
+          geschlecht,
+          familienstand,
+          kvNummer,
+          bisherigeKrankenkasse,
         },
-        adresse: {
-          strasse: String(f.mitgliedStrasse ?? ""),
-          hausnummer: String(f.mitgliedHausnummer ?? ""),
-          plz: String(f.mitgliedPlz ?? ""),
-          ort: String(f.ort ?? ""),
-        },
-        telefon: String(f.telefon ?? ""),
-        email: String(f.email ?? ""),
-        bank: {
-          kontoinhaber: String(bank.kontoinhaber ?? ""),
-          iban: String(bank.iban ?? ""),
-          bic: String(bank.bic ?? ""),
-          kreditinstitut: String(bank.kreditinstitut ?? ""),
-        },
-        ehegatte: eh && (eh.vorname || eh.name)
+        adresse: baseAdresse,
+        telefon: baseTelefon,
+        email: baseEmail,
+        bank: baseBank,
+        ehegatte: !isSub && eh && (eh.vorname || eh.name)
           ? { vorname: String(eh.vorname ?? ""), nachname: String(eh.name ?? ""), geburtsdatum: String(eh.geburtsdatum ?? "") }
           : null,
-        kinder: kinder.map((k) => ({
-          vorname: String(k.vorname ?? ""),
-          nachname: String(k.name ?? ""),
-          geburtsdatum: String(k.geburtsdatum ?? ""),
-        })),
+        kinder: !isSub
+          ? kinder.map((k) => ({
+              vorname: String(k.vorname ?? ""),
+              nachname: String(k.name ?? ""),
+              geburtsdatum: String(k.geburtsdatum ?? ""),
+            }))
+          : [],
       };
       await navigator.clipboard.writeText(JSON.stringify(autofill));
-      toast.success("Antragsdaten in Zwischenablage. Klicke im neuen Tab dein Lesezeichen 'BIG Autofill'.");
+      toast.success(
+        isSub
+          ? `Daten für ${subLabel} in Zwischenablage. Im neuen Tab „BIG Autofill" klicken.`
+          : "Antragsdaten in Zwischenablage. Klicke im neuen Tab dein Lesezeichen 'BIG Autofill'.",
+      );
       const vp = application.vertriebspartner || "8199db59-990d-464b-a851-afaa918b68cc";
       window.open(
         `https://www.big-direkt.de/de/mitglied-werden/online-mitglied-werden?distributionpartner=${encodeURIComponent(vp)}`,
@@ -190,14 +245,16 @@ export function ApplicationDetailDrawer({
 
               {isBig && (
                 <div className="rounded-xl border border-border p-3 space-y-2 bg-muted/30">
-                  <div className="text-sm font-medium">BIG direkt — Online-Antrag</div>
+                  <div className="text-sm font-medium">
+                    BIG direkt — Online-Antrag{isSub ? ` (${subLabel})` : ""}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     Kopiert die Antragsdaten in die Zwischenablage und öffnet BIG. Auf der BIG-Seite dann dein
                     Lesezeichen <b>„BIG Autofill"</b> klicken.
                   </p>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={handleBigOnlineAusfuellen} disabled={busy} className="flex-1 gap-1">
-                      <ExternalLink className="h-3 w-3" /> BIG online ausfüllen
+                      <ExternalLink className="h-3 w-3" /> BIG online ausfüllen{isSub ? ` (${subLabel})` : ""}
                     </Button>
                     <Button size="sm" variant="outline" asChild>
                       <Link to="/big-autofill-setup">Einrichten</Link>
