@@ -250,8 +250,14 @@ const fillColumn = (
   }
   // weiterhin bei
   setText(form, cols.weiterBei, m.bisherigBestehtWeiterBei || 'BIG direkt gesund');
-  // Name bisherige Kasse (Textfeld)
-  setText(form, cols.weiterBeiKKName, m.bisherigBestandBei || '');
+  // Name bisherige Kasse (Textfeld "bestand bei")
+  // Fallback: bei Ehegatte auf formData.ehegatteKrankenkasse, sonst mitgliedKrankenkasse
+  const bestandBei =
+    m.bisherigBestandBei ||
+    (isPartner ? member.ehegatteKrankenkasse : '') ||
+    member.mitgliedKrankenkasse ||
+    '';
+  setText(form, cols.weiterBeiKKName, bestandBei);
 
   // Page 2 — Versichertennummer / Geburtsdaten
   setText(form, cols.versNr, m.versichertennummer);
