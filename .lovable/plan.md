@@ -1,59 +1,37 @@
-# WhatsApp-Versand nach E-Mail
+## Fixes für VIACTIV — Arbeitgeber + Kinder-BE + WhatsApp
 
-Nach jeder erfolgreich versendeten E-Mail-Gruppe im `SendEmailDialog` wird zusätzlich eine WhatsApp-Sequenz an die feste Gruppe `120363309092314738@g.us` gesendet.
+### 1) Arbeitgeber-Felder werden nicht vollständig in die BE geschrieben
 
-## Sequenz pro Sende-Gruppe
+Ursache in `src/utils/viactivExport.ts` → `resolveArbeitgeber` / `resolveArbeitgeberForSpouse`:
+Sobald `viactivBeschaeftigung === "al_geld_2"` (oder `"al_geld_1"`) gesetzt ist, überschreibt der Fallback **immer** die vom User eingetragenen Arbeitgeberdaten. Ergebnis: `Name` wird pauschal auf `"Jobcenter"` gesetzt (statt „Jobcenter Kiel"), `Straße`/`Hausnummer` gehen verloren, `PLZ`/`Ort` werden mit `mitgliedPlz`/`ort` überschrieben — auch wenn im UI (Screenshot 1) explizit „Postfach / 7007 / 24170 / Kiel" eingetragen wurde.
 
-Jede Zeile = eigene WhatsApp-Nachricht, in dieser Reihenfolge:
+Fix:
+- `resolveArbeitgeber` / `resolveArbeitgeberForSpouse` umbauen zu einem **Merge**: User-Eingaben (`viactivArbeitgeber.*`) haben Vorrang; die ALG-Defaults (`"Jobcenter"` bzw. `"Agentur für Arbeit"` und `mitgliedPlz`/`ort`) füllen **nur leere Felder**.
+- Gilt für alle vier BE-Varianten (Mitglied, Ehegatte, Kind — siehe Punkt 2).
 
-```text
-<Zusammenfassung_Mitgliedsantrag.pdf>
-<Vorname Name
-Erstellungsdatum
-Krankenkasse
-Vertriebspartner>
-.
-.
-.
-```
+### 2) Kind-BE (≥15, eigene Mitgliedschaft) — Arbeitgeber vom Hauptantragsteller übernehmen
 
-- Erstellungsdatum = heutiges Datum, Format `dd.MM.yyyy`.
-- Krankenkasse-Label (ohne Betrag):
-  - `big_plusbonus` → `Bigdirekt gesund`
-  - `viactiv` → `VIACTIV`
-  - `novitas` → `Novitas BKK`
-  - `dak` → `DAK`
-  - `bkk_gs` → `BKK GILDEMEISTER SEIDENSTICKER`
-- Vertriebspartner = `formData.vertriebspartner` (Zeile weglassen, wenn leer).
+In `createViactivBeitrittserklaerungForChild` fehlen aktuell:
+- Beschäftigungsstatus-Checkboxen
+- Arbeitgeber-Textfelder
 
-## PDF-Auswahl
+Neu (analog zur Ehegatten-Logik):
+- Wenn Kind eigene Mitgliedschaft hat, wird der **Beschäftigungsstatus des Hauptantragstellers** (`formData.viactivBeschaeftigung`) auf das Kind angewendet (alle Checkboxen: `Ich bin beschäftigt`, `ich beziehe AL-Geld I`, `ich beziehe AL-Geld II`, `ich studiere`, `Ich bin in Ausbildung`, `Minijob`, `selbstständig`, `rente`, `freiwillig_versichert`, `einkommen_ueber_grenze`).
+- Arbeitgeberdaten werden über dieselbe (in Punkt 1 gefixte) `resolveArbeitgeber(formData)` gezogen und in `Name des Arbeitgebers`, `Arbeitgeber Straße/Hausnummer/PLZ/Ort`, `Beschäftigt seit` geschrieben.
+- Familienstand bleibt `ledig`; bisherige Versicherung bleibt `familienversichert`.
 
-Für jede Sende-Gruppe wird die Datei gesendet, deren Dateiname (case-insensitive) mit `Zusammenfassung_Mitgliedsantrag` beginnt und die in der Gruppe als aktiver Anhang (`include=true`) vorhanden ist. Ist keine solche Datei angehängt → WA-Versand für diese Gruppe wird übersprungen (Toast-Hinweis).
+### 3) WhatsApp-Versand: bei VIACTIV die BE senden statt „Zusammenfassung_Mitgliedsantrag"
 
-## Auslöser (UI)
+In `src/components/SendEmailDialog.tsx` → `handleSend` (WhatsApp-Block):
+- Aktuell wird der Anhang gesucht via `filename.toLowerCase().startsWith('zusammenfassung_mitgliedsantrag')`.
+- Neue Regel: **pro Sende-Gruppe** (Hauptmitglied, Ehegatte-Variante-B, Kind-Variante-B) die zugehörige Datei auswählen.
+  - `formData.selectedKrankenkasse === 'viactiv'`: Anhang mit Prefix `viactiv_` **und** Segment `_be_` (Beispiel: `Viactiv_Lahham, Mohammad Kamel_BE_30.06.2026.pdf`), der zur Person der Gruppe gehört (Name+Vorname im Dateinamen). Fällt keine person-spezifische BE, fällt keine BE für die Gruppe → info-Toast + skip.
+  - Sonst (BIG etc.): bisheriges Verhalten (`zusammenfassung_mitgliedsantrag`) beibehalten.
+- Für VIACTIV wird künftig auch **pro Kind mit eigener Mitgliedschaft** eine eigene Sende-Gruppe benötigt (analog zur bestehenden BIG-Variante-B-Logik). Der `groups`-`useMemo`-Block wird für `selectedKrankenkasse === 'viactiv'` erweitert: Ehegatte mit eigener Mitgliedschaft und Kinder mit `eigeneMitgliedschaft` bekommen jeweils eine eigene Gruppe, deren `auto`-Anhänge nach Prefix `viactiv_` + Namensmatch gefiltert werden.
 
-Im `SendEmailDialog` neue Checkbox „Auch per WhatsApp an Gruppe senden" unterhalb der Sende-Gruppen, standardmäßig aktiv. Nach jeder erfolgreich per E-Mail versendeten Gruppe wird — falls Checkbox aktiv und Zusammenfassungs-PDF vorhanden — die WA-Sequenz ausgelöst. WA-Fehler blockieren den E-Mail-Erfolg nicht, werden aber als Toast angezeigt.
+### Betroffene Dateien
+- `src/utils/viactivExport.ts` — Merge-Logik in `resolveArbeitgeber` / `resolveArbeitgeberForSpouse`; Beschäftigung + Arbeitgeber in `createViactivBeitrittserklaerungForChild`.
+- `src/components/SendEmailDialog.tsx` — VIACTIV-BE-Auswahl im WhatsApp-Block; zusätzliche Sende-Gruppen für Ehegatte/Kind mit eigener Mitgliedschaft bei VIACTIV.
 
-## Neue Edge Function `send-whatsapp-summary`
-
-- JWT-verifiziert (wie `send-application-email`).
-- Body: `{ application_id?: string, chatId: string, pdfBase64: string, pdfFilename: string, textLines: string[] }`.
-- Nutzt bestehende Env `WHAPI_TOKEN` und die WHAPI-REST-API.
-- Ablauf (sequenziell, `await` zwischen den Calls für stabile Reihenfolge):
-  1. Dokument (PDF, base64, `filename = pdfFilename`)
-  2. Text `textLines.join('\n')`
-  3. `.` als Text (3×)
-- Fehler → HTTP 502 mit Details.
-- Audit-Event `whatsapp_sent` in `application_events` (nur Metadaten: `chat_id`, `filename`, keine Inhalte).
-
-## Frontend-Änderungen (`SendEmailDialog.tsx`)
-
-- Neuer State `sendToWhatsApp` (default `true`) + Checkbox.
-- In `handleSend` nach jeder erfolgreichen E-Mail:
-  - Zusammenfassungs-PDF der Gruppe finden.
-  - Falls vorhanden + Checkbox aktiv: `supabase.functions.invoke('send-whatsapp-summary', …)` mit den gebauten `textLines`.
-
-## Nicht Teil des Plans
-
-- Keine Änderungen an WhatsApp-Intake, E-Mail-Logik oder Persistierung.
-- Keine Konfigurations-UI für Chat-ID (fest verdrahtet).
+### Nicht geändert
+- Betreff/Body-Templates, E-Mail-Versand, Persistenz, Edge Function `send-whatsapp-summary`, Krankenkassen-Labels für WhatsApp.

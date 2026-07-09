@@ -218,32 +218,20 @@ const downloadPDF = (pdfBytes: Uint8Array, filename: string) => {
 const resolveArbeitgeber = (
   formData: FormData,
 ): { data: FormData["viactivArbeitgeber"]; source: string } => {
-  const ag = formData.viactivArbeitgeber;
-  // ALG I/II hat IMMER Vorrang vor User-Arbeitgeberdaten (Jobcenter/Agentur überschreibt)
-  if (formData.viactivBeschaeftigung === "al_geld_2") {
+  const ag = formData.viactivArbeitgeber || ({} as FormData["viactivArbeitgeber"]);
+  // ALG-Defaults füllen NUR leere Felder — User-Eingaben haben immer Vorrang
+  if (formData.viactivBeschaeftigung === "al_geld_2" || formData.viactivBeschaeftigung === "al_geld_1") {
+    const defaultName = formData.viactivBeschaeftigung === "al_geld_2" ? "Jobcenter" : "Agentur für Arbeit";
     return {
       data: {
-        name: "Jobcenter",
-        strasse: "",
-        hausnummer: "",
-        plz: formData.mitgliedPlz || "",
-        ort: formData.ort || "",
-        beschaeftigtSeit: "",
+        name: ag.name || defaultName,
+        strasse: ag.strasse || "",
+        hausnummer: ag.hausnummer || "",
+        plz: ag.plz || formData.mitgliedPlz || "",
+        ort: ag.ort || formData.ort || "",
+        beschaeftigtSeit: ag.beschaeftigtSeit || "",
       },
-      source: "Fallback Jobcenter (ALG II)",
-    };
-  }
-  if (formData.viactivBeschaeftigung === "al_geld_1") {
-    return {
-      data: {
-        name: "Agentur für Arbeit",
-        strasse: "",
-        hausnummer: "",
-        plz: formData.mitgliedPlz || "",
-        ort: formData.ort || "",
-        beschaeftigtSeit: "",
-      },
-      source: "Fallback Agentur für Arbeit (ALG I)",
+      source: `Merge ${defaultName} + User`,
     };
   }
   const hasArbeitgeber = !!(ag && (ag.name || ag.strasse || ag.plz || ag.ort));
@@ -259,30 +247,19 @@ const resolveArbeitgeberForSpouse = (
   formData: FormData,
 ): { data: FormData["viactivArbeitgeber"]; source: string } => {
   const beschaeftigung = formData.ehegatte?.beschaeftigung;
-  if (beschaeftigung === "al_geld_2") {
+  const ag = formData.viactivArbeitgeber || ({} as FormData["viactivArbeitgeber"]);
+  if (beschaeftigung === "al_geld_2" || beschaeftigung === "al_geld_1") {
+    const defaultName = beschaeftigung === "al_geld_2" ? "Jobcenter" : "Agentur für Arbeit";
     return {
       data: {
-        name: "Jobcenter",
-        strasse: "",
-        hausnummer: "",
-        plz: formData.mitgliedPlz || "",
-        ort: formData.ort || "",
+        name: ag.name || defaultName,
+        strasse: ag.strasse || "",
+        hausnummer: ag.hausnummer || "",
+        plz: ag.plz || formData.mitgliedPlz || "",
+        ort: ag.ort || formData.ort || "",
         beschaeftigtSeit: "",
       },
-      source: "Spouse Fallback Jobcenter (ALG II)",
-    };
-  }
-  if (beschaeftigung === "al_geld_1") {
-    return {
-      data: {
-        name: "Agentur für Arbeit",
-        strasse: "",
-        hausnummer: "",
-        plz: formData.mitgliedPlz || "",
-        ort: formData.ort || "",
-        beschaeftigtSeit: "",
-      },
-      source: "Spouse Fallback Agentur für Arbeit (ALG I)",
+      source: `Spouse Merge ${defaultName} + User`,
     };
   }
   return {
