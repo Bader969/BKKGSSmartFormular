@@ -17,43 +17,25 @@ export interface FileForPdf {
  * Each image is placed on its own page, scaled to fit A4
  */
 const createPdfFromImages = async (images: ImageForPdf[]): Promise<Uint8Array> => {
-  const A4_WIDTH = 210;
-  const A4_HEIGHT = 297;
-  const MARGIN = 10;
-  
-  const pdf = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  });
-  
+  let pdf: jsPDF | null = null;
+
   for (let i = 0; i < images.length; i++) {
-    if (i > 0) {
-      pdf.addPage();
-    }
-    
     const img = images[i];
-    
-    const maxWidth = A4_WIDTH - 2 * MARGIN;
-    const maxHeight = A4_HEIGHT - 2 * MARGIN;
-    
-    const imgWidthMm = (img.width / 96) * 25.4;
-    const imgHeightMm = (img.height / 96) * 25.4;
-    
-    const scaleX = maxWidth / imgWidthMm;
-    const scaleY = maxHeight / imgHeightMm;
-    const scale = Math.min(scaleX, scaleY, 1);
-    
-    const scaledWidth = imgWidthMm * scale;
-    const scaledHeight = imgHeightMm * scale;
-    
-    const x = (A4_WIDTH - scaledWidth) / 2;
-    const y = (A4_HEIGHT - scaledHeight) / 2;
-    
-    pdf.addImage(img.dataUrl, 'JPEG', x, y, scaledWidth, scaledHeight);
+    const widthMm = (img.width / 96) * 25.4;
+    const heightMm = (img.height / 96) * 25.4;
+    const orientation = widthMm >= heightMm ? 'landscape' : 'portrait';
+    const format: [number, number] = [widthMm, heightMm];
+
+    if (!pdf) {
+      pdf = new jsPDF({ orientation, unit: 'mm', format });
+    } else {
+      pdf.addPage(format, orientation);
+    }
+
+    pdf.addImage(img.dataUrl, 'JPEG', 0, 0, widthMm, heightMm);
   }
-  
-  const arrayBuffer = pdf.output('arraybuffer');
+
+  const arrayBuffer = pdf!.output('arraybuffer');
   return new Uint8Array(arrayBuffer);
 };
 
