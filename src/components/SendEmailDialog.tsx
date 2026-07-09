@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Mail, Paperclip, Upload, Loader2, X } from 'lucide-react';
+import { Mail, Paperclip, Upload, Loader2, X, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import type { FormData } from '@/types/form';
@@ -50,7 +50,7 @@ async function filesToFileForPdf(files: File[]): Promise<FileForPdf[]> {
   );
 }
 
-type AttachmentKind = 'auto' | 'shared' | 'group';
+type AttachmentKind = 'auto' | 'shared' | 'group' | 'photo-shared' | 'photo-group';
 type Attachment = CapturedFile & { include: boolean; kind: AttachmentKind; groupId?: string };
 
 type SendGroup = {
@@ -127,6 +127,8 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [sharedDocs, setSharedDocs] = useState<File[]>([]);
   const [groupDocs, setGroupDocs] = useState<Record<string, File[]>>({});
+  const [sharedPhotos, setSharedPhotos] = useState<File[]>([]);
+  const [groupPhotos, setGroupPhotos] = useState<Record<string, File[]>>({});
   const [combiningShared, setCombiningShared] = useState(false);
   const [combiningGroup, setCombiningGroup] = useState<Record<string, boolean>>({});
   const [subjTpl, setSubjTpl] = useState<string>(DEFAULT_SUBJECT_TEMPLATE);
@@ -138,7 +140,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
   const groups: SendGroup[] = useMemo(() => {
     if (loadingAttachments) return [];
     const sharedIndices = attachments
-      .map((a, i) => (a.kind === 'shared' ? i : -1))
+      .map((a, i) => (a.kind === 'shared' || a.kind === 'photo-shared' ? i : -1))
       .filter((i) => i >= 0);
 
     const result: SendGroup[] = [];
@@ -156,14 +158,20 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
       }
     });
     const mainGroupIdx = attachments
-      .map((a, i) => (a.kind === 'group' && a.groupId === 'main' ? i : -1))
+      .map((a, i) => ((a.kind === 'group' || a.kind === 'photo-group') && a.groupId === 'main' ? i : -1))
       .filter((i) => i >= 0);
     const mainAttIdx = Array.from(new Set([...mainIdx, ...sharedIndices, ...mainGroupIdx]));
     const mainKey = 'main';
+    const mainHasPhotos = mainAttIdx.some((i) => {
+      const a = attachments[i];
+      return a && a.include && (a.kind === 'photo-shared' || a.kind === 'photo-group');
+    });
     const mainVars = buildTemplateVarsForPerson(
       formData,
       { vorname: formData.mitgliedVorname, name: formData.mitgliedName, geburtsdatum: formData.mitgliedGeburtsdatum },
       bearbeiter,
+      undefined,
+      { hasPhotos: mainHasPhotos },
     );
     result.push({
       id: mainKey,
@@ -195,14 +203,19 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           if (fn.startsWith('antrag plusbonus') && fileBelongsToPerson(a.filename, p.vorname, p.name)) idx.push(i);
         });
         const groupSpecific = attachments
-          .map((a, i) => (a.kind === 'group' && a.groupId === p.id ? i : -1))
+          .map((a, i) => ((a.kind === 'group' || a.kind === 'photo-group') && a.groupId === p.id ? i : -1))
           .filter((i) => i >= 0);
         const attIdx = Array.from(new Set([...idx, ...sharedIndices, ...groupSpecific]));
+        const pHasPhotos = attIdx.some((i) => {
+          const a = attachments[i];
+          return a && a.include && (a.kind === 'photo-shared' || a.kind === 'photo-group');
+        });
         const pVars = buildTemplateVarsForPerson(
           formData,
           { vorname: p.vorname, name: p.name, geburtsdatum: p.geb },
           bearbeiter,
           'Plusbonus',
+          { hasPhotos: pHasPhotos },
         );
         result.push({
           id: p.id,
@@ -226,6 +239,8 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
     setLoadingAttachments(true);
     setSharedDocs([]);
     setGroupDocs({});
+    setSharedPhotos([]);
+    setGroupPhotos({});
 
     (async () => {
       try {
@@ -360,6 +375,65 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
     await rebuildGroup(gid, next);
   };
 
+  // Photos: attached as-is (no PDF conversion). Only image/* accepted.
+  const rebuildSharedPhotos = (files: File[]) => {
+    const photos: Attachment[] = files
+      .filter((f) => f.type.startsWith('image/'))
+      .map((f) => ({
+        filename: f.name,
+        blob: f,
+        include: true,
+        kind: 'photo-shared' as AttachmentKind,
+      }));
+    setAttachments((prev) => [...prev.filter((a) => a.kind !== 'photo-shared'), ...photos]);
+  };
+
+  const rebuildGroupPhotos = (gid: string, files: File[]) => {
+    const photos: Attachment[] = files
+      .filter((f) => f.type.startsWith('image/'))
+      .map((f) => ({
+        filename: f.name,
+        blob: f,
+        include: true,
+        kind: 'photo-group' as AttachmentKind,
+        groupId: gid,
+      }));
+    setAttachments((prev) => [
+      ...prev.filter((a) => !(a.kind === 'photo-group' && a.groupId === gid)),
+      ...photos,
+    ]);
+  };
+
+  const handleAddSharedPhotos = (files: FileList | null) => {
+    if (!files || !files.length) return;
+    const arr = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (!arr.length) { toast.error('Nur Bilddateien erlaubt.'); return; }
+    const next = [...sharedPhotos, ...arr];
+    setSharedPhotos(next);
+    rebuildSharedPhotos(next);
+  };
+
+  const removeSharedPhoto = (idx: number) => {
+    const next = sharedPhotos.filter((_, i) => i !== idx);
+    setSharedPhotos(next);
+    rebuildSharedPhotos(next);
+  };
+
+  const handleAddGroupPhotos = (gid: string, files: FileList | null) => {
+    if (!files || !files.length) return;
+    const arr = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (!arr.length) { toast.error('Nur Bilddateien erlaubt.'); return; }
+    const next = [...(groupPhotos[gid] || []), ...arr];
+    setGroupPhotos((s) => ({ ...s, [gid]: next }));
+    rebuildGroupPhotos(gid, next);
+  };
+
+  const removeGroupPhoto = (gid: string, idx: number) => {
+    const next = (groupPhotos[gid] || []).filter((_, i) => i !== idx);
+    setGroupPhotos((s) => ({ ...s, [gid]: next }));
+    rebuildGroupPhotos(gid, next);
+  };
+
   const totalSize = attachments.filter((a) => a.include).reduce((s, a) => s + a.blob.size, 0);
   const tooLarge = totalSize > 24 * 1024 * 1024;
 
@@ -454,7 +528,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
             <Label htmlFor="email-body">Nachricht</Label>
             <Textarea id="email-body" rows={8} value={body} onChange={(e) => setBody(e.target.value)} />
             <p className="text-xs text-muted-foreground mt-1">
-              Platzhalter: {'{name}'}, {'{vorname}'}, {'{geburtsdatum}'}, {'{antragsform}'}, {'{krankenkasse}'}, {'{bearbeiter}'}
+              Platzhalter: {'{name}'}, {'{vorname}'}, {'{geburtsdatum}'}, {'{antragsform}'}, {'{krankenkasse}'}, {'{bearbeiter}'}, {'{unterlagen}'}, {'{foto}'}, {'{startdatum}'}
             </p>
           </div>
 
@@ -529,6 +603,30 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
                         </ul>
                       )}
                     </div>
+                    <div className="border-t border-border/40 pt-2 mt-1">
+                      <Label className="flex items-center gap-2 text-xs">
+                        <ImageIcon className="h-3 w-3" /> Fotos (nur für diese E-Mail, ohne PDF-Konvertierung)
+                      </Label>
+                      <Input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={(e) => handleAddGroupPhotos(g.id, e.target.files)}
+                        className="mt-1 h-8 text-xs"
+                      />
+                      {(groupPhotos[g.id]?.length ?? 0) > 0 && (
+                        <ul className="mt-1 space-y-1">
+                          {(groupPhotos[g.id] || []).map((f, i) => (
+                            <li key={f.name + i} className="flex items-center gap-2 text-xs">
+                              <span className="flex-1 truncate">{f.name}</span>
+                              <button onClick={() => removeGroupPhoto(g.id, i)} className="text-muted-foreground hover:text-destructive">
+                                <X className="h-3 w-3" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
                 );
               })
@@ -548,6 +646,26 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
                   <li key={f.name + i} className="flex items-center gap-2 text-xs">
                     <span className="flex-1 truncate">{f.name}</span>
                     <button onClick={() => removeSharedDoc(i)} className="text-muted-foreground hover:text-destructive">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="border-t border-border/60 pt-3">
+            <Label className="flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Fotos (an alle E-Mails, ohne PDF-Konvertierung)</Label>
+            <p className="text-xs text-muted-foreground mt-1">
+              Bilder werden als separate Foto-Anhänge versendet (nicht zu PDF konvertiert). Aktiviert „+ Foto" im Betreff.
+            </p>
+            <Input type="file" multiple accept="image/*" onChange={(e) => handleAddSharedPhotos(e.target.files)} className="mt-2" />
+            {sharedPhotos.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {sharedPhotos.map((f, i) => (
+                  <li key={f.name + i} className="flex items-center gap-2 text-xs">
+                    <span className="flex-1 truncate">{f.name}</span>
+                    <button onClick={() => removeSharedPhoto(i)} className="text-muted-foreground hover:text-destructive">
                       <X className="h-3 w-3" />
                     </button>
                   </li>

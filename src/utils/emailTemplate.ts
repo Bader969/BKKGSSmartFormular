@@ -1,5 +1,5 @@
 import type { FormData } from '@/types/form';
-import { deriveAntragsform } from './antragsform';
+import { deriveAntragsform, deriveAntragsformLong } from './antragsform';
 
 export type TemplateVars = {
   name: string;
@@ -8,6 +8,9 @@ export type TemplateVars = {
   antragsform: string;
   krankenkasse: string;
   bearbeiter: string;
+  unterlagen: string;
+  foto: string;
+  startdatum: string;
 };
 
 const KK_LABEL: Record<string, string> = {
@@ -27,14 +30,21 @@ const formatGeburtsdatum = (input: string): string => {
   return input;
 };
 
-export function buildTemplateVars(formData: FormData, bearbeiter: string): TemplateVars {
+export function buildTemplateVars(
+  formData: FormData,
+  bearbeiter: string,
+  opts?: { hasPhotos?: boolean },
+): TemplateVars {
   return {
     name: formData.mitgliedName || '',
     vorname: formData.mitgliedVorname || '',
     geburtsdatum: formatGeburtsdatum(formData.mitgliedGeburtsdatum || ''),
-    antragsform: deriveAntragsform(formData),
+    antragsform: deriveAntragsformLong(formData),
     krankenkasse: KK_LABEL[formData.selectedKrankenkasse] || formData.selectedKrankenkasse || '',
     bearbeiter: bearbeiter || '',
+    unterlagen: 'Unterlagen',
+    foto: opts?.hasPhotos ? ' + Foto' : '',
+    startdatum: formatGeburtsdatum(formData.beginnFamilienversicherung || ''),
   };
 }
 
@@ -43,14 +53,18 @@ export function buildTemplateVarsForPerson(
   person: { vorname: string; name: string; geburtsdatum: string },
   bearbeiter: string,
   antragsformOverride?: string,
+  opts?: { hasPhotos?: boolean },
 ): TemplateVars {
   return {
     name: person.name || '',
     vorname: person.vorname || '',
     geburtsdatum: formatGeburtsdatum(person.geburtsdatum || ''),
-    antragsform: antragsformOverride ?? deriveAntragsform(formData),
+    antragsform: (antragsformOverride ?? deriveAntragsformLong(formData)).replace(/Familienvers\./g, 'Familienversicherung'),
     krankenkasse: KK_LABEL[formData.selectedKrankenkasse] || formData.selectedKrankenkasse || '',
     bearbeiter: bearbeiter || '',
+    unterlagen: 'Unterlagen',
+    foto: opts?.hasPhotos ? ' + Foto' : '',
+    startdatum: formatGeburtsdatum(formData.beginnFamilienversicherung || ''),
   };
 }
 
@@ -59,7 +73,7 @@ export function applyTemplate(tpl: string, vars: TemplateVars): string {
 }
 
 export const DEFAULT_SUBJECT_TEMPLATE =
-  '{name}, {vorname}, {geburtsdatum} ({antragsform})';
+  '{vorname} {name} {geburtsdatum} - {unterlagen} + {antragsform}{foto} start {startdatum}';
 
 export const DEFAULT_BODY_TEMPLATE =
   `Sehr geehrte Damen und Herren,\n\n` +

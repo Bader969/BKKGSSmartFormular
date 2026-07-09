@@ -24,3 +24,10 @@ export function deriveAntragsform(formData: FormData): string {
       return '';
   }
 }
+
+/**
+ * Long form for email subject usage: "Familienvers." expanded to "Familienversicherung".
+ */
+export function deriveAntragsformLong(formData: FormData): string {
+  return deriveAntragsform(formData).replace(/Familienvers\./g, 'Familienversicherung');
+}
