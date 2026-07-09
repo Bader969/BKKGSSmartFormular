@@ -85,6 +85,35 @@ function baseFilename(formData: FormData): string {
   return parts.join('_') || 'Antrag';
 }
 
+const WA_CHAT_ID = '120363309092314738@g.us';
+const WA_KK_LABEL: Record<string, string> = {
+  big_plusbonus: 'Bigdirekt gesund',
+  viactiv: 'VIACTIV',
+  novitas: 'Novitas BKK',
+  dak: 'DAK',
+  bkk_gs: 'BKK GILDEMEISTER SEIDENSTICKER',
+};
+
+function todayDdMmYyyy(): string {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+}
+
+function buildWaTextLines(
+  person: { vorname: string; name: string },
+  kk: string,
+  vertriebspartner: string,
+): string[] {
+  const lines: string[] = [];
+  const fullName = `${(person.vorname || '').trim()} ${(person.name || '').trim()}`.trim();
+  if (fullName) lines.push(fullName);
+  lines.push(todayDdMmYyyy());
+  const kkLabel = WA_KK_LABEL[kk] || kk;
+  if (kkLabel) lines.push(kkLabel);
+  if (vertriebspartner && vertriebspartner.trim()) lines.push(vertriebspartner.trim());
+  return lines;
+}
+
 async function runAllExports(formData: FormData): Promise<void> {
   const kk = formData.selectedKrankenkasse;
   if (kk === 'big_plusbonus') {
