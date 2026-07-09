@@ -239,6 +239,8 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
     setLoadingAttachments(true);
     setSharedDocs([]);
     setGroupDocs({});
+    setSharedPhotos([]);
+    setGroupPhotos({});
 
     (async () => {
       try {
