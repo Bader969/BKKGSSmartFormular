@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Mail, Paperclip, Upload, Loader2, X } from 'lucide-react';
+import { Mail, Paperclip, Upload, Loader2, X, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import type { FormData } from '@/types/form';
@@ -50,7 +50,7 @@ async function filesToFileForPdf(files: File[]): Promise<FileForPdf[]> {
   );
 }
 
-type AttachmentKind = 'auto' | 'shared' | 'group';
+type AttachmentKind = 'auto' | 'shared' | 'group' | 'photo-shared' | 'photo-group';
 type Attachment = CapturedFile & { include: boolean; kind: AttachmentKind; groupId?: string };
 
 type SendGroup = {
@@ -127,6 +127,8 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [sharedDocs, setSharedDocs] = useState<File[]>([]);
   const [groupDocs, setGroupDocs] = useState<Record<string, File[]>>({});
+  const [sharedPhotos, setSharedPhotos] = useState<File[]>([]);
+  const [groupPhotos, setGroupPhotos] = useState<Record<string, File[]>>({});
   const [combiningShared, setCombiningShared] = useState(false);
   const [combiningGroup, setCombiningGroup] = useState<Record<string, boolean>>({});
   const [subjTpl, setSubjTpl] = useState<string>(DEFAULT_SUBJECT_TEMPLATE);
@@ -138,7 +140,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
   const groups: SendGroup[] = useMemo(() => {
     if (loadingAttachments) return [];
     const sharedIndices = attachments
-      .map((a, i) => (a.kind === 'shared' ? i : -1))
+      .map((a, i) => (a.kind === 'shared' || a.kind === 'photo-shared' ? i : -1))
       .filter((i) => i >= 0);
 
     const result: SendGroup[] = [];
@@ -156,14 +158,20 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
       }
     });
     const mainGroupIdx = attachments
-      .map((a, i) => (a.kind === 'group' && a.groupId === 'main' ? i : -1))
+      .map((a, i) => ((a.kind === 'group' || a.kind === 'photo-group') && a.groupId === 'main' ? i : -1))
       .filter((i) => i >= 0);
     const mainAttIdx = Array.from(new Set([...mainIdx, ...sharedIndices, ...mainGroupIdx]));
     const mainKey = 'main';
+    const mainHasPhotos = mainAttIdx.some((i) => {
+      const a = attachments[i];
+      return a && a.include && (a.kind === 'photo-shared' || a.kind === 'photo-group');
+    });
     const mainVars = buildTemplateVarsForPerson(
       formData,
       { vorname: formData.mitgliedVorname, name: formData.mitgliedName, geburtsdatum: formData.mitgliedGeburtsdatum },
       bearbeiter,
+      undefined,
+      { hasPhotos: mainHasPhotos },
     );
     result.push({
       id: mainKey,
@@ -195,14 +203,19 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           if (fn.startsWith('antrag plusbonus') && fileBelongsToPerson(a.filename, p.vorname, p.name)) idx.push(i);
         });
         const groupSpecific = attachments
-          .map((a, i) => (a.kind === 'group' && a.groupId === p.id ? i : -1))
+          .map((a, i) => ((a.kind === 'group' || a.kind === 'photo-group') && a.groupId === p.id ? i : -1))
           .filter((i) => i >= 0);
         const attIdx = Array.from(new Set([...idx, ...sharedIndices, ...groupSpecific]));
+        const pHasPhotos = attIdx.some((i) => {
+          const a = attachments[i];
+          return a && a.include && (a.kind === 'photo-shared' || a.kind === 'photo-group');
+        });
         const pVars = buildTemplateVarsForPerson(
           formData,
           { vorname: p.vorname, name: p.name, geburtsdatum: p.geb },
           bearbeiter,
           'Plusbonus',
+          { hasPhotos: pHasPhotos },
         );
         result.push({
           id: p.id,
