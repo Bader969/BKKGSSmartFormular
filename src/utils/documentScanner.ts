@@ -9,7 +9,8 @@ export interface Point {
 
 export type Corners = [Point, Point, Point, Point]; // TL, TR, BR, BL
 
-const OUTPUT_MAX_WIDTH = 1100;
+const OUTPUT_MAX_WIDTH = 850;
+const EXPORT_SOURCE_MAX_DIMENSION = 1500;
 const PREVIEW_SCAN_MAX_DIMENSION = 360;
 
 export function defaultCorners(width: number, height: number): Corners {
@@ -188,10 +189,20 @@ export function cropAndEnhanceFallback(
 ): HTMLCanvasElement {
   const naturalWidth = img.naturalWidth || img.width;
   const naturalHeight = img.naturalHeight || img.height;
-  const topW = distance(corners[0], corners[1]);
-  const bottomW = distance(corners[3], corners[2]);
-  const leftH = distance(corners[0], corners[3]);
-  const rightH = distance(corners[1], corners[2]);
+  const sourceScale = Math.min(
+    1,
+    EXPORT_SOURCE_MAX_DIMENSION / Math.max(naturalWidth, naturalHeight)
+  );
+  const scaledCorners = corners.map((p) => ({
+    x: p.x * sourceScale,
+    y: p.y * sourceScale,
+  })) as Corners;
+  const sourceWidth = Math.max(1, Math.round(naturalWidth * sourceScale));
+  const sourceHeight = Math.max(1, Math.round(naturalHeight * sourceScale));
+  const topW = distance(scaledCorners[0], scaledCorners[1]);
+  const bottomW = distance(scaledCorners[3], scaledCorners[2]);
+  const leftH = distance(scaledCorners[0], scaledCorners[3]);
+  const rightH = distance(scaledCorners[1], scaledCorners[2]);
   const srcW = Math.max(1, (topW + bottomW) / 2);
   const srcH = Math.max(1, (leftH + rightH) / 2);
   const dstW = Math.min(OUTPUT_MAX_WIDTH, Math.max(700, Math.round(srcW)));
@@ -204,22 +215,24 @@ export function cropAndEnhanceFallback(
   if (!ctx) throw new Error("Canvas konnte nicht initialisiert werden");
 
   const srcCanvas = document.createElement("canvas");
-  srcCanvas.width = naturalWidth;
-  srcCanvas.height = naturalHeight;
+  srcCanvas.width = sourceWidth;
+  srcCanvas.height = sourceHeight;
   const srcCtx = srcCanvas.getContext("2d", { willReadFrequently: true });
   if (!srcCtx) throw new Error("Canvas konnte nicht initialisiert werden");
-  srcCtx.drawImage(img, 0, 0);
-  const srcData = srcCtx.getImageData(0, 0, naturalWidth, naturalHeight);
+  srcCtx.imageSmoothingEnabled = true;
+  srcCtx.imageSmoothingQuality = "high";
+  srcCtx.drawImage(img, 0, 0, sourceWidth, sourceHeight);
+  const srcData = srcCtx.getImageData(0, 0, sourceWidth, sourceHeight);
   const out = ctx.createImageData(dstW, dstH);
-  const coeff = inversePerspectiveCoefficients(corners, dstW, dstH);
+  const coeff = inversePerspectiveCoefficients(scaledCorners, dstW, dstH);
 
   if (!coeff) {
     ctx.filter = "contrast(1.2) brightness(1.08) saturate(1.08)";
-    const minX = Math.max(0, Math.min(...corners.map((p) => p.x)));
-    const minY = Math.max(0, Math.min(...corners.map((p) => p.y)));
-    const maxX = Math.min(naturalWidth, Math.max(...corners.map((p) => p.x)));
-    const maxY = Math.min(naturalHeight, Math.max(...corners.map((p) => p.y)));
-    ctx.drawImage(img, minX, minY, maxX - minX, maxY - minY, 0, 0, dstW, dstH);
+    const minX = Math.max(0, Math.min(...scaledCorners.map((p) => p.x)));
+    const minY = Math.max(0, Math.min(...scaledCorners.map((p) => p.y)));
+    const maxX = Math.min(sourceWidth, Math.max(...scaledCorners.map((p) => p.x)));
+    const maxY = Math.min(sourceHeight, Math.max(...scaledCorners.map((p) => p.y)));
+    ctx.drawImage(srcCanvas, minX, minY, maxX - minX, maxY - minY, 0, 0, dstW, dstH);
     return canvas;
   }
 
