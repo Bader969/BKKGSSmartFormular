@@ -578,11 +578,22 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           // WhatsApp-Versand
           if (sendToWhatsApp) {
             const active = g.attachmentIndices.map((i) => attachments[i]).filter((a) => a && a.include);
-            const summary = active.find((a) =>
-              a.filename.toLowerCase().startsWith('zusammenfassung_mitgliedsantrag'),
-            );
+            const isViactiv = formData.selectedKrankenkasse === 'viactiv';
+            const summary = isViactiv
+              ? active.find((a) => {
+                  const fn = a.filename.toLowerCase();
+                  return fn.startsWith('viactiv_') && fn.includes('_be_') &&
+                    fileBelongsToPerson(a.filename, g.person.vorname, g.person.name);
+                })
+              : active.find((a) =>
+                  a.filename.toLowerCase().startsWith('zusammenfassung_mitgliedsantrag'),
+                );
             if (!summary) {
-              toast.info(`"${g.label}": keine „Zusammenfassung_Mitgliedsantrag" angehängt — WhatsApp übersprungen.`);
+              toast.info(
+                isViactiv
+                  ? `"${g.label}": keine Beitrittserklärung (BE) gefunden — WhatsApp übersprungen.`
+                  : `"${g.label}": keine „Zusammenfassung_Mitgliedsantrag" angehängt — WhatsApp übersprungen.`,
+              );
             } else {
               try {
                 const pdfBase64 = await blobToBase64(summary.blob);
