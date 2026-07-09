@@ -73,10 +73,15 @@ async function waitForRuntime(cv: CV): Promise<CV> {
     };
     // If `cv` is a Promise (some builds), await it.
     if (cv && typeof cv.then === "function") {
-      cv.then((resolved: CV) => {
-        window.cv = resolved;
-        done();
-      }).catch(reject);
+      Promise.resolve(cv)
+        .then((resolved: CV) => {
+          window.cv = resolved;
+          done();
+        })
+        .catch((err) => {
+          window.clearTimeout(timeout);
+          reject(err);
+        });
       return;
     }
     if (cv) {
