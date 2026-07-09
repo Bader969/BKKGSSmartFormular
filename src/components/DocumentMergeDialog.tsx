@@ -104,6 +104,7 @@ export const DocumentMergeDialog: React.FC = () => {
     const imageFiles = validFiles.filter((f) => f.mimeType.startsWith('image/'));
     if (imageFiles.length === 0) return;
 
+    const runId = ++scanRunRef.current;
     setCvLoading(true);
     try {
       await loadOpenCV();
@@ -120,7 +121,6 @@ export const DocumentMergeDialog: React.FC = () => {
     }
     setCvLoading(false);
 
-    const runId = scanRunRef.current;
     for (const uf of imageFiles) {
       if (runId !== scanRunRef.current) break;
       await yieldToBrowser();
