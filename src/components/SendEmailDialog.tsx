@@ -511,6 +511,40 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           }
           if (data?.error) throw new Error(data.error);
           okCount++;
+
+          // WhatsApp-Versand
+          if (sendToWhatsApp) {
+            const active = g.attachmentIndices.map((i) => attachments[i]).filter((a) => a && a.include);
+            const summary = active.find((a) =>
+              a.filename.toLowerCase().startsWith('zusammenfassung_mitgliedsantrag'),
+            );
+            if (!summary) {
+              toast.info(`"${g.label}": keine „Zusammenfassung_Mitgliedsantrag" angehängt — WhatsApp übersprungen.`);
+            } else {
+              try {
+                const pdfBase64 = await blobToBase64(summary.blob);
+                const textLines = buildWaTextLines(
+                  g.person,
+                  formData.selectedKrankenkasse,
+                  formData.vertriebspartner || '',
+                );
+                const { data: waData, error: waErr } = await supabase.functions.invoke('send-whatsapp-summary', {
+                  body: {
+                    application_id: applicationId,
+                    chatId: WA_CHAT_ID,
+                    pdfBase64,
+                    pdfFilename: summary.filename,
+                    textLines,
+                  },
+                });
+                if (waErr) throw new Error(waErr.message);
+                if (waData?.error) throw new Error(waData.error);
+                toast.success(`WhatsApp gesendet: ${g.label}`);
+              } catch (waErr) {
+                toast.error(`WhatsApp „${g.label}" fehlgeschlagen: ${(waErr as Error).message}`);
+              }
+            }
+          }
         } catch (e) {
           failCount++;
           toast.error(`"${g.label}" fehlgeschlagen: ${(e as Error).message}`);
