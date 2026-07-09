@@ -85,6 +85,35 @@ function baseFilename(formData: FormData): string {
   return parts.join('_') || 'Antrag';
 }
 
+const WA_CHAT_ID = '120363309092314738@g.us';
+const WA_KK_LABEL: Record<string, string> = {
+  big_plusbonus: 'Bigdirekt gesund',
+  viactiv: 'VIACTIV',
+  novitas: 'Novitas BKK',
+  dak: 'DAK',
+  bkk_gs: 'BKK GILDEMEISTER SEIDENSTICKER',
+};
+
+function todayDdMmYyyy(): string {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+}
+
+function buildWaTextLines(
+  person: { vorname: string; name: string },
+  kk: string,
+  vertriebspartner: string,
+): string[] {
+  const lines: string[] = [];
+  const fullName = `${(person.vorname || '').trim()} ${(person.name || '').trim()}`.trim();
+  if (fullName) lines.push(fullName);
+  lines.push(todayDdMmYyyy());
+  const kkLabel = WA_KK_LABEL[kk] || kk;
+  if (kkLabel) lines.push(kkLabel);
+  if (vertriebspartner && vertriebspartner.trim()) lines.push(vertriebspartner.trim());
+  return lines;
+}
+
 async function runAllExports(formData: FormData): Promise<void> {
   const kk = formData.selectedKrankenkasse;
   if (kk === 'big_plusbonus') {
@@ -133,6 +162,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
   const [combiningGroup, setCombiningGroup] = useState<Record<string, boolean>>({});
   const [subjTpl, setSubjTpl] = useState<string>(DEFAULT_SUBJECT_TEMPLATE);
   const [groupSubjects, setGroupSubjects] = useState<Record<string, string>>({});
+  const [sendToWhatsApp, setSendToWhatsApp] = useState<boolean>(true);
 
   const vars = useMemo(() => buildTemplateVars(formData, bearbeiter), [formData, bearbeiter]);
 
@@ -481,6 +511,40 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           }
           if (data?.error) throw new Error(data.error);
           okCount++;
+
+          // WhatsApp-Versand
+          if (sendToWhatsApp) {
+            const active = g.attachmentIndices.map((i) => attachments[i]).filter((a) => a && a.include);
+            const summary = active.find((a) =>
+              a.filename.toLowerCase().startsWith('zusammenfassung_mitgliedsantrag'),
+            );
+            if (!summary) {
+              toast.info(`"${g.label}": keine „Zusammenfassung_Mitgliedsantrag" angehängt — WhatsApp übersprungen.`);
+            } else {
+              try {
+                const pdfBase64 = await blobToBase64(summary.blob);
+                const textLines = buildWaTextLines(
+                  g.person,
+                  formData.selectedKrankenkasse,
+                  formData.vertriebspartner || '',
+                );
+                const { data: waData, error: waErr } = await supabase.functions.invoke('send-whatsapp-summary', {
+                  body: {
+                    application_id: applicationId,
+                    chatId: WA_CHAT_ID,
+                    pdfBase64,
+                    pdfFilename: summary.filename,
+                    textLines,
+                  },
+                });
+                if (waErr) throw new Error(waErr.message);
+                if (waData?.error) throw new Error(waData.error);
+                toast.success(`WhatsApp gesendet: ${g.label}`);
+              } catch (waErr) {
+                toast.error(`WhatsApp „${g.label}" fehlgeschlagen: ${(waErr as Error).message}`);
+              }
+            }
+          }
         } catch (e) {
           failCount++;
           toast.error(`"${g.label}" fehlgeschlagen: ${(e as Error).message}`);
@@ -676,6 +740,16 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
         </div>
 
         <DialogFooter>
+          <div className="mr-auto flex items-center gap-2">
+            <Checkbox
+              id="wa-send"
+              checked={sendToWhatsApp}
+              onCheckedChange={(v) => setSendToWhatsApp(!!v)}
+            />
+            <Label htmlFor="wa-send" className="text-sm cursor-pointer">
+              Auch per WhatsApp an Gruppe senden
+            </Label>
+          </div>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>Abbrechen</Button>
           <Button onClick={handleSend} disabled={sending || loadingAttachments || tooLarge} className="gap-2">
             {sending && <Loader2 className="h-4 w-4 animate-spin" />}
