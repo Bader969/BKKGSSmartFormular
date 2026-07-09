@@ -7,9 +7,6 @@ Nach jeder erfolgreich versendeten E-Mail-Gruppe im `SendEmailDialog` wird zusä
 Jede Zeile = eigene WhatsApp-Nachricht, in dieser Reihenfolge:
 
 ```text
-.
-.
-.
 <Zusammenfassung_Mitgliedsantrag.pdf>
 <Vorname Name
 Erstellungsdatum
