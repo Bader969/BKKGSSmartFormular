@@ -6,14 +6,15 @@ import { toast } from 'sonner';
 import { createCombinedPdf, downloadBlob } from '@/utils/pdfUtils';
 import { CornerOverlay } from './CornerOverlay';
 import {
+  cropAndEnhanceFallback,
   detectDocumentCorners,
+  detectDocumentCornersFast,
   defaultCorners,
   warpAndEnhance,
   canvasToJpegBase64,
   loadImage,
   type Corners,
 } from '@/utils/documentScanner';
-import { loadOpenCV } from '@/utils/opencvLoader';
 
 /**
  * Convert a File to base64 string (without data URL prefix)
@@ -59,7 +60,6 @@ export const DocumentMergeDialog: React.FC = () => {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [outputFilename, setOutputFilename] = useState('');
   const [processProgress, setProcessProgress] = useState<{ current: number; total: number } | null>(null);
-  const [cvLoading, setCvLoading] = useState(false);
   const scanRunRef = useRef(0);
 
   const handleFileUpload = useCallback(async (files: FileList | File[]) => {
@@ -105,22 +105,6 @@ export const DocumentMergeDialog: React.FC = () => {
     if (imageFiles.length === 0) return;
 
     const runId = ++scanRunRef.current;
-    setCvLoading(true);
-    try {
-      await loadOpenCV();
-    } catch (e) {
-      console.error('OpenCV load failed', e);
-      toast.error('Scanner konnte nicht geladen werden. Auto-Erkennung deaktiviert.');
-      setCvLoading(false);
-      setUploadedFiles((prev) =>
-        prev.map((f) =>
-          imageFiles.includes(f) ? { ...f, detecting: false } : f,
-        ),
-      );
-      return;
-    }
-    setCvLoading(false);
-
     for (const uf of imageFiles) {
       if (runId !== scanRunRef.current) break;
       await yieldToBrowser();
@@ -131,9 +115,9 @@ export const DocumentMergeDialog: React.FC = () => {
         let corners: Corners;
         try {
           await yieldToBrowser();
-          corners = await detectDocumentCorners(img);
+          corners = detectDocumentCornersFast(img);
         } catch (err) {
-          console.error('Edge detection failed', err);
+          console.error('Fast edge detection failed', err);
           corners = defaultCorners(natWidth, natHeight);
         }
         setUploadedFiles((prev) =>
@@ -208,7 +192,14 @@ export const DocumentMergeDialog: React.FC = () => {
           try {
             const img = await loadImage(f.preview);
             await yieldToBrowser();
-            const canvas = await warpAndEnhance(img, f.corners);
+            let canvas: HTMLCanvasElement;
+            try {
+              const refinedCorners = await detectDocumentCorners(img);
+              canvas = await warpAndEnhance(img, refinedCorners);
+            } catch (opencvErr) {
+              console.error('OpenCV scan failed, using canvas fallback', opencvErr);
+              canvas = cropAndEnhanceFallback(img, f.corners);
+            }
             const jpeg = canvasToJpegBase64(canvas, 0.92);
             filesForPdf.push({ base64: jpeg, mimeType: 'image/jpeg' });
           } catch (err) {
@@ -350,11 +341,6 @@ export const DocumentMergeDialog: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                {cvLoading && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-2">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Scanner wird geladen…
-                  </p>
-                )}
               </div>
             )}
           </div>
