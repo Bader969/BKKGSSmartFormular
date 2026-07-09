@@ -162,6 +162,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
   const [combiningGroup, setCombiningGroup] = useState<Record<string, boolean>>({});
   const [subjTpl, setSubjTpl] = useState<string>(DEFAULT_SUBJECT_TEMPLATE);
   const [groupSubjects, setGroupSubjects] = useState<Record<string, string>>({});
+  const [sendToWhatsApp, setSendToWhatsApp] = useState<boolean>(true);
 
   const vars = useMemo(() => buildTemplateVars(formData, bearbeiter), [formData, bearbeiter]);
 
