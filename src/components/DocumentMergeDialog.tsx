@@ -7,10 +7,8 @@ import { createCombinedPdf, downloadBlob } from '@/utils/pdfUtils';
 import { CornerOverlay } from './CornerOverlay';
 import {
   cropAndEnhanceFallback,
-  detectDocumentCorners,
   detectDocumentCornersFast,
   defaultCorners,
-  warpAndEnhance,
   canvasToJpegBase64,
   loadImage,
   type Corners,
@@ -192,14 +190,7 @@ export const DocumentMergeDialog: React.FC = () => {
           try {
             const img = await loadImage(f.preview);
             await yieldToBrowser();
-            let canvas: HTMLCanvasElement;
-            try {
-              const refinedCorners = await detectDocumentCorners(img);
-              canvas = await warpAndEnhance(img, refinedCorners);
-            } catch (opencvErr) {
-              console.error('OpenCV scan failed, using canvas fallback', opencvErr);
-              canvas = cropAndEnhanceFallback(img, f.corners);
-            }
+            const canvas = cropAndEnhanceFallback(img, f.corners);
             const jpeg = canvasToJpegBase64(canvas, 0.92);
             filesForPdf.push({ base64: jpeg, mimeType: 'image/jpeg' });
           } catch (err) {
