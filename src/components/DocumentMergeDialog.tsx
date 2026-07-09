@@ -7,10 +7,8 @@ import { createCombinedPdf, downloadBlob } from '@/utils/pdfUtils';
 import { CornerOverlay } from './CornerOverlay';
 import {
   cropAndEnhanceFallback,
-  detectDocumentCorners,
   detectDocumentCornersFast,
   defaultCorners,
-  warpAndEnhance,
   canvasToJpegBase64,
   loadImage,
   type Corners,
@@ -61,6 +59,7 @@ export const DocumentMergeDialog: React.FC = () => {
   const [outputFilename, setOutputFilename] = useState('');
   const [processProgress, setProcessProgress] = useState<{ current: number; total: number } | null>(null);
   const scanRunRef = useRef(0);
+  const isDetecting = uploadedFiles.some((file) => file.detecting);
 
   const handleFileUpload = useCallback(async (files: FileList | File[]) => {
     const validFiles: UploadedFile[] = [];
@@ -177,6 +176,10 @@ export const DocumentMergeDialog: React.FC = () => {
       toast.error('Keine Dateien für PDF-Export vorhanden');
       return;
     }
+    if (uploadedFiles.some((file) => file.detecting)) {
+      toast.error('Bitte warten, bis die automatische Erkennung fertig ist');
+      return;
+    }
 
     setIsExportingPdf(true);
 
@@ -192,14 +195,7 @@ export const DocumentMergeDialog: React.FC = () => {
           try {
             const img = await loadImage(f.preview);
             await yieldToBrowser();
-            let canvas: HTMLCanvasElement;
-            try {
-              const refinedCorners = await detectDocumentCorners(img);
-              canvas = await warpAndEnhance(img, refinedCorners);
-            } catch (opencvErr) {
-              console.error('OpenCV scan failed, using canvas fallback', opencvErr);
-              canvas = cropAndEnhanceFallback(img, f.corners);
-            }
+            const canvas = cropAndEnhanceFallback(img, f.corners);
             const jpeg = canvasToJpegBase64(canvas, 0.92);
             filesForPdf.push({ base64: jpeg, mimeType: 'image/jpeg' });
           } catch (err) {
@@ -363,7 +359,7 @@ export const DocumentMergeDialog: React.FC = () => {
           {/* Export Button */}
           <Button
             onClick={handleExportPdf}
-            disabled={isExportingPdf || uploadedFiles.length === 0}
+            disabled={isExportingPdf || isDetecting || uploadedFiles.length === 0}
             className="w-full gap-2"
             size="lg"
           >
@@ -373,6 +369,11 @@ export const DocumentMergeDialog: React.FC = () => {
                 {processProgress
                   ? `Verarbeite ${processProgress.current}/${processProgress.total}…`
                   : 'Erstelle PDF…'}
+              </>
+            ) : isDetecting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Erkenne Dokumentränder…
               </>
             ) : (
               <>
