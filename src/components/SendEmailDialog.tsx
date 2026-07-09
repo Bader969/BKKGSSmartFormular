@@ -603,6 +603,30 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
                         </ul>
                       )}
                     </div>
+                    <div className="border-t border-border/40 pt-2 mt-1">
+                      <Label className="flex items-center gap-2 text-xs">
+                        <ImageIcon className="h-3 w-3" /> Fotos (nur für diese E-Mail, ohne PDF-Konvertierung)
+                      </Label>
+                      <Input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={(e) => handleAddGroupPhotos(g.id, e.target.files)}
+                        className="mt-1 h-8 text-xs"
+                      />
+                      {(groupPhotos[g.id]?.length ?? 0) > 0 && (
+                        <ul className="mt-1 space-y-1">
+                          {(groupPhotos[g.id] || []).map((f, i) => (
+                            <li key={f.name + i} className="flex items-center gap-2 text-xs">
+                              <span className="flex-1 truncate">{f.name}</span>
+                              <button onClick={() => removeGroupPhoto(g.id, i)} className="text-muted-foreground hover:text-destructive">
+                                <X className="h-3 w-3" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
                 );
               })
@@ -622,6 +646,26 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
                   <li key={f.name + i} className="flex items-center gap-2 text-xs">
                     <span className="flex-1 truncate">{f.name}</span>
                     <button onClick={() => removeSharedDoc(i)} className="text-muted-foreground hover:text-destructive">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="border-t border-border/60 pt-3">
+            <Label className="flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Fotos (an alle E-Mails, ohne PDF-Konvertierung)</Label>
+            <p className="text-xs text-muted-foreground mt-1">
+              Bilder werden als separate Foto-Anhänge versendet (nicht zu PDF konvertiert). Aktiviert „+ Foto" im Betreff.
+            </p>
+            <Input type="file" multiple accept="image/*" onChange={(e) => handleAddSharedPhotos(e.target.files)} className="mt-2" />
+            {sharedPhotos.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {sharedPhotos.map((f, i) => (
+                  <li key={f.name + i} className="flex items-center gap-2 text-xs">
+                    <span className="flex-1 truncate">{f.name}</span>
+                    <button onClick={() => removeSharedPhoto(i)} className="text-muted-foreground hover:text-destructive">
                       <X className="h-3 w-3" />
                     </button>
                   </li>
