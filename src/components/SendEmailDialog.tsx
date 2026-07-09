@@ -373,6 +373,65 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
     await rebuildGroup(gid, next);
   };
 
+  // Photos: attached as-is (no PDF conversion). Only image/* accepted.
+  const rebuildSharedPhotos = (files: File[]) => {
+    const photos: Attachment[] = files
+      .filter((f) => f.type.startsWith('image/'))
+      .map((f) => ({
+        filename: f.name,
+        blob: f,
+        include: true,
+        kind: 'photo-shared' as AttachmentKind,
+      }));
+    setAttachments((prev) => [...prev.filter((a) => a.kind !== 'photo-shared'), ...photos]);
+  };
+
+  const rebuildGroupPhotos = (gid: string, files: File[]) => {
+    const photos: Attachment[] = files
+      .filter((f) => f.type.startsWith('image/'))
+      .map((f) => ({
+        filename: f.name,
+        blob: f,
+        include: true,
+        kind: 'photo-group' as AttachmentKind,
+        groupId: gid,
+      }));
+    setAttachments((prev) => [
+      ...prev.filter((a) => !(a.kind === 'photo-group' && a.groupId === gid)),
+      ...photos,
+    ]);
+  };
+
+  const handleAddSharedPhotos = (files: FileList | null) => {
+    if (!files || !files.length) return;
+    const arr = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (!arr.length) { toast.error('Nur Bilddateien erlaubt.'); return; }
+    const next = [...sharedPhotos, ...arr];
+    setSharedPhotos(next);
+    rebuildSharedPhotos(next);
+  };
+
+  const removeSharedPhoto = (idx: number) => {
+    const next = sharedPhotos.filter((_, i) => i !== idx);
+    setSharedPhotos(next);
+    rebuildSharedPhotos(next);
+  };
+
+  const handleAddGroupPhotos = (gid: string, files: FileList | null) => {
+    if (!files || !files.length) return;
+    const arr = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (!arr.length) { toast.error('Nur Bilddateien erlaubt.'); return; }
+    const next = [...(groupPhotos[gid] || []), ...arr];
+    setGroupPhotos((s) => ({ ...s, [gid]: next }));
+    rebuildGroupPhotos(gid, next);
+  };
+
+  const removeGroupPhoto = (gid: string, idx: number) => {
+    const next = (groupPhotos[gid] || []).filter((_, i) => i !== idx);
+    setGroupPhotos((s) => ({ ...s, [gid]: next }));
+    rebuildGroupPhotos(gid, next);
+  };
+
   const totalSize = attachments.filter((a) => a.include).reduce((s, a) => s + a.blob.size, 0);
   const tooLarge = totalSize > 24 * 1024 * 1024;
 
