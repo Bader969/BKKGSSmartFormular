@@ -740,6 +740,16 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
         </div>
 
         <DialogFooter>
+          <div className="mr-auto flex items-center gap-2">
+            <Checkbox
+              id="wa-send"
+              checked={sendToWhatsApp}
+              onCheckedChange={(v) => setSendToWhatsApp(!!v)}
+            />
+            <Label htmlFor="wa-send" className="text-sm cursor-pointer">
+              Auch per WhatsApp an Gruppe senden
+            </Label>
+          </div>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>Abbrechen</Button>
           <Button onClick={handleSend} disabled={sending || loadingAttachments || tooLarge} className="gap-2">
             {sending && <Loader2 className="h-4 w-4 animate-spin" />}
