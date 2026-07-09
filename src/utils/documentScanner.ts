@@ -195,6 +195,109 @@ function distance(a: Point, b: Point): number {
 }
 
 /**
+ * Lightweight, non-WASM document boundary estimate for upload previews.
+ * This intentionally avoids OpenCV during upload so large batches cannot freeze
+ * the tab while the WASM runtime compiles on the main thread.
+ */
+export function detectDocumentCornersFast(img: HTMLImageElement): Corners {
+  const naturalWidth = img.naturalWidth || img.width;
+  const naturalHeight = img.naturalHeight || img.height;
+  const maxDim = 420;
+  const scale = Math.min(1, maxDim / Math.max(naturalWidth, naturalHeight));
+  const width = Math.max(1, Math.round(naturalWidth * scale));
+  const height = Math.max(1, Math.round(naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return defaultCorners(naturalWidth, naturalHeight);
+
+  ctx.drawImage(img, 0, 0, width, height);
+  const { data } = ctx.getImageData(0, 0, width, height);
+  const sample = (x: number, y: number) => {
+    const i = (y * width + x) * 4;
+    return data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+  };
+
+  const borderSamples: number[] = [];
+  const step = Math.max(2, Math.floor(Math.min(width, height) / 60));
+  for (let x = 0; x < width; x += step) {
+    borderSamples.push(sample(x, 0), sample(x, height - 1));
+  }
+  for (let y = 0; y < height; y += step) {
+    borderSamples.push(sample(0, y), sample(width - 1, y));
+  }
+  borderSamples.sort((a, b) => a - b);
+  const borderMedian = borderSamples[Math.floor(borderSamples.length / 2)] ?? 180;
+
+  let minX = width;
+  let minY = height;
+  let maxX = 0;
+  let maxY = 0;
+  let hits = 0;
+  const threshold = 24;
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      const lum = sample(x, y);
+      if (Math.abs(lum - borderMedian) > threshold || lum > borderMedian + 18) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+        hits += 1;
+      }
+    }
+  }
+
+  if (hits < 20 || maxX - minX < width * 0.25 || maxY - minY < height * 0.25) {
+    const padX = naturalWidth * 0.03;
+    const padY = naturalHeight * 0.03;
+    return [
+      { x: padX, y: padY },
+      { x: naturalWidth - padX, y: padY },
+      { x: naturalWidth - padX, y: naturalHeight - padY },
+      { x: padX, y: naturalHeight - padY },
+    ];
+  }
+
+  const pad = Math.max(2, step * 2);
+  minX = Math.max(0, minX - pad);
+  minY = Math.max(0, minY - pad);
+  maxX = Math.min(width, maxX + pad);
+  maxY = Math.min(height, maxY + pad);
+
+  const inv = 1 / scale;
+  return [
+    { x: minX * inv, y: minY * inv },
+    { x: maxX * inv, y: minY * inv },
+    { x: maxX * inv, y: maxY * inv },
+    { x: minX * inv, y: maxY * inv },
+  ];
+}
+
+export function cropAndEnhanceFallback(
+  img: HTMLImageElement,
+  corners: Corners
+): HTMLCanvasElement {
+  const minX = Math.max(0, Math.min(...corners.map((p) => p.x)));
+  const minY = Math.max(0, Math.min(...corners.map((p) => p.y)));
+  const maxX = Math.min(img.naturalWidth || img.width, Math.max(...corners.map((p) => p.x)));
+  const maxY = Math.min(img.naturalHeight || img.height, Math.max(...corners.map((p) => p.y)));
+  const srcW = Math.max(1, maxX - minX);
+  const srcH = Math.max(1, maxY - minY);
+  const dstW = Math.min(OUTPUT_MAX_WIDTH, Math.max(900, Math.round(srcW)));
+  const dstH = Math.round(dstW * (srcH / srcW));
+  const canvas = document.createElement("canvas");
+  canvas.width = dstW;
+  canvas.height = dstH;
+  const ctx = canvas.getContext("2d", { alpha: false });
+  if (!ctx) throw new Error("Canvas konnte nicht initialisiert werden");
+  ctx.filter = "contrast(1.18) brightness(1.08) saturate(1.08)";
+  ctx.drawImage(img, minX, minY, srcW, srcH, 0, 0, dstW, dstH);
+  return canvas;
+}
+
+/**
  * Warp the quad defined by `corners` to a top-down A4 canvas and apply the
  * "Magic Color" filter (shadow removal + ink pop).
  * Returns a canvas containing the enhanced image.
