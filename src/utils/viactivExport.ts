@@ -645,7 +645,34 @@ export const createViactivBeitrittserklaerungForChild = async (
   setCheckbox("Lebenspartnerschaft", false);
 
   // === BESCHÄFTIGUNGSSTATUS (Kind - in der Regel nicht beschäftigt) ===
-  // Alle Checkboxen leer lassen da Kind normalerweise nicht beschäftigt
+  // Beschäftigungsstatus vom Hauptantragsteller übernehmen (analog Ehegatte)
+  setCheckbox("Ich bin beschäftigt", formData.viactivBeschaeftigung === "beschaeftigt");
+  setCheckbox("Ich bin in Ausbildung", formData.viactivBeschaeftigung === "ausbildung");
+  setCheckbox("Ich beziehe Rente", formData.viactivBeschaeftigung === "rente");
+  setCheckbox("Ich bin freiwillig versichert", formData.viactivBeschaeftigung === "freiwillig_versichert");
+  setCheckbox("ich studiere", formData.viactivBeschaeftigung === "studiere");
+  setCheckbox("ich beziehe AL-Geld I", formData.viactivBeschaeftigung === "al_geld_1");
+  setCheckbox("ich beziehe AL-Geld II", formData.viactivBeschaeftigung === "al_geld_2");
+  setCheckbox("ich habe einen Minijob (bis zu 450 Euro)", formData.viactivBeschaeftigung === "minijob");
+  setCheckbox("ich bin selbstständig", formData.viactivBeschaeftigung === "selbststaendig");
+  setCheckbox("Einkommen über 64.350 Euro-Stand 2022", formData.viactivBeschaeftigung === "einkommen_ueber_grenze");
+
+  // === ARBEITGEBER (vom Hauptantragsteller übernehmen) ===
+  const { data: childAg, source: childAgSource } = resolveArbeitgeber(formData);
+  console.log(
+    "VIACTIV Kind Arbeitgeber Quelle:",
+    childAgSource,
+    "PLZ:",
+    childAg?.plz,
+    "Name:",
+    childAg?.name,
+  );
+  setTextField("Name des Arbeitgebers", childAg.name || "");
+  setTextField("Arbeitgeber Straße", childAg.strasse || "");
+  setTextField("Arbeitgeber Hausnummer", childAg.hausnummer || "");
+  setTextField("Arbeitgeber PLZ", (childAg.plz || "").trim());
+  setTextField("Arbeitgeber Ort", childAg.ort || "");
+  setTextField("Beschäftigt seit", formatInputDate(childAg.beschaeftigtSeit || ""));
 
   // === BISHERIGE VERSICHERUNGSART ===
   // Kind war familienversichert
