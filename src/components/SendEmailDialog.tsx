@@ -528,7 +528,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
             <Label htmlFor="email-body">Nachricht</Label>
             <Textarea id="email-body" rows={8} value={body} onChange={(e) => setBody(e.target.value)} />
             <p className="text-xs text-muted-foreground mt-1">
-              Platzhalter: {'{name}'}, {'{vorname}'}, {'{geburtsdatum}'}, {'{antragsform}'}, {'{krankenkasse}'}, {'{bearbeiter}'}
+              Platzhalter: {'{name}'}, {'{vorname}'}, {'{geburtsdatum}'}, {'{antragsform}'}, {'{krankenkasse}'}, {'{bearbeiter}'}, {'{unterlagen}'}, {'{foto}'}, {'{startdatum}'}
             </p>
           </div>
 
