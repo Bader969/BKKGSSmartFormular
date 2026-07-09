@@ -218,32 +218,20 @@ const downloadPDF = (pdfBytes: Uint8Array, filename: string) => {
 const resolveArbeitgeber = (
   formData: FormData,
 ): { data: FormData["viactivArbeitgeber"]; source: string } => {
-  const ag = formData.viactivArbeitgeber;
-  // ALG I/II hat IMMER Vorrang vor User-Arbeitgeberdaten (Jobcenter/Agentur überschreibt)
-  if (formData.viactivBeschaeftigung === "al_geld_2") {
+  const ag = formData.viactivArbeitgeber || ({} as FormData["viactivArbeitgeber"]);
+  // ALG-Defaults füllen NUR leere Felder — User-Eingaben haben immer Vorrang
+  if (formData.viactivBeschaeftigung === "al_geld_2" || formData.viactivBeschaeftigung === "al_geld_1") {
+    const defaultName = formData.viactivBeschaeftigung === "al_geld_2" ? "Jobcenter" : "Agentur für Arbeit";
     return {
       data: {
-        name: "Jobcenter",
-        strasse: "",
-        hausnummer: "",
-        plz: formData.mitgliedPlz || "",
-        ort: formData.ort || "",
-        beschaeftigtSeit: "",
+        name: ag.name || defaultName,
+        strasse: ag.strasse || "",
+        hausnummer: ag.hausnummer || "",
+        plz: ag.plz || formData.mitgliedPlz || "",
+        ort: ag.ort || formData.ort || "",
+        beschaeftigtSeit: ag.beschaeftigtSeit || "",
       },
-      source: "Fallback Jobcenter (ALG II)",
-    };
-  }
-  if (formData.viactivBeschaeftigung === "al_geld_1") {
-    return {
-      data: {
-        name: "Agentur für Arbeit",
-        strasse: "",
-        hausnummer: "",
-        plz: formData.mitgliedPlz || "",
-        ort: formData.ort || "",
-        beschaeftigtSeit: "",
-      },
-      source: "Fallback Agentur für Arbeit (ALG I)",
+      source: `Merge ${defaultName} + User`,
     };
   }
   const hasArbeitgeber = !!(ag && (ag.name || ag.strasse || ag.plz || ag.ort));
@@ -259,30 +247,19 @@ const resolveArbeitgeberForSpouse = (
   formData: FormData,
 ): { data: FormData["viactivArbeitgeber"]; source: string } => {
   const beschaeftigung = formData.ehegatte?.beschaeftigung;
-  if (beschaeftigung === "al_geld_2") {
+  const ag = formData.viactivArbeitgeber || ({} as FormData["viactivArbeitgeber"]);
+  if (beschaeftigung === "al_geld_2" || beschaeftigung === "al_geld_1") {
+    const defaultName = beschaeftigung === "al_geld_2" ? "Jobcenter" : "Agentur für Arbeit";
     return {
       data: {
-        name: "Jobcenter",
-        strasse: "",
-        hausnummer: "",
-        plz: formData.mitgliedPlz || "",
-        ort: formData.ort || "",
+        name: ag.name || defaultName,
+        strasse: ag.strasse || "",
+        hausnummer: ag.hausnummer || "",
+        plz: ag.plz || formData.mitgliedPlz || "",
+        ort: ag.ort || formData.ort || "",
         beschaeftigtSeit: "",
       },
-      source: "Spouse Fallback Jobcenter (ALG II)",
-    };
-  }
-  if (beschaeftigung === "al_geld_1") {
-    return {
-      data: {
-        name: "Agentur für Arbeit",
-        strasse: "",
-        hausnummer: "",
-        plz: formData.mitgliedPlz || "",
-        ort: formData.ort || "",
-        beschaeftigtSeit: "",
-      },
-      source: "Spouse Fallback Agentur für Arbeit (ALG I)",
+      source: `Spouse Merge ${defaultName} + User`,
     };
   }
   return {
@@ -668,7 +645,34 @@ export const createViactivBeitrittserklaerungForChild = async (
   setCheckbox("Lebenspartnerschaft", false);
 
   // === BESCHÄFTIGUNGSSTATUS (Kind - in der Regel nicht beschäftigt) ===
-  // Alle Checkboxen leer lassen da Kind normalerweise nicht beschäftigt
+  // Beschäftigungsstatus vom Hauptantragsteller übernehmen (analog Ehegatte)
+  setCheckbox("Ich bin beschäftigt", formData.viactivBeschaeftigung === "beschaeftigt");
+  setCheckbox("Ich bin in Ausbildung", formData.viactivBeschaeftigung === "ausbildung");
+  setCheckbox("Ich beziehe Rente", formData.viactivBeschaeftigung === "rente");
+  setCheckbox("Ich bin freiwillig versichert", formData.viactivBeschaeftigung === "freiwillig_versichert");
+  setCheckbox("ich studiere", formData.viactivBeschaeftigung === "studiere");
+  setCheckbox("ich beziehe AL-Geld I", formData.viactivBeschaeftigung === "al_geld_1");
+  setCheckbox("ich beziehe AL-Geld II", formData.viactivBeschaeftigung === "al_geld_2");
+  setCheckbox("ich habe einen Minijob (bis zu 450 Euro)", formData.viactivBeschaeftigung === "minijob");
+  setCheckbox("ich bin selbstständig", formData.viactivBeschaeftigung === "selbststaendig");
+  setCheckbox("Einkommen über 64.350 Euro-Stand 2022", formData.viactivBeschaeftigung === "einkommen_ueber_grenze");
+
+  // === ARBEITGEBER (vom Hauptantragsteller übernehmen) ===
+  const { data: childAg, source: childAgSource } = resolveArbeitgeber(formData);
+  console.log(
+    "VIACTIV Kind Arbeitgeber Quelle:",
+    childAgSource,
+    "PLZ:",
+    childAg?.plz,
+    "Name:",
+    childAg?.name,
+  );
+  setTextField("Name des Arbeitgebers", childAg.name || "");
+  setTextField("Arbeitgeber Straße", childAg.strasse || "");
+  setTextField("Arbeitgeber Hausnummer", childAg.hausnummer || "");
+  setTextField("Arbeitgeber PLZ", (childAg.plz || "").trim());
+  setTextField("Arbeitgeber Ort", childAg.ort || "");
+  setTextField("Beschäftigt seit", formatInputDate(childAg.beschaeftigtSeit || ""));
 
   // === BISHERIGE VERSICHERUNGSART ===
   // Kind war familienversichert

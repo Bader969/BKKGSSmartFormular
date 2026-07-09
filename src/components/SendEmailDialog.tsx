@@ -177,11 +177,29 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
 
     // Hauptmitglied: FamVers + alle Plusbonus-PDFs des Mitglieds + Dokumente
     const mainIdx: number[] = [];
+    // Vorab: Personen mit eigener VIACTIV-Mitgliedschaft (für Filename-Zuordnung)
+    const viactivOwnMembers: Array<{ vorname: string; name: string }> = [];
+    if (formData.selectedKrankenkasse === 'viactiv' && formData.viactivFamilienangehoerigeMitversichern) {
+      const e = formData.ehegatte;
+      if (e && (e.vorname || e.name) && e.bisherigArt === 'mitgliedschaft') {
+        viactivOwnMembers.push({ vorname: e.vorname, name: e.name });
+      }
+      formData.kinder.forEach((k) => {
+        if (k.eigeneMitgliedschaft && (k.vorname || k.name)) {
+          viactivOwnMembers.push({ vorname: k.vorname, name: k.name });
+        }
+      });
+    }
     attachments.forEach((a, i) => {
       if (a.kind !== 'auto') return;
       const fn = a.filename.toLowerCase();
       if (fn.startsWith('zusammenfassung_familienversicherung')) mainIdx.push(i);
       else if (fn.startsWith('antrag plusbonus') && fileBelongsToPerson(a.filename, formData.mitgliedVorname, formData.mitgliedName)) mainIdx.push(i);
+      else if (formData.selectedKrankenkasse === 'viactiv') {
+        // VIACTIV: Datei gehört zu Hauptmitglied, wenn sie nicht einem separaten Mitglied zugeordnet ist
+        const belongsToOther = viactivOwnMembers.some((p) => fileBelongsToPerson(a.filename, p.vorname, p.name));
+        if (!belongsToOther) mainIdx.push(i);
+      }
       else if (formData.selectedKrankenkasse !== 'big_plusbonus') {
         // Für nicht-BIG: alle Antrags-PDFs gehören zum Hauptmitglied
         mainIdx.push(i);
@@ -245,6 +263,51 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           { vorname: p.vorname, name: p.name, geburtsdatum: p.geb },
           bearbeiter,
           'Plusbonus',
+          { hasPhotos: pHasPhotos },
+        );
+        result.push({
+          id: p.id,
+          label: p.label,
+          person: { vorname: p.vorname, name: p.name, geburtsdatum: p.geb },
+          antragsform: pVars.antragsform,
+          subject: groupSubjects[p.id] ?? applyTemplate(subjTpl, pVars),
+          body: applyTemplate(body || DEFAULT_BODY_TEMPLATE, pVars),
+          attachmentIndices: attIdx,
+        });
+      }
+    }
+
+    // VIACTIV Variante B: Ehegatte + Kinder mit eigener Mitgliedschaft
+    if (formData.selectedKrankenkasse === 'viactiv' && formData.viactivFamilienangehoerigeMitversichern) {
+      const persons: Array<{ id: string; label: string; vorname: string; name: string; geb: string }> = [];
+      const e = formData.ehegatte;
+      if (e && (e.vorname || e.name) && e.bisherigArt === 'mitgliedschaft') {
+        persons.push({ id: 'spouse', label: `Ehegatte — ${e.vorname} ${e.name}`.trim(), vorname: e.vorname, name: e.name, geb: e.geburtsdatum });
+      }
+      formData.kinder.forEach((k, i) => {
+        if (k.eigeneMitgliedschaft && (k.vorname || k.name)) {
+          persons.push({ id: `kind-${i}`, label: `Kind ${i + 1} — ${k.vorname} ${k.name}`.trim(), vorname: k.vorname, name: k.name, geb: k.geburtsdatum });
+        }
+      });
+      for (const p of persons) {
+        const idx: number[] = [];
+        attachments.forEach((a, i) => {
+          if (a.kind !== 'auto') return;
+          if (fileBelongsToPerson(a.filename, p.vorname, p.name)) idx.push(i);
+        });
+        const groupSpecific = attachments
+          .map((a, i) => ((a.kind === 'group' || a.kind === 'photo-group') && a.groupId === p.id ? i : -1))
+          .filter((i) => i >= 0);
+        const attIdx = Array.from(new Set([...idx, ...sharedIndices, ...groupSpecific]));
+        const pHasPhotos = attIdx.some((i) => {
+          const a = attachments[i];
+          return a && a.include && (a.kind === 'photo-shared' || a.kind === 'photo-group');
+        });
+        const pVars = buildTemplateVarsForPerson(
+          formData,
+          { vorname: p.vorname, name: p.name, geburtsdatum: p.geb },
+          bearbeiter,
+          undefined,
           { hasPhotos: pHasPhotos },
         );
         result.push({
@@ -515,11 +578,22 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           // WhatsApp-Versand
           if (sendToWhatsApp) {
             const active = g.attachmentIndices.map((i) => attachments[i]).filter((a) => a && a.include);
-            const summary = active.find((a) =>
-              a.filename.toLowerCase().startsWith('zusammenfassung_mitgliedsantrag'),
-            );
+            const isViactiv = formData.selectedKrankenkasse === 'viactiv';
+            const summary = isViactiv
+              ? active.find((a) => {
+                  const fn = a.filename.toLowerCase();
+                  return fn.startsWith('viactiv_') && fn.includes('_be_') &&
+                    fileBelongsToPerson(a.filename, g.person.vorname, g.person.name);
+                })
+              : active.find((a) =>
+                  a.filename.toLowerCase().startsWith('zusammenfassung_mitgliedsantrag'),
+                );
             if (!summary) {
-              toast.info(`"${g.label}": keine „Zusammenfassung_Mitgliedsantrag" angehängt — WhatsApp übersprungen.`);
+              toast.info(
+                isViactiv
+                  ? `"${g.label}": keine Beitrittserklärung (BE) gefunden — WhatsApp übersprungen.`
+                  : `"${g.label}": keine „Zusammenfassung_Mitgliedsantrag" angehängt — WhatsApp übersprungen.`,
+              );
             } else {
               try {
                 const pdfBase64 = await blobToBase64(summary.blob);
