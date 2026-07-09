@@ -78,8 +78,6 @@ Deno.serve(async (req) => {
   if (!textLines.length) return json(400, { error: 'no_text' });
 
   try {
-    // 3× dot
-    for (let i = 0; i < 3; i++) await sendText(whapiToken, chatId, '.');
     // document
     await sendDocument(whapiToken, chatId, pdfBase64, pdfFilename);
     // text
