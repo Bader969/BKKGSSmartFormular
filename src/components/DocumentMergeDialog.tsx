@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Loader2, X, FileImage, Image, Download, FileText, Files } from 'lucide-react';
@@ -32,6 +32,7 @@ const fileToBase64 = (file: File): Promise<string> => {
 };
 
 interface UploadedFile {
+  id: string;
   file: File;
   preview: string;
   base64: string;
@@ -43,6 +44,14 @@ interface UploadedFile {
   detecting?: boolean;
 }
 
+const yieldToBrowser = () =>
+  new Promise<void>((resolve) => window.setTimeout(resolve, 40));
+
+const createFileId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
 export const DocumentMergeDialog: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -51,6 +60,7 @@ export const DocumentMergeDialog: React.FC = () => {
   const [outputFilename, setOutputFilename] = useState('');
   const [processProgress, setProcessProgress] = useState<{ current: number; total: number } | null>(null);
   const [cvLoading, setCvLoading] = useState(false);
+  const scanRunRef = useRef(0);
 
   const handleFileUpload = useCallback(async (files: FileList | File[]) => {
     const validFiles: UploadedFile[] = [];
@@ -72,6 +82,7 @@ export const DocumentMergeDialog: React.FC = () => {
         const base64 = await fileToBase64(file);
         const preview = URL.createObjectURL(file);
         validFiles.push({
+          id: createFileId(),
           file,
           preview,
           base64,
@@ -109,13 +120,17 @@ export const DocumentMergeDialog: React.FC = () => {
     }
     setCvLoading(false);
 
+    const runId = scanRunRef.current;
     for (const uf of imageFiles) {
+      if (runId !== scanRunRef.current) break;
+      await yieldToBrowser();
       try {
         const img = await loadImage(uf.preview);
         const natWidth = img.naturalWidth;
         const natHeight = img.naturalHeight;
         let corners: Corners;
         try {
+          await yieldToBrowser();
           corners = await detectDocumentCorners(img);
         } catch (err) {
           console.error('Edge detection failed', err);
@@ -123,7 +138,7 @@ export const DocumentMergeDialog: React.FC = () => {
         }
         setUploadedFiles((prev) =>
           prev.map((f) =>
-            f === uf
+            f.id === uf.id
               ? { ...f, natWidth, natHeight, corners, detecting: false }
               : f,
           ),
@@ -131,7 +146,7 @@ export const DocumentMergeDialog: React.FC = () => {
       } catch (err) {
         console.error('Image init failed', err);
         setUploadedFiles((prev) =>
-          prev.map((f) => (f === uf ? { ...f, detecting: false } : f)),
+          prev.map((f) => (f.id === uf.id ? { ...f, detecting: false } : f)),
         );
       }
     }
@@ -188,9 +203,11 @@ export const DocumentMergeDialog: React.FC = () => {
       for (const f of uploadedFiles) {
         idx += 1;
         setProcessProgress({ current: idx, total });
+        await yieldToBrowser();
         if (f.mimeType.startsWith('image/') && f.corners && f.natWidth && f.natHeight) {
           try {
             const img = await loadImage(f.preview);
+            await yieldToBrowser();
             const canvas = await warpAndEnhance(img, f.corners);
             const jpeg = canvasToJpegBase64(canvas, 0.92);
             filesForPdf.push({ base64: jpeg, mimeType: 'image/jpeg' });
@@ -222,6 +239,7 @@ export const DocumentMergeDialog: React.FC = () => {
   const handleDialogClose = (isOpen: boolean) => {
     setOpen(isOpen);
     if (!isOpen) {
+      scanRunRef.current += 1;
       // Clean up previews when closing
       uploadedFiles.forEach(f => URL.revokeObjectURL(f.preview));
       setUploadedFiles([]);
