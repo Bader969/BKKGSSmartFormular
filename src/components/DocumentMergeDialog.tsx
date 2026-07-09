@@ -4,6 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Loader2, X, FileImage, Image, Download, FileText, Files } from 'lucide-react';
 import { toast } from 'sonner';
 import { createCombinedPdf, downloadBlob } from '@/utils/pdfUtils';
+import { CornerOverlay } from './CornerOverlay';
+import {
+  detectDocumentCorners,
+  defaultCorners,
+  warpAndEnhance,
+  canvasToJpegBase64,
+  loadImage,
+  type Corners,
+} from '@/utils/documentScanner';
+import { loadOpenCV } from '@/utils/opencvLoader';
 
 /**
  * Convert a File to base64 string (without data URL prefix)
@@ -26,6 +36,11 @@ interface UploadedFile {
   preview: string;
   base64: string;
   mimeType: string;
+  // Image-only fields
+  natWidth?: number;
+  natHeight?: number;
+  corners?: Corners;
+  detecting?: boolean;
 }
 
 export const DocumentMergeDialog: React.FC = () => {
@@ -34,6 +49,8 @@ export const DocumentMergeDialog: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [outputFilename, setOutputFilename] = useState('');
+  const [processProgress, setProcessProgress] = useState<{ current: number; total: number } | null>(null);
+  const [cvLoading, setCvLoading] = useState(false);
 
   const handleFileUpload = useCallback(async (files: FileList | File[]) => {
     const validFiles: UploadedFile[] = [];
@@ -59,6 +76,7 @@ export const DocumentMergeDialog: React.FC = () => {
           preview,
           base64,
           mimeType: file.type,
+          detecting: isImage,
         });
       } catch (error) {
         console.error('Error processing file:', error);
@@ -66,7 +84,57 @@ export const DocumentMergeDialog: React.FC = () => {
       }
     }
     
-    setUploadedFiles(prev => [...prev, ...validFiles]);
+    setUploadedFiles(prev => {
+      const next = [...prev, ...validFiles];
+      return next;
+    });
+
+    // Kick off auto-detection for any newly added images.
+    const imageFiles = validFiles.filter((f) => f.mimeType.startsWith('image/'));
+    if (imageFiles.length === 0) return;
+
+    setCvLoading(true);
+    try {
+      await loadOpenCV();
+    } catch (e) {
+      console.error('OpenCV load failed', e);
+      toast.error('Scanner konnte nicht geladen werden. Auto-Erkennung deaktiviert.');
+      setCvLoading(false);
+      setUploadedFiles((prev) =>
+        prev.map((f) =>
+          imageFiles.includes(f) ? { ...f, detecting: false } : f,
+        ),
+      );
+      return;
+    }
+    setCvLoading(false);
+
+    for (const uf of imageFiles) {
+      try {
+        const img = await loadImage(uf.preview);
+        const natWidth = img.naturalWidth;
+        const natHeight = img.naturalHeight;
+        let corners: Corners;
+        try {
+          corners = await detectDocumentCorners(img);
+        } catch (err) {
+          console.error('Edge detection failed', err);
+          corners = defaultCorners(natWidth, natHeight);
+        }
+        setUploadedFiles((prev) =>
+          prev.map((f) =>
+            f === uf
+              ? { ...f, natWidth, natHeight, corners, detecting: false }
+              : f,
+          ),
+        );
+      } catch (err) {
+        console.error('Image init failed', err);
+        setUploadedFiles((prev) =>
+          prev.map((f) => (f === uf ? { ...f, detecting: false } : f)),
+        );
+      }
+    }
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -97,6 +165,14 @@ export const DocumentMergeDialog: React.FC = () => {
     });
   };
 
+  const updateCorners = (index: number, corners: Corners) => {
+    setUploadedFiles((prev) => {
+      const next = prev.slice();
+      next[index] = { ...next[index], corners };
+      return next;
+    });
+  };
+
   const handleExportPdf = async () => {
     if (uploadedFiles.length === 0) {
       toast.error('Keine Dateien für PDF-Export vorhanden');
@@ -106,10 +182,27 @@ export const DocumentMergeDialog: React.FC = () => {
     setIsExportingPdf(true);
 
     try {
-      const filesForPdf = uploadedFiles.map(f => ({
-        base64: f.base64,
-        mimeType: f.mimeType
-      }));
+      const filesForPdf: { base64: string; mimeType: string }[] = [];
+      const total = uploadedFiles.length;
+      let idx = 0;
+      for (const f of uploadedFiles) {
+        idx += 1;
+        setProcessProgress({ current: idx, total });
+        if (f.mimeType.startsWith('image/') && f.corners && f.natWidth && f.natHeight) {
+          try {
+            const img = await loadImage(f.preview);
+            const canvas = await warpAndEnhance(img, f.corners);
+            const jpeg = canvasToJpegBase64(canvas, 0.92);
+            filesForPdf.push({ base64: jpeg, mimeType: 'image/jpeg' });
+          } catch (err) {
+            console.error('Warp failed for', f.file.name, err);
+            toast.error(`${f.file.name}: Scan fehlgeschlagen, Original verwendet`);
+            filesForPdf.push({ base64: f.base64, mimeType: f.mimeType });
+          }
+        } else {
+          filesForPdf.push({ base64: f.base64, mimeType: f.mimeType });
+        }
+      }
 
       const pdfBlob = await createCombinedPdf(filesForPdf);
       const filename = outputFilename.trim() 
@@ -122,6 +215,7 @@ export const DocumentMergeDialog: React.FC = () => {
       toast.error('Fehler beim Erstellen der PDF');
     } finally {
       setIsExportingPdf(false);
+      setProcessProgress(null);
     }
   };
 
@@ -196,19 +290,37 @@ export const DocumentMergeDialog: React.FC = () => {
                 <p className="text-xs font-medium text-muted-foreground">
                   {uploadedFiles.length} Dokument(e) ausgewählt:
                 </p>
-                <div className="flex flex-wrap gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {uploadedFiles.map((file, index) => (
-                    <div key={index} className="relative group">
+                    <div key={index} className="relative group border rounded-md p-2 bg-background">
                       {file.mimeType === 'application/pdf' ? (
-                        <div className="h-24 w-24 flex items-center justify-center rounded-md border bg-muted">
-                          <FileText className="h-8 w-8 text-muted-foreground" />
+                        <div className="h-40 w-full flex items-center justify-center rounded-md border bg-muted">
+                          <FileText className="h-10 w-10 text-muted-foreground" />
                         </div>
                       ) : (
-                        <img
-                          src={file.preview}
-                          alt={file.file.name}
-                          className="h-24 w-24 object-cover rounded-md border"
-                        />
+                        <div className="relative w-full" style={{ aspectRatio: file.natWidth && file.natHeight ? `${file.natWidth} / ${file.natHeight}` : '4 / 3' }}>
+                          <img
+                            src={file.preview}
+                            alt={file.file.name}
+                            className="absolute inset-0 w-full h-full object-fill rounded-md border"
+                            draggable={false}
+                          />
+                          {file.corners && file.natWidth && file.natHeight && (
+                            <CornerOverlay
+                              corners={file.corners}
+                              natWidth={file.natWidth}
+                              natHeight={file.natHeight}
+                              onChange={(c) => updateCorners(index, c)}
+                              className="absolute inset-0 w-full h-full"
+                            />
+                          )}
+                          {file.detecting && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-background/60 rounded-md">
+                              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                              <span className="ml-2 text-xs">Erkenne Ränder…</span>
+                            </div>
+                          )}
+                        </div>
                       )}
                       <button
                         onClick={() => removeFile(index)}
@@ -216,10 +328,15 @@ export const DocumentMergeDialog: React.FC = () => {
                       >
                         <X className="h-3 w-3" />
                       </button>
-                      <p className="text-[10px] truncate max-w-[96px] mt-1">{file.file.name}</p>
+                      <p className="text-[10px] truncate mt-1">{file.file.name}</p>
                     </div>
                   ))}
                 </div>
+                {cvLoading && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Scanner wird geladen…
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -249,7 +366,9 @@ export const DocumentMergeDialog: React.FC = () => {
             {isExportingPdf ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Erstelle PDF...
+                {processProgress
+                  ? `Verarbeite ${processProgress.current}/${processProgress.total}…`
+                  : 'Erstelle PDF…'}
               </>
             ) : (
               <>
