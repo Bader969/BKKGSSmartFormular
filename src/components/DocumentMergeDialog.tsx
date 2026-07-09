@@ -59,6 +59,7 @@ export const DocumentMergeDialog: React.FC = () => {
   const [outputFilename, setOutputFilename] = useState('');
   const [processProgress, setProcessProgress] = useState<{ current: number; total: number } | null>(null);
   const scanRunRef = useRef(0);
+  const isDetecting = uploadedFiles.some((file) => file.detecting);
 
   const handleFileUpload = useCallback(async (files: FileList | File[]) => {
     const validFiles: UploadedFile[] = [];
@@ -173,6 +174,10 @@ export const DocumentMergeDialog: React.FC = () => {
   const handleExportPdf = async () => {
     if (uploadedFiles.length === 0) {
       toast.error('Keine Dateien für PDF-Export vorhanden');
+      return;
+    }
+    if (uploadedFiles.some((file) => file.detecting)) {
+      toast.error('Bitte warten, bis die automatische Erkennung fertig ist');
       return;
     }
 
@@ -354,7 +359,7 @@ export const DocumentMergeDialog: React.FC = () => {
           {/* Export Button */}
           <Button
             onClick={handleExportPdf}
-            disabled={isExportingPdf || uploadedFiles.length === 0}
+            disabled={isExportingPdf || isDetecting || uploadedFiles.length === 0}
             className="w-full gap-2"
             size="lg"
           >
@@ -364,6 +369,11 @@ export const DocumentMergeDialog: React.FC = () => {
                 {processProgress
                   ? `Verarbeite ${processProgress.current}/${processProgress.total}…`
                   : 'Erstelle PDF…'}
+              </>
+            ) : isDetecting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Erkenne Dokumentränder…
               </>
             ) : (
               <>
