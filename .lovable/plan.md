@@ -40,10 +40,9 @@ Im `SendEmailDialog` neue Checkbox „Auch per WhatsApp an Gruppe senden" unterh
 - Body: `{ application_id?: string, chatId: string, pdfBase64: string, pdfFilename: string, textLines: string[] }`.
 - Nutzt bestehende Env `WHAPI_TOKEN` und die WHAPI-REST-API.
 - Ablauf (sequenziell, `await` zwischen den Calls für stabile Reihenfolge):
-  1. `.` als Text (3×)
-  2. Dokument (PDF, base64, `filename = pdfFilename`)
-  3. Text `textLines.join('\n')`
-  4. `.` als Text (3×)
+  1. Dokument (PDF, base64, `filename = pdfFilename`)
+  2. Text `textLines.join('\n')`
+  3. `.` als Text (3×)
 - Fehler → HTTP 502 mit Details.
 - Audit-Event `whatsapp_sent` in `application_events` (nur Metadaten: `chat_id`, `filename`, keine Inhalte).
 
