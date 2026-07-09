@@ -11,6 +11,18 @@ export interface Point {
 
 export type Corners = [Point, Point, Point, Point]; // TL, TR, BR, BL
 
+const DETECTION_MAX_DIMENSION = 1100;
+const WARP_MAX_DIMENSION = 1800;
+const OUTPUT_MAX_WIDTH = 1500;
+
+interface PreparedImageSource {
+  source: HTMLImageElement | HTMLCanvasElement;
+  width: number;
+  height: number;
+  scaleX: number;
+  scaleY: number;
+}
+
 function safeDelete(obj: unknown) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -18,6 +30,46 @@ function safeDelete(obj: unknown) {
   } catch {
     /* ignore */
   }
+}
+
+function prepareImageSource(
+  img: HTMLImageElement,
+  maxDimension: number
+): PreparedImageSource {
+  const naturalWidth = img.naturalWidth || img.width;
+  const naturalHeight = img.naturalHeight || img.height;
+  const largest = Math.max(naturalWidth, naturalHeight);
+
+  if (largest <= maxDimension) {
+    return {
+      source: img,
+      width: naturalWidth,
+      height: naturalHeight,
+      scaleX: 1,
+      scaleY: 1,
+    };
+  }
+
+  const scale = maxDimension / largest;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(naturalHeight * scale));
+
+  const ctx = canvas.getContext("2d", { alpha: false });
+  if (!ctx) {
+    throw new Error("Canvas konnte nicht initialisiert werden");
+  }
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  return {
+    source: canvas,
+    width: canvas.width,
+    height: canvas.height,
+    scaleX: canvas.width / naturalWidth,
+    scaleY: canvas.height / naturalHeight,
+  };
 }
 
 function orderCorners(pts: Point[]): Corners {
@@ -50,15 +102,18 @@ export async function detectDocumentCorners(
   img: HTMLImageElement
 ): Promise<Corners> {
   const cv: OpenCV = await loadOpenCV();
-  const width = img.naturalWidth || img.width;
-  const height = img.naturalHeight || img.height;
+  const naturalWidth = img.naturalWidth || img.width;
+  const naturalHeight = img.naturalHeight || img.height;
+  const prepared = prepareImageSource(img, DETECTION_MAX_DIMENSION);
+  const width = prepared.width;
+  const height = prepared.height;
   const imgArea = width * height;
 
   let src: unknown, gray: unknown, blurred: unknown, edged: unknown;
   let contours: unknown, hierarchy: unknown;
-  const perContourMats: unknown[] = [];
+  const contourEntries: { contour: unknown; area: number }[] = [];
   try {
-    src = cv.imread(img);
+    src = cv.imread(prepared.source);
     gray = new cv.Mat();
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
     blurred = new cv.Mat();
@@ -80,21 +135,21 @@ export async function detectDocumentCorners(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cs = contours as any;
     const count: number = cs.size();
-    const byArea: { idx: number; area: number }[] = [];
     for (let i = 0; i < count; i++) {
       const c = cs.get(i);
-      const area = cv.contourArea(c);
-      byArea.push({ idx: i, area });
-      // Note: not deleted here — retrieved by reference; we free later.
-      perContourMats.push(c);
+      try {
+        const area = cv.contourArea(c);
+        contourEntries.push({ contour: c, area });
+      } catch {
+        safeDelete(c);
+      }
     }
-    byArea.sort((a, b) => b.area - a.area);
+    contourEntries.sort((a, b) => b.area - a.area);
 
     let found: Corners | null = null;
-    for (let k = 0; k < Math.min(5, byArea.length); k++) {
-      const { idx, area } = byArea[k];
+    for (let k = 0; k < Math.min(8, contourEntries.length); k++) {
+      const { contour: c, area } = contourEntries[k];
       if (area < imgArea * 0.1) continue;
-      const c = cs.get(idx);
       const peri = cv.arcLength(c, true);
       const approx = new cv.Mat();
       try {
@@ -109,7 +164,6 @@ export async function detectDocumentCorners(
             pts.push({ x, y });
           }
           found = orderCorners(pts);
-          safeDelete(approx);
           break;
         }
       } finally {
@@ -117,9 +171,14 @@ export async function detectDocumentCorners(
       }
     }
 
-    return found ?? defaultCorners(width, height);
+    if (!found) return defaultCorners(naturalWidth, naturalHeight);
+
+    return found.map((p) => ({
+      x: Math.max(0, Math.min(naturalWidth, p.x / prepared.scaleX)),
+      y: Math.max(0, Math.min(naturalHeight, p.y / prepared.scaleY)),
+    })) as Corners;
   } finally {
-    for (const m of perContourMats) safeDelete(m);
+    for (const { contour } of contourEntries) safeDelete(contour);
     safeDelete(hierarchy);
     safeDelete(contours);
     safeDelete(edged);
@@ -136,6 +195,109 @@ function distance(a: Point, b: Point): number {
 }
 
 /**
+ * Lightweight, non-WASM document boundary estimate for upload previews.
+ * This intentionally avoids OpenCV during upload so large batches cannot freeze
+ * the tab while the WASM runtime compiles on the main thread.
+ */
+export function detectDocumentCornersFast(img: HTMLImageElement): Corners {
+  const naturalWidth = img.naturalWidth || img.width;
+  const naturalHeight = img.naturalHeight || img.height;
+  const maxDim = 420;
+  const scale = Math.min(1, maxDim / Math.max(naturalWidth, naturalHeight));
+  const width = Math.max(1, Math.round(naturalWidth * scale));
+  const height = Math.max(1, Math.round(naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return defaultCorners(naturalWidth, naturalHeight);
+
+  ctx.drawImage(img, 0, 0, width, height);
+  const { data } = ctx.getImageData(0, 0, width, height);
+  const sample = (x: number, y: number) => {
+    const i = (y * width + x) * 4;
+    return data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+  };
+
+  const borderSamples: number[] = [];
+  const step = Math.max(2, Math.floor(Math.min(width, height) / 60));
+  for (let x = 0; x < width; x += step) {
+    borderSamples.push(sample(x, 0), sample(x, height - 1));
+  }
+  for (let y = 0; y < height; y += step) {
+    borderSamples.push(sample(0, y), sample(width - 1, y));
+  }
+  borderSamples.sort((a, b) => a - b);
+  const borderMedian = borderSamples[Math.floor(borderSamples.length / 2)] ?? 180;
+
+  let minX = width;
+  let minY = height;
+  let maxX = 0;
+  let maxY = 0;
+  let hits = 0;
+  const threshold = 24;
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      const lum = sample(x, y);
+      if (Math.abs(lum - borderMedian) > threshold || lum > borderMedian + 18) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+        hits += 1;
+      }
+    }
+  }
+
+  if (hits < 20 || maxX - minX < width * 0.25 || maxY - minY < height * 0.25) {
+    const padX = naturalWidth * 0.03;
+    const padY = naturalHeight * 0.03;
+    return [
+      { x: padX, y: padY },
+      { x: naturalWidth - padX, y: padY },
+      { x: naturalWidth - padX, y: naturalHeight - padY },
+      { x: padX, y: naturalHeight - padY },
+    ];
+  }
+
+  const pad = Math.max(2, step * 2);
+  minX = Math.max(0, minX - pad);
+  minY = Math.max(0, minY - pad);
+  maxX = Math.min(width, maxX + pad);
+  maxY = Math.min(height, maxY + pad);
+
+  const inv = 1 / scale;
+  return [
+    { x: minX * inv, y: minY * inv },
+    { x: maxX * inv, y: minY * inv },
+    { x: maxX * inv, y: maxY * inv },
+    { x: minX * inv, y: maxY * inv },
+  ];
+}
+
+export function cropAndEnhanceFallback(
+  img: HTMLImageElement,
+  corners: Corners
+): HTMLCanvasElement {
+  const minX = Math.max(0, Math.min(...corners.map((p) => p.x)));
+  const minY = Math.max(0, Math.min(...corners.map((p) => p.y)));
+  const maxX = Math.min(img.naturalWidth || img.width, Math.max(...corners.map((p) => p.x)));
+  const maxY = Math.min(img.naturalHeight || img.height, Math.max(...corners.map((p) => p.y)));
+  const srcW = Math.max(1, maxX - minX);
+  const srcH = Math.max(1, maxY - minY);
+  const dstW = Math.min(OUTPUT_MAX_WIDTH, Math.max(900, Math.round(srcW)));
+  const dstH = Math.round(dstW * (srcH / srcW));
+  const canvas = document.createElement("canvas");
+  canvas.width = dstW;
+  canvas.height = dstH;
+  const ctx = canvas.getContext("2d", { alpha: false });
+  if (!ctx) throw new Error("Canvas konnte nicht initialisiert werden");
+  ctx.filter = "contrast(1.18) brightness(1.08) saturate(1.08)";
+  ctx.drawImage(img, minX, minY, srcW, srcH, 0, 0, dstW, dstH);
+  return canvas;
+}
+
+/**
  * Warp the quad defined by `corners` to a top-down A4 canvas and apply the
  * "Magic Color" filter (shadow removal + ink pop).
  * Returns a canvas containing the enhanced image.
@@ -145,13 +307,17 @@ export async function warpAndEnhance(
   corners: Corners
 ): Promise<HTMLCanvasElement> {
   const cv: OpenCV = await loadOpenCV();
+  const prepared = prepareImageSource(img, WARP_MAX_DIMENSION);
 
-  const [tl, tr, br, bl] = corners;
+  const [tl, tr, br, bl] = corners.map((p) => ({
+    x: p.x * prepared.scaleX,
+    y: p.y * prepared.scaleY,
+  })) as Corners;
   const widthPx = Math.max(distance(tl, tr), distance(bl, br));
   // A4 ratio (portrait)
   let dstW = Math.round(widthPx);
-  if (dstW < 400) dstW = 400;
-  if (dstW > 2000) dstW = 2000;
+  if (dstW < 900) dstW = 900;
+  if (dstW > OUTPUT_MAX_WIDTH) dstW = OUTPUT_MAX_WIDTH;
   const dstH = Math.round(dstW * Math.SQRT2);
 
   let src: unknown,
@@ -166,7 +332,7 @@ export async function warpAndEnhance(
   const hsvCh: unknown[] = [];
   const kernel: unknown[] = [];
   try {
-    src = cv.imread(img);
+    src = cv.imread(prepared.source);
     srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
       tl.x,
       tl.y,
