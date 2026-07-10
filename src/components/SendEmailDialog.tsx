@@ -94,6 +94,14 @@ const WA_KK_LABEL: Record<string, string> = {
   bkk_gs: 'BKK GILDEMEISTER SEIDENSTICKER',
 };
 
+const VIACTIV_SUBJECT_TEMPLATE = '{name}, {vorname}, geb. {geburtsdatum}';
+const VIACTIV_BODY_TEMPLATE =
+  `Sehr geehrte Damen und Herren,\n\n` +
+  `anbei finden Sie den/die Antrag/Anträge für {vorname} {name}, geboren am {geburtsdatum}.\n\n` +
+  `Angefügt: {antragsform} (Beitrittserklärung und Wegbegleiter und ggf. Familienversicherung){foto} und dazu benötigte Dokumente.\n\n` +
+  `Mit freundlichen Grüßen\n\n` +
+  `BlitzVox Team`;
+
 function todayDdMmYyyy(): string {
   const d = new Date();
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
