@@ -117,10 +117,7 @@ export const SpouseSection: React.FC<SpouseSectionProps> = ({ formData, updateFo
               label="Name der bisherigen Krankenkasse (Ehegatte)"
               id="ehegatteKrankenkasse"
               value={formData.ehegatteKrankenkasse}
-              onChange={(value) => updateFormData({ 
-                ehegatteKrankenkasse: value,
-                mitgliedKrankenkasse: value  // Synchronisiert mit Name der Krankenkasse (Mitglied)
-              })}
+              onChange={(value) => updateFormData({ ehegatteKrankenkasse: value })}
               placeholder="z.B. BKK GS"
               required
               validate={validateKrankenkasse}
