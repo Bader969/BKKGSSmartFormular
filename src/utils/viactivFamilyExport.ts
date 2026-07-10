@@ -389,7 +389,6 @@ export const exportViactivFamilienversicherung = async (formData: FormData): Pro
 
   const numberOfPDFs = Math.max(1, Math.ceil(familienversicherteKinder.length / 3));
   
-  const today = new Date();
   // Dateiname enthält jetzt das Geburtsdatum des Hauptantragstellers (TT.MM.JJJJ)
   const datumForFilename = formatInputDate(formData.mitgliedGeburtsdatum) || 'Geburtsdatum';
   const nachname = formData.mitgliedName || 'Nachname';
