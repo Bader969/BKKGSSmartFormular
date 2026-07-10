@@ -367,16 +367,30 @@ export const exportViactivBonusPDFs = async (formData: FormData): Promise<number
     downloadPDF(memberPdfBytes, memberFilename);
     count++;
 
-    // 2. Ehegatte (nur familienversichert; keine eigene Mitgliedschaft)
+    // 2. Ehegatte — auch bei eigener Mitgliedschaft immer Erwachsenen-Bonus (WB)
     if (
       formData.viactivFamilienangehoerigeMitversichern &&
-      formData.ehegatte.name &&
-      !formData.ehegatte.eigeneMitgliedschaft
+      formData.ehegatte.name
     ) {
       const spouse = formData.ehegatte;
       console.log(`VIACTIV Bonus: Erstelle PDF für Ehegatte (Alter: ${calculateAge(spouse.geburtsdatum)})`);
-      
-      if (isChild(spouse.geburtsdatum)) {
+
+      const spouseOwnMembership =
+        spouse.eigeneMitgliedschaft || spouse.bisherigArt === 'mitgliedschaft';
+
+      if (spouseOwnMembership) {
+        // Eigene Mitgliedschaft → immer Erwachsenen-Bonus
+        const spousePdfBytes = await createBonusErwachsenePDF(
+          formData,
+          spouse.vorname,
+          spouse.name,
+          spouse.geburtsdatum,
+          spouse.versichertennummer,
+          formData.unterschrift,
+        );
+        const spouseFilename = generateBonusFilename(spouse.name, spouse.vorname, spouse.geburtsdatum);
+        downloadPDF(spousePdfBytes, spouseFilename);
+      } else if (isChild(spouse.geburtsdatum)) {
         // Unter 15: Kinder-PDF (110€)
         const spousePdfBytes = await createBonusKinderPDF(
           formData,

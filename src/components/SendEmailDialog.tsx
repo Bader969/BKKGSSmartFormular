@@ -94,6 +94,14 @@ const WA_KK_LABEL: Record<string, string> = {
   bkk_gs: 'BKK GILDEMEISTER SEIDENSTICKER',
 };
 
+const VIACTIV_SUBJECT_TEMPLATE = '{name}, {vorname}, geb. {geburtsdatum}';
+const VIACTIV_BODY_TEMPLATE =
+  `Sehr geehrte Damen und Herren,\n\n` +
+  `anbei finden Sie den/die Antrag/Anträge für {vorname} {name}, geboren am {geburtsdatum}.\n\n` +
+  `Angefügt: {antragsform} (Beitrittserklärung und Wegbegleiter und ggf. Familienversicherung){foto} und dazu benötigte Dokumente.\n\n` +
+  `Mit freundlichen Grüßen\n\n` +
+  `BlitzVox Team`;
+
 function todayDdMmYyyy(): string {
   const d = new Date();
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
@@ -221,13 +229,16 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
       undefined,
       { hasPhotos: mainHasPhotos },
     );
+    const isViactiv = formData.selectedKrankenkasse === 'viactiv';
+    const mainSubjectTpl = isViactiv ? VIACTIV_SUBJECT_TEMPLATE : subjTpl;
+    const mainBodyTpl = body || (isViactiv ? VIACTIV_BODY_TEMPLATE : DEFAULT_BODY_TEMPLATE);
     result.push({
       id: mainKey,
       label: `Hauptmitglied — ${formData.mitgliedVorname} ${formData.mitgliedName}`.trim(),
       person: { vorname: formData.mitgliedVorname, name: formData.mitgliedName, geburtsdatum: formData.mitgliedGeburtsdatum },
       antragsform: mainVars.antragsform,
-      subject: groupSubjects[mainKey] ?? applyTemplate(subjTpl, mainVars),
-      body: applyTemplate(body || DEFAULT_BODY_TEMPLATE, mainVars),
+      subject: groupSubjects[mainKey] ?? applyTemplate(mainSubjectTpl, mainVars),
+      body: applyTemplate(mainBodyTpl, mainVars),
       attachmentIndices: mainAttIdx,
     });
 
@@ -315,8 +326,8 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           label: p.label,
           person: { vorname: p.vorname, name: p.name, geburtsdatum: p.geb },
           antragsform: pVars.antragsform,
-          subject: groupSubjects[p.id] ?? applyTemplate(subjTpl, pVars),
-          body: applyTemplate(body || DEFAULT_BODY_TEMPLATE, pVars),
+          subject: groupSubjects[p.id] ?? applyTemplate(VIACTIV_SUBJECT_TEMPLATE, pVars),
+          body: applyTemplate(body || VIACTIV_BODY_TEMPLATE, pVars),
           attachmentIndices: attIdx,
         });
       }
@@ -369,7 +380,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
 
         if (!cancelled) {
           setSubjTpl(nextSubjTpl);
-          setBody(bodyTpl);
+          setBody(formData.selectedKrankenkasse === 'viactiv' ? VIACTIV_BODY_TEMPLATE : bodyTpl);
           setGroupSubjects({});
         }
 
