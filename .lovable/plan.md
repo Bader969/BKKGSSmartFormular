@@ -1,62 +1,47 @@
-## VIACTIV — Separate E-Mails, FV-Umbenennung, VIACTIV-Betreff & fehlender WB für Ehegatten
+## Ziel
+Die "Name der Krankenkasse" des Hauptmitglieds bleibt die Quelle, die überall automatisch übernommen wird. Sobald jedoch bei Ehegatte oder einem Kind ein abweichender Wert manuell eingetragen wurde, darf ein späteres Ändern der Krankenkasse beim Hauptmitglied diesen individuellen Wert **nicht** mehr überschreiben. Änderungen an Ehegatten-/Kinder-Feldern dürfen außerdem **nicht** rückwärts auf das Hauptmitglied wirken.
 
-### 1) Fehlender Wegbegleiter (Bonus-PDF) für Ehegatten mit eigener Mitgliedschaft
+## Analyse (aktuelles Verhalten)
+- `MemberSection.tsx` (Zeile 183–186): Beim Ändern von `mitgliedKrankenkasse` wird **immer** auch `ehegatteKrankenkasse` überschrieben → zerstört individuelle Ehegatten-Krankenkasse.
+- `SpouseSection.tsx` (Zeile 120–123): Beim Ändern von `ehegatteKrankenkasse` wird **rückwärts** auch `mitgliedKrankenkasse` überschrieben → Änderung wirkt „überall".
+- Kinder-Felder (`ChildrenSection.tsx` Z. 134, `ViactivSection.tsx` Z. 345/482/674, `FamilyMemberForm.tsx` Z. 226–229): benutzen bereits das Fallback-Muster `kind.bisherigBestandBei || formData.mitgliedKrankenkasse`. Ein individuell eingetragener Wert bleibt technisch erhalten, aber die Anzeige „synchronisiert" sich visuell — das ist gewünscht.
 
-**Ursache** in `src/utils/viactivBonusExport.ts` → Ehegatten-Block:
-Die Bedingung lautet `!formData.ehegatte.eigeneMitgliedschaft`. Wenn der Ehegatte eine eigene Mitgliedschaft hat (Fall im Screenshot: Alhamad, Mahasen), wird **kein** Bonus-PDF (WB) erzeugt. Für Kinder mit `eigeneMitgliedschaft` existiert die Logik bereits (→ Erwachsenen-Bonus).
+## Änderungen
 
-**Fix:** Ehegatten-Block analog zu Kindern behandeln:
-- Wenn `ehegatte.eigeneMitgliedschaft` (bzw. `bisherigArt === 'mitgliedschaft'`) → **immer** Erwachsenen-Bonus-PDF.
-- Sonst wie bisher: unter 15 → Kinder-Bonus, ab 15 → Erwachsenen-Bonus.
-- Bedingung `viactivFamilienangehoerigeMitversichern` bleibt bestehen.
+### 1) `src/components/MemberSection.tsx`
+Der `onChange`-Handler für `mitgliedKrankenkasse` überschreibt `ehegatteKrankenkasse` nur noch, wenn dort noch kein eigener Wert steht bzw. der bisherige Wert identisch mit dem alten `mitgliedKrankenkasse` war (also noch nie manuell abgewandelt).
 
-### 2) FV-Dateiname: Erstellungsdatum → Geburtsdatum des Hauptantragstellers
-
-**Aktuell** in `src/utils/viactivFamilyExport.ts`:
+```ts
+onChange={(value) => {
+  const prev = formData.mitgliedKrankenkasse ?? '';
+  const spouseUntouched =
+    !formData.ehegatteKrankenkasse || formData.ehegatteKrankenkasse === prev;
+  updateFormData({
+    mitgliedKrankenkasse: value,
+    ...(spouseUntouched ? { ehegatteKrankenkasse: value } : {}),
+  });
+}}
 ```
-Viactiv_Nachname, Vorname_Familienversicherung_<heutigesDatum>.pdf
+
+### 2) `src/components/SpouseSection.tsx`
+Rückwärts-Sync entfernen. `ehegatteKrankenkasse` schreibt nur noch sich selbst — das Hauptmitglied bleibt unangetastet.
+
+```ts
+onChange={(value) => updateFormData({ ehegatteKrankenkasse: value })}
 ```
-**Neu:**
-```
-Viactiv_Nachname, Vorname_Familienversicherung_<Geburtsdatum Hauptmitglied im Format TT.MM.JJJJ>.pdf
-```
-Umsetzung: `datumForFilename` durch `formatInputDate(formData.mitgliedGeburtsdatum)` ersetzen (Fallback auf leer/`Geburtsdatum`, falls nicht gesetzt). `_Teil1/_Teil2`-Suffix bleibt bei >3 Kindern.
 
-### 3) Separate E-Mail-Gruppen bei VIACTIV pro eigener Mitgliedschaft
+### 3) Kinder- und Viactiv-Felder
+Keine Änderung nötig. Das bestehende Fallback-Muster `kind.bisherigBestandBei || formData.mitgliedKrankenkasse` erfüllt die Anforderung bereits:
+- Solange nichts eingetragen wurde, wird die Krankenkasse des Hauptmitglieds angezeigt und exportiert.
+- Sobald man einen abweichenden Wert einträgt, bleibt dieser dauerhaft — spätere Änderungen am Hauptmitglied wirken sich auf dieses Kind nicht mehr aus.
 
-`src/components/SendEmailDialog.tsx` erzeugt für VIACTIV bereits eigene Gruppen für Ehegatte/Kind mit eigener Mitgliedschaft (Block „VIACTIV Variante B"). WB und BE folgen automatisch dem Namens-Match; FV bleibt beim Hauptmitglied. Keine strukturelle Änderung, nur Betreff/Body-Overrides (siehe Punkt 4).
+Analog für die Ehegatten-Felder `bisherigBestandBei` / `bisherigBestehtWeiterBei` in `ViactivSection.tsx` und `FamilyMemberForm.tsx` (bereits Fallback, kein Overwrite).
 
-### 4) VIACTIV-spezifische Betreff- und Body-Regeln
+## Nicht betroffen
+- Import-Logik (`JsonImportDialog`, `FreitextImportDialog`, `krankenkassenMapping.ts`): initiales Vorbelegen bleibt wie gehabt.
+- PDF-Exporte (`viactivExport.ts`, `dakExport.ts`, `novitasExport.ts`, `bigFamversExport.ts`, `viactivFamilyExport.ts`, `pdfExport.ts`): nutzen bereits person-spezifische Werte mit Fallback auf `mitgliedKrankenkasse`.
+- Provider-Auswahl (`selectedKrankenkasse`) und Antragsform-Logik.
 
-Aktuell nutzt jede Gruppe das globale Template.
-
-Für VIACTIV wird pro Gruppe (Hauptmitglied und Variante-B-Personen) **hart** überschrieben:
-
-- **Betreff:** `{name}, {vorname}, geb. {geburtsdatum}` → Beispiel: `Hmedi, Ali, geb. 01.01.2011`
-- **Body:**
-  ```
-  Sehr geehrte Damen und Herren,
-
-  anbei finden Sie den/die Antrag/Anträge für {vorname} {name}, geboren am {geburtsdatum}.
-
-  Angefügt: {antragsform} (Beitrittserklärung und Wegbegleiter und ggf. Familienversicherung){foto} und dazu benötigte Dokumente.
-
-  Mit freundlichen Grüßen
-
-  BlitzVox Team
-  ```
-
-Umsetzung in `SendEmailDialog.tsx`:
-- Neue lokale Konstanten `VIACTIV_SUBJECT_TEMPLATE` und `VIACTIV_BODY_TEMPLATE`.
-- Beim Bauen der Gruppen: bei `selectedKrankenkasse === 'viactiv'` diese Templates statt `subjTpl` / `body` verwenden.
-- Body-State wird beim Öffnen für VIACTIV auf `VIACTIV_BODY_TEMPLATE` gesetzt; der User kann ihn im Textfeld weiterhin anpassen.
-
-### Betroffene Dateien
-- `src/utils/viactivBonusExport.ts` — Ehegatten-Zweig um `eigeneMitgliedschaft`-Fall erweitern.
-- `src/utils/viactivFamilyExport.ts` — FV-Dateiname auf Geburtsdatum des Hauptantragstellers umstellen.
-- `src/components/SendEmailDialog.tsx` — VIACTIV-spezifische Betreff-/Body-Templates.
-
-### Nicht geändert
-- Gruppen-Aufteilung für VIACTIV (Variante B existiert bereits).
-- BIG, DAK, Novitas, BKK GS Templates.
-- WhatsApp-Versand-Logik.
+## Betroffene Dateien
+- `src/components/MemberSection.tsx`
+- `src/components/SpouseSection.tsx`
