@@ -231,7 +231,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
     );
     const isViactiv = formData.selectedKrankenkasse === 'viactiv';
     const mainSubjectTpl = isViactiv ? VIACTIV_SUBJECT_TEMPLATE : subjTpl;
-    const mainBodyTpl = isViactiv ? VIACTIV_BODY_TEMPLATE : (body || DEFAULT_BODY_TEMPLATE);
+    const mainBodyTpl = body || (isViactiv ? VIACTIV_BODY_TEMPLATE : DEFAULT_BODY_TEMPLATE);
     result.push({
       id: mainKey,
       label: `Hauptmitglied — ${formData.mitgliedVorname} ${formData.mitgliedName}`.trim(),
@@ -327,7 +327,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           person: { vorname: p.vorname, name: p.name, geburtsdatum: p.geb },
           antragsform: pVars.antragsform,
           subject: groupSubjects[p.id] ?? applyTemplate(VIACTIV_SUBJECT_TEMPLATE, pVars),
-          body: applyTemplate(VIACTIV_BODY_TEMPLATE, pVars),
+          body: applyTemplate(body || VIACTIV_BODY_TEMPLATE, pVars),
           attachmentIndices: attIdx,
         });
       }
