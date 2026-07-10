@@ -69,9 +69,15 @@ function fullNameLower(v: string, n: string) {
 
 function fileBelongsToPerson(filename: string, vorname: string, name: string): boolean {
   const fn = filename.toLowerCase();
-  const full = fullNameLower(vorname, name);
-  if (!full) return false;
-  return fn.includes(full);
+  const v = (vorname || '').trim().toLowerCase();
+  const n = (name || '').trim().toLowerCase();
+  if (!v && !n) return false;
+  const variants = [
+    `${v} ${n}`.trim(),        // "mahasen alhamad"
+    `${n}, ${v}`.trim(),       // "alhamad, mahasen"
+    `${n}_${v}`.trim(),        // "alhamad_mahasen"
+  ].filter((s) => s.length > 1);
+  return variants.some((s) => fn.includes(s));
 }
 
 function sanitize(s: string): string {
