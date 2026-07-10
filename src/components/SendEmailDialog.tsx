@@ -229,13 +229,16 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
       undefined,
       { hasPhotos: mainHasPhotos },
     );
+    const isViactiv = formData.selectedKrankenkasse === 'viactiv';
+    const mainSubjectTpl = isViactiv ? VIACTIV_SUBJECT_TEMPLATE : subjTpl;
+    const mainBodyTpl = isViactiv ? VIACTIV_BODY_TEMPLATE : (body || DEFAULT_BODY_TEMPLATE);
     result.push({
       id: mainKey,
       label: `Hauptmitglied — ${formData.mitgliedVorname} ${formData.mitgliedName}`.trim(),
       person: { vorname: formData.mitgliedVorname, name: formData.mitgliedName, geburtsdatum: formData.mitgliedGeburtsdatum },
       antragsform: mainVars.antragsform,
-      subject: groupSubjects[mainKey] ?? applyTemplate(subjTpl, mainVars),
-      body: applyTemplate(body || DEFAULT_BODY_TEMPLATE, mainVars),
+      subject: groupSubjects[mainKey] ?? applyTemplate(mainSubjectTpl, mainVars),
+      body: applyTemplate(mainBodyTpl, mainVars),
       attachmentIndices: mainAttIdx,
     });
 
@@ -323,8 +326,8 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           label: p.label,
           person: { vorname: p.vorname, name: p.name, geburtsdatum: p.geb },
           antragsform: pVars.antragsform,
-          subject: groupSubjects[p.id] ?? applyTemplate(subjTpl, pVars),
-          body: applyTemplate(body || DEFAULT_BODY_TEMPLATE, pVars),
+          subject: groupSubjects[p.id] ?? applyTemplate(VIACTIV_SUBJECT_TEMPLATE, pVars),
+          body: applyTemplate(VIACTIV_BODY_TEMPLATE, pVars),
           attachmentIndices: attIdx,
         });
       }
