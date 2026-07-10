@@ -380,7 +380,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
 
         if (!cancelled) {
           setSubjTpl(nextSubjTpl);
-          setBody(bodyTpl);
+          setBody(formData.selectedKrankenkasse === 'viactiv' ? VIACTIV_BODY_TEMPLATE : bodyTpl);
           setGroupSubjects({});
         }
 
