@@ -320,7 +320,52 @@ Deno.serve(async (req) => {
         userEmails = Object.fromEntries((profs ?? []).map((p) => [p.id, p.email ?? ""]));
         userDisplayNames = Object.fromEntries((profs ?? []).map((p) => [p.id, p.display_name ?? ""]));
       }
-      return json(200, { applications: filtered, isAdmin: !!isAdminData, userEmails, userDisplayNames });
+      // Attach latest emailed_at / whatsapp_sent_at per application row (per person).
+      // Sub-entries (Ehegatte/Kind) key on (parent_id, person_role, person_index);
+      // parent rows key on (id, 'main', null) with a legacy fallback for events
+      // that were written without a person_role.
+      const withStatus = (filtered ?? []).map((r) => ({ ...r, emailed_at: null as string | null, whatsapp_sent_at: null as string | null }));
+      if (withStatus.length) {
+        // Determine which parent application ids we need to look up events for:
+        // parent-rows themselves + parents of any sub-rows.
+        const parentIds = new Set<string>();
+        for (const r of withStatus) {
+          parentIds.add(r.parent_application_id ?? r.id);
+        }
+        const { data: evs } = await admin
+          .from("application_events")
+          .select("application_id, event_type, meta, created_at")
+          .in("application_id", Array.from(parentIds))
+          .in("event_type", ["emailed", "whatsapp_sent"])
+          .order("created_at", { ascending: false })
+          .limit(2000);
+        // Bucket latest timestamp per (parent_application_id, event_type, person_role, person_index)
+        const latest = new Map<string, string>();
+        for (const ev of evs ?? []) {
+          const meta = (ev.meta ?? {}) as Record<string, unknown>;
+          const role = typeof meta.person_role === "string" ? meta.person_role : "__legacy__";
+          const idx = typeof meta.person_index === "number" ? meta.person_index : "";
+          const key = `${ev.application_id}#${ev.event_type}#${role}#${idx}`;
+          if (!latest.has(key)) latest.set(key, ev.created_at as string);
+        }
+        for (const r of withStatus) {
+          const pid = r.parent_application_id ?? r.id;
+          const isSub = !!r.parent_application_id;
+          const role = isSub ? (r.person_role ?? "") : "main";
+          const idx = isSub && r.person_role === "kind" ? (r.person_index ?? "") : "";
+          const pick = (evType: string): string | null => {
+            // Preferred: strict per-person match
+            const hit = latest.get(`${pid}#${evType}#${role}#${idx}`);
+            if (hit) return hit;
+            // Legacy fallback: parent rows also accept events without any person_role
+            if (!isSub) return latest.get(`${pid}#${evType}#__legacy__#`) ?? null;
+            return null;
+          };
+          r.emailed_at = pick("emailed");
+          r.whatsapp_sent_at = pick("whatsapp_sent");
+        }
+      }
+      return json(200, { applications: withStatus, isAdmin: !!isAdminData, userEmails, userDisplayNames });
     }
 
     if (action === "decrypt") {
