@@ -21,6 +21,8 @@ export type ApplicationRow = {
   person_role: string | null;
   person_index: number | null;
   source?: string | null;
+  emailed_at?: string | null;
+  whatsapp_sent_at?: string | null;
 };
 
 export function ApplicationDetailDrawer({
