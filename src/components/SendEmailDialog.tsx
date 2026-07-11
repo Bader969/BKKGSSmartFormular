@@ -253,14 +253,14 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
 
     // BIG Variante B: pro Ehegatte/Kind mit eigener Mitgliedschaft
     if (formData.selectedKrankenkasse === 'big_plusbonus' && formData.bigFamilienversicherung) {
-      const persons: Array<{ id: string; label: string; vorname: string; name: string; geb: string }> = [];
+      const persons: Array<{ id: string; label: string; vorname: string; name: string; geb: string; role: 'ehegatte' | 'kind'; index?: number }> = [];
       const e = formData.ehegatte;
       if (e && e.eigeneMitgliedschaft && (e.vorname || e.name)) {
-        persons.push({ id: 'spouse', label: `Ehegatte — ${e.vorname} ${e.name}`.trim(), vorname: e.vorname, name: e.name, geb: e.geburtsdatum });
+        persons.push({ id: 'spouse', label: `Ehegatte — ${e.vorname} ${e.name}`.trim(), vorname: e.vorname, name: e.name, geb: e.geburtsdatum, role: 'ehegatte' });
       }
       formData.kinder.forEach((k, i) => {
         if (k.eigeneMitgliedschaft && (k.vorname || k.name)) {
-          persons.push({ id: `kind-${i}`, label: `Kind ${i + 1} — ${k.vorname} ${k.name}`.trim(), vorname: k.vorname, name: k.name, geb: k.geburtsdatum });
+          persons.push({ id: `kind-${i}`, label: `Kind ${i + 1} — ${k.vorname} ${k.name}`.trim(), vorname: k.vorname, name: k.name, geb: k.geburtsdatum, role: 'kind', index: i + 1 });
         }
       });
       for (const p of persons) {
@@ -293,20 +293,22 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           subject: groupSubjects[p.id] ?? applyTemplate(subjTpl, pVars),
           body: applyTemplate(body || DEFAULT_BODY_TEMPLATE, pVars),
           attachmentIndices: attIdx,
+          personRole: p.role,
+          personIndex: p.index,
         });
       }
     }
 
     // VIACTIV Variante B: Ehegatte + Kinder mit eigener Mitgliedschaft
     if (formData.selectedKrankenkasse === 'viactiv' && formData.viactivFamilienangehoerigeMitversichern) {
-      const persons: Array<{ id: string; label: string; vorname: string; name: string; geb: string }> = [];
+      const persons: Array<{ id: string; label: string; vorname: string; name: string; geb: string; role: 'ehegatte' | 'kind'; index?: number }> = [];
       const e = formData.ehegatte;
       if (e && (e.vorname || e.name) && e.bisherigArt === 'mitgliedschaft') {
-        persons.push({ id: 'spouse', label: `Ehegatte — ${e.vorname} ${e.name}`.trim(), vorname: e.vorname, name: e.name, geb: e.geburtsdatum });
+        persons.push({ id: 'spouse', label: `Ehegatte — ${e.vorname} ${e.name}`.trim(), vorname: e.vorname, name: e.name, geb: e.geburtsdatum, role: 'ehegatte' });
       }
       formData.kinder.forEach((k, i) => {
         if (k.eigeneMitgliedschaft && (k.vorname || k.name)) {
-          persons.push({ id: `kind-${i}`, label: `Kind ${i + 1} — ${k.vorname} ${k.name}`.trim(), vorname: k.vorname, name: k.name, geb: k.geburtsdatum });
+          persons.push({ id: `kind-${i}`, label: `Kind ${i + 1} — ${k.vorname} ${k.name}`.trim(), vorname: k.vorname, name: k.name, geb: k.geburtsdatum, role: 'kind', index: i + 1 });
         }
       });
       for (const p of persons) {
@@ -338,6 +340,8 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           subject: groupSubjects[p.id] ?? applyTemplate(VIACTIV_SUBJECT_TEMPLATE, pVars),
           body: applyTemplate(body || VIACTIV_BODY_TEMPLATE, pVars),
           attachmentIndices: attIdx,
+          personRole: p.role,
+          personIndex: p.index,
         });
       }
     }
