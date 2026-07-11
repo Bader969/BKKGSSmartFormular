@@ -748,7 +748,18 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
                 const groupTooLarge = groupSize > 24 * 1024 * 1024;
                 return (
                   <div key={g.id} className="border border-border/60 rounded-lg p-3 space-y-2">
-                    <div className="text-xs font-semibold text-muted-foreground">{g.label}</div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs font-semibold text-muted-foreground truncate">{g.label}</div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleSendSingle(g)}
+                        disabled={sending || loadingAttachments || groupTooLarge}
+                        className="h-7 gap-1 text-xs shrink-0"
+                      >
+                        <Mail className="h-3 w-3" /> Nur diese senden
+                      </Button>
+                    </div>
                     <div>
                       <Label htmlFor={`subj-${g.id}`} className="text-xs">Betreff *</Label>
                       <Input
