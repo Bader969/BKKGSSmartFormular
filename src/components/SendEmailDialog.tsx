@@ -61,6 +61,8 @@ type SendGroup = {
   subject: string;
   body: string;
   attachmentIndices: number[]; // Verweis auf attachments
+  personRole: 'main' | 'ehegatte' | 'kind';
+  personIndex?: number;
 };
 
 function fullNameLower(v: string, n: string) {
