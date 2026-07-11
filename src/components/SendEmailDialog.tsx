@@ -562,7 +562,10 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
     let okCount = 0;
     let failCount = 0;
     try {
+      console.info('[SendEmail] Sende', groups.length, 'Gruppe(n):',
+        groups.map((g) => ({ id: g.id, label: g.label, anhaenge: g.attachmentIndices.length })));
       for (const g of groups) {
+        console.info('[SendEmail] → Start Gruppe:', g.id, g.label);
         try {
           const active = g.attachmentIndices.map((i) => attachments[i]).filter((a) => a && a.include);
           const encoded = await Promise.all(
@@ -591,6 +594,8 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           }
           if (data?.error) throw new Error(data.error);
           okCount++;
+          console.info('[SendEmail] ✓ Gruppe gesendet:', g.id, g.label, 'gmail_id:', data?.gmail_id);
+          toast.success(`E-Mail gesendet: ${g.label}`);
 
           // WhatsApp-Versand
           if (sendToWhatsApp) {
@@ -638,10 +643,13 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           }
         } catch (e) {
           failCount++;
+          console.error('[SendEmail] ✗ Gruppe fehlgeschlagen:', g.id, g.label, e);
           toast.error(`"${g.label}" fehlgeschlagen: ${(e as Error).message}`);
         }
       }
-      if (okCount) toast.success(`${okCount} E-Mail(s) versendet.`);
+      if (okCount || failCount) {
+        toast.message(`Ergebnis: ${okCount} gesendet, ${failCount} fehlgeschlagen (von ${groups.length}).`);
+      }
       if (okCount && !failCount) {
         onSent?.();
         onOpenChange(false);
