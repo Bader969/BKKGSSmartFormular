@@ -61,6 +61,8 @@ type SendGroup = {
   subject: string;
   body: string;
   attachmentIndices: number[]; // Verweis auf attachments
+  personRole: 'main' | 'ehegatte' | 'kind';
+  personIndex?: number;
 };
 
 function fullNameLower(v: string, n: string) {
@@ -246,18 +248,19 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
       subject: groupSubjects[mainKey] ?? applyTemplate(mainSubjectTpl, mainVars),
       body: applyTemplate(mainBodyTpl, mainVars),
       attachmentIndices: mainAttIdx,
+      personRole: 'main',
     });
 
     // BIG Variante B: pro Ehegatte/Kind mit eigener Mitgliedschaft
     if (formData.selectedKrankenkasse === 'big_plusbonus' && formData.bigFamilienversicherung) {
-      const persons: Array<{ id: string; label: string; vorname: string; name: string; geb: string }> = [];
+      const persons: Array<{ id: string; label: string; vorname: string; name: string; geb: string; role: 'ehegatte' | 'kind'; index?: number }> = [];
       const e = formData.ehegatte;
       if (e && e.eigeneMitgliedschaft && (e.vorname || e.name)) {
-        persons.push({ id: 'spouse', label: `Ehegatte — ${e.vorname} ${e.name}`.trim(), vorname: e.vorname, name: e.name, geb: e.geburtsdatum });
+        persons.push({ id: 'spouse', label: `Ehegatte — ${e.vorname} ${e.name}`.trim(), vorname: e.vorname, name: e.name, geb: e.geburtsdatum, role: 'ehegatte' });
       }
       formData.kinder.forEach((k, i) => {
         if (k.eigeneMitgliedschaft && (k.vorname || k.name)) {
-          persons.push({ id: `kind-${i}`, label: `Kind ${i + 1} — ${k.vorname} ${k.name}`.trim(), vorname: k.vorname, name: k.name, geb: k.geburtsdatum });
+          persons.push({ id: `kind-${i}`, label: `Kind ${i + 1} — ${k.vorname} ${k.name}`.trim(), vorname: k.vorname, name: k.name, geb: k.geburtsdatum, role: 'kind', index: i + 1 });
         }
       });
       for (const p of persons) {
@@ -290,20 +293,22 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           subject: groupSubjects[p.id] ?? applyTemplate(subjTpl, pVars),
           body: applyTemplate(body || DEFAULT_BODY_TEMPLATE, pVars),
           attachmentIndices: attIdx,
+          personRole: p.role,
+          personIndex: p.index,
         });
       }
     }
 
     // VIACTIV Variante B: Ehegatte + Kinder mit eigener Mitgliedschaft
     if (formData.selectedKrankenkasse === 'viactiv' && formData.viactivFamilienangehoerigeMitversichern) {
-      const persons: Array<{ id: string; label: string; vorname: string; name: string; geb: string }> = [];
+      const persons: Array<{ id: string; label: string; vorname: string; name: string; geb: string; role: 'ehegatte' | 'kind'; index?: number }> = [];
       const e = formData.ehegatte;
       if (e && (e.vorname || e.name) && e.bisherigArt === 'mitgliedschaft') {
-        persons.push({ id: 'spouse', label: `Ehegatte — ${e.vorname} ${e.name}`.trim(), vorname: e.vorname, name: e.name, geb: e.geburtsdatum });
+        persons.push({ id: 'spouse', label: `Ehegatte — ${e.vorname} ${e.name}`.trim(), vorname: e.vorname, name: e.name, geb: e.geburtsdatum, role: 'ehegatte' });
       }
       formData.kinder.forEach((k, i) => {
         if (k.eigeneMitgliedschaft && (k.vorname || k.name)) {
-          persons.push({ id: `kind-${i}`, label: `Kind ${i + 1} — ${k.vorname} ${k.name}`.trim(), vorname: k.vorname, name: k.name, geb: k.geburtsdatum });
+          persons.push({ id: `kind-${i}`, label: `Kind ${i + 1} — ${k.vorname} ${k.name}`.trim(), vorname: k.vorname, name: k.name, geb: k.geburtsdatum, role: 'kind', index: i + 1 });
         }
       });
       for (const p of persons) {
@@ -335,6 +340,8 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           subject: groupSubjects[p.id] ?? applyTemplate(VIACTIV_SUBJECT_TEMPLATE, pVars),
           body: applyTemplate(body || VIACTIV_BODY_TEMPLATE, pVars),
           attachmentIndices: attIdx,
+          personRole: p.role,
+          personIndex: p.index,
         });
       }
     }
@@ -547,15 +554,117 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
   const totalSize = attachments.filter((a) => a.include).reduce((s, a) => s + a.blob.size, 0);
   const tooLarge = totalSize > 24 * 1024 * 1024;
 
+  const validateGroup = (g: SendGroup): string | null => {
+    if (!to.trim()) return 'Bitte Empfänger angeben.';
+    if (!g.subject.trim()) return `Betreff für "${g.label}" fehlt.`;
+    const active = g.attachmentIndices.map((i) => attachments[i]).filter((a) => a && a.include);
+    if (!active.length) return `Mindestens ein Anhang für "${g.label}" erforderlich.`;
+    const size = active.reduce((s, a) => s + a.blob.size, 0);
+    if (size > 24 * 1024 * 1024) return `"${g.label}" überschreitet 24 MB.`;
+    return null;
+  };
+
+  // Sendet genau eine Gruppe (E-Mail + optional WhatsApp). Wirft bei Fehler.
+  const sendGroup = async (g: SendGroup): Promise<void> => {
+    console.info('[SendEmail] → Start Gruppe:', g.id, g.label);
+    const active = g.attachmentIndices.map((i) => attachments[i]).filter((a) => a && a.include);
+    const encoded = await Promise.all(
+      active.map(async (a) => ({
+        filename: a.filename,
+        mimeType: a.blob.type || 'application/pdf',
+        base64: await blobToBase64(a.blob),
+      })),
+    );
+    const { data, error } = await supabase.functions.invoke('send-application-email', {
+      body: {
+        application_id: applicationId,
+        to: to.trim(),
+        cc: cc.trim() || undefined,
+        bcc: bcc.trim() || undefined,
+        subject: g.subject.trim(),
+        body: g.body,
+        attachments: encoded,
+        person_role: g.personRole,
+        person_index: g.personIndex ?? null,
+        person_label: g.label,
+      },
+    });
+    if (error) throw new Error(error.message);
+    if (data?.error === 'gmail_scope_missing') {
+      throw new Error('Gmail-Verbindung erlaubt kein Senden. Bitte Verbindung mit Scope "gmail.send" neu autorisieren.');
+    }
+    if (data?.error) throw new Error(data.error);
+    console.info('[SendEmail] ✓ Gruppe gesendet:', g.id, g.label, 'gmail_id:', data?.gmail_id);
+    toast.success(`E-Mail gesendet: ${g.label}`);
+
+    if (sendToWhatsApp) {
+      const isViactiv = formData.selectedKrankenkasse === 'viactiv';
+      const summary = isViactiv
+        ? active.find((a) => {
+            const fn = a.filename.toLowerCase();
+            return fn.startsWith('viactiv_') && fn.includes('_be_') &&
+              fileBelongsToPerson(a.filename, g.person.vorname, g.person.name);
+          })
+        : active.find((a) => a.filename.toLowerCase().startsWith('zusammenfassung_mitgliedsantrag'));
+      if (!summary) {
+        toast.info(
+          isViactiv
+            ? `"${g.label}": keine Beitrittserklärung (BE) gefunden — WhatsApp übersprungen.`
+            : `"${g.label}": keine „Zusammenfassung_Mitgliedsantrag" angehängt — WhatsApp übersprungen.`,
+        );
+      } else {
+        try {
+          const pdfBase64 = await blobToBase64(summary.blob);
+          const textLines = buildWaTextLines(
+            g.person,
+            formData.selectedKrankenkasse,
+            formData.vertriebspartner || '',
+          );
+          const { data: waData, error: waErr } = await supabase.functions.invoke('send-whatsapp-summary', {
+            body: {
+              application_id: applicationId,
+              chatId: WA_CHAT_ID,
+              pdfBase64,
+              pdfFilename: summary.filename,
+              textLines,
+              person_role: g.personRole,
+              person_index: g.personIndex ?? null,
+              person_label: g.label,
+            },
+          });
+          if (waErr) throw new Error(waErr.message);
+          if (waData?.error) throw new Error(waData.error);
+          toast.success(`WhatsApp gesendet: ${g.label}`);
+        } catch (waErr) {
+          toast.error(`WhatsApp „${g.label}" fehlgeschlagen: ${(waErr as Error).message}`);
+        }
+      }
+    }
+  };
+
+  // Nur eine einzige Gruppe senden — Dialog bleibt offen, andere Gruppen unangetastet.
+  const handleSendSingle = async (g: SendGroup) => {
+    const err = validateGroup(g);
+    if (err) { toast.error(err); return; }
+    setSending(true);
+    try {
+      await sendGroup(g);
+      onSent?.();
+    } catch (e) {
+      console.error('[SendEmail] ✗ Gruppe fehlgeschlagen:', g.id, g.label, e);
+      toast.error(`"${g.label}" fehlgeschlagen: ${(e as Error).message}`);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // Alle Gruppen nacheinander senden.
   const handleSend = async () => {
     if (!to.trim()) { toast.error('Bitte Empfänger angeben.'); return; }
     if (!groups.length) { toast.error('Keine Sende-Gruppen.'); return; }
     for (const g of groups) {
-      if (!g.subject.trim()) { toast.error(`Betreff für "${g.label}" fehlt.`); return; }
-      const active = g.attachmentIndices.map((i) => attachments[i]).filter((a) => a && a.include);
-      if (!active.length) { toast.error(`Mindestens ein Anhang für "${g.label}" erforderlich.`); return; }
-      const size = active.reduce((s, a) => s + a.blob.size, 0);
-      if (size > 24 * 1024 * 1024) { toast.error(`"${g.label}" überschreitet 24 MB.`); return; }
+      const err = validateGroup(g);
+      if (err) { toast.error(err); return; }
     }
 
     setSending(true);
@@ -565,82 +674,9 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
       console.info('[SendEmail] Sende', groups.length, 'Gruppe(n):',
         groups.map((g) => ({ id: g.id, label: g.label, anhaenge: g.attachmentIndices.length })));
       for (const g of groups) {
-        console.info('[SendEmail] → Start Gruppe:', g.id, g.label);
         try {
-          const active = g.attachmentIndices.map((i) => attachments[i]).filter((a) => a && a.include);
-          const encoded = await Promise.all(
-            active.map(async (a) => ({
-              filename: a.filename,
-              mimeType: a.blob.type || 'application/pdf',
-              base64: await blobToBase64(a.blob),
-            })),
-          );
-          const { data, error } = await supabase.functions.invoke('send-application-email', {
-            body: {
-              application_id: applicationId,
-              to: to.trim(),
-              cc: cc.trim() || undefined,
-              bcc: bcc.trim() || undefined,
-              subject: g.subject.trim(),
-              body: g.body,
-              attachments: encoded,
-            },
-          });
-          if (error) throw new Error(error.message);
-          if (data?.error === 'gmail_scope_missing') {
-            toast.error('Gmail-Verbindung erlaubt kein Senden. Bitte Verbindung mit Scope "gmail.send" neu autorisieren.');
-            failCount++;
-            continue;
-          }
-          if (data?.error) throw new Error(data.error);
+          await sendGroup(g);
           okCount++;
-          console.info('[SendEmail] ✓ Gruppe gesendet:', g.id, g.label, 'gmail_id:', data?.gmail_id);
-          toast.success(`E-Mail gesendet: ${g.label}`);
-
-          // WhatsApp-Versand
-          if (sendToWhatsApp) {
-            const active = g.attachmentIndices.map((i) => attachments[i]).filter((a) => a && a.include);
-            const isViactiv = formData.selectedKrankenkasse === 'viactiv';
-            const summary = isViactiv
-              ? active.find((a) => {
-                  const fn = a.filename.toLowerCase();
-                  return fn.startsWith('viactiv_') && fn.includes('_be_') &&
-                    fileBelongsToPerson(a.filename, g.person.vorname, g.person.name);
-                })
-              : active.find((a) =>
-                  a.filename.toLowerCase().startsWith('zusammenfassung_mitgliedsantrag'),
-                );
-            if (!summary) {
-              toast.info(
-                isViactiv
-                  ? `"${g.label}": keine Beitrittserklärung (BE) gefunden — WhatsApp übersprungen.`
-                  : `"${g.label}": keine „Zusammenfassung_Mitgliedsantrag" angehängt — WhatsApp übersprungen.`,
-              );
-            } else {
-              try {
-                const pdfBase64 = await blobToBase64(summary.blob);
-                const textLines = buildWaTextLines(
-                  g.person,
-                  formData.selectedKrankenkasse,
-                  formData.vertriebspartner || '',
-                );
-                const { data: waData, error: waErr } = await supabase.functions.invoke('send-whatsapp-summary', {
-                  body: {
-                    application_id: applicationId,
-                    chatId: WA_CHAT_ID,
-                    pdfBase64,
-                    pdfFilename: summary.filename,
-                    textLines,
-                  },
-                });
-                if (waErr) throw new Error(waErr.message);
-                if (waData?.error) throw new Error(waData.error);
-                toast.success(`WhatsApp gesendet: ${g.label}`);
-              } catch (waErr) {
-                toast.error(`WhatsApp „${g.label}" fehlgeschlagen: ${(waErr as Error).message}`);
-              }
-            }
-          }
         } catch (e) {
           failCount++;
           console.error('[SendEmail] ✗ Gruppe fehlgeschlagen:', g.id, g.label, e);
@@ -650,8 +686,8 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
       if (okCount || failCount) {
         toast.message(`Ergebnis: ${okCount} gesendet, ${failCount} fehlgeschlagen (von ${groups.length}).`);
       }
+      if (okCount) onSent?.();
       if (okCount && !failCount) {
-        onSent?.();
         onOpenChange(false);
       }
     } finally {
@@ -712,7 +748,18 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
                 const groupTooLarge = groupSize > 24 * 1024 * 1024;
                 return (
                   <div key={g.id} className="border border-border/60 rounded-lg p-3 space-y-2">
-                    <div className="text-xs font-semibold text-muted-foreground">{g.label}</div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs font-semibold text-muted-foreground truncate">{g.label}</div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleSendSingle(g)}
+                        disabled={sending || loadingAttachments || groupTooLarge}
+                        className="h-7 gap-1 text-xs shrink-0"
+                      >
+                        <Mail className="h-3 w-3" /> Nur diese senden
+                      </Button>
+                    </div>
                     <div>
                       <Label htmlFor={`subj-${g.id}`} className="text-xs">Betreff *</Label>
                       <Input

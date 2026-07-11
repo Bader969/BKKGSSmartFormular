@@ -52,6 +52,8 @@ export function useApplicationPersistence() {
       person_role: string | null;
       person_index: number | null;
       source: string | null;
+      emailed_at: string | null;
+      whatsapp_sent_at: string | null;
     }>;
     isAdmin: boolean;
     userEmails: Record<string, string>;

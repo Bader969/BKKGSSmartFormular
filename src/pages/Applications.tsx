@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShieldCheck, FileText, ArrowLeft, FileSpreadsheet } from "lucide-react";
+import { ShieldCheck, FileText, ArrowLeft, FileSpreadsheet, Mail, MessageCircle, Check } from "lucide-react";
 import { useApplicationPersistence } from "@/hooks/useApplicationPersistence";
 import { ApplicationDetailDrawer, type ApplicationRow } from "@/components/ApplicationDetailDrawer";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -107,6 +107,8 @@ export default function Applications() {
       Krankenkasse: r.krankenkasse,
       Status: r.parent_application_id ? "" : (r.status === "exported" ? "Exportiert" : "Entwurf"),
       PDFs: r.parent_application_id ? "" : r.pdf_count,
+      "E-Mail gesendet": r.emailed_at ? new Date(r.emailed_at).toLocaleString("de-DE") : "",
+      "WhatsApp gesendet": r.whatsapp_sent_at ? new Date(r.whatsapp_sent_at).toLocaleString("de-DE") : "",
       Aktualisiert: new Date(r.updated_at).toLocaleString("de-DE"),
       Erstellt: new Date(r.created_at).toLocaleString("de-DE"),
       VP: r.vertriebspartner ?? "",
@@ -206,6 +208,8 @@ export default function Applications() {
                 <TableHead>Krankenkasse</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>PDFs</TableHead>
+                <TableHead>E-Mail</TableHead>
+                <TableHead>WhatsApp</TableHead>
                 <TableHead>Aktualisiert</TableHead>
                 <TableHead>Erstellt</TableHead>
                 <TableHead>VP</TableHead>
@@ -217,10 +221,10 @@ export default function Applications() {
             </TableHeader>
             <TableBody>
               {loading && (
-                <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">Lädt…</TableCell></TableRow>
+                <TableRow><TableCell colSpan={13} className="text-center text-muted-foreground py-8">Lädt…</TableCell></TableRow>
               )}
               {!loading && grouped.length === 0 && (
-                <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                <TableRow><TableCell colSpan={13} className="text-center text-muted-foreground py-8">
                   <FileText className="inline h-4 w-4 mr-1" /> Noch keine Anträge gespeichert.
                 </TableCell></TableRow>
               )}
@@ -248,6 +252,24 @@ export default function Applications() {
                     )}
                   </TableCell>
                   <TableCell>{isSub ? <span className="text-muted-foreground">—</span> : r.pdf_count}</TableCell>
+                  <TableCell>
+                    {r.emailed_at ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-green-700 dark:text-green-400" title={`Gesendet: ${new Date(r.emailed_at).toLocaleString("de-DE")}`}>
+                        <Check className="h-3 w-3" /> <Mail className="h-3 w-3" />
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {r.whatsapp_sent_at ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-green-700 dark:text-green-400" title={`Gesendet: ${new Date(r.whatsapp_sent_at).toLocaleString("de-DE")}`}>
+                        <Check className="h-3 w-3" /> <MessageCircle className="h-3 w-3" />
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{new Date(r.updated_at).toLocaleString("de-DE")}</TableCell>
                   <TableCell className="text-muted-foreground">{new Date(r.created_at).toLocaleString("de-DE")}</TableCell>
                   <TableCell>{r.vertriebspartner || <span className="text-muted-foreground">—</span>}</TableCell>

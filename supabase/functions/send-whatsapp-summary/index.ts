@@ -64,6 +64,9 @@ Deno.serve(async (req) => {
     pdfBase64?: string;
     pdfFilename?: string;
     textLines?: string[];
+    person_role?: string | null;
+    person_index?: number | null;
+    person_label?: string | null;
   };
   try { payload = await req.json(); } catch { return json(400, { error: 'invalid_json' }); }
 
@@ -93,11 +96,20 @@ Deno.serve(async (req) => {
   if (payload.application_id) {
     try {
       const admin = createClient(supaUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      const role = typeof payload.person_role === 'string' ? payload.person_role : 'main';
+      const pIndex = typeof payload.person_index === 'number' ? payload.person_index : null;
+      const pLabel = typeof payload.person_label === 'string' ? payload.person_label.slice(0, 160) : null;
       await admin.from('application_events').insert({
         application_id: payload.application_id,
         user_id: userData.user.id,
         event_type: 'whatsapp_sent',
-        meta: { chat_id: chatId, filename: pdfFilename },
+        meta: {
+          chat_id: chatId,
+          filename: pdfFilename,
+          person_role: role,
+          person_index: pIndex,
+          person_label: pLabel,
+        },
       });
     } catch (e) {
       console.error('Audit insert failed', (e as Error).message);

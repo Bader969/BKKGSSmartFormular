@@ -1,47 +1,70 @@
 ## Ziel
-Die "Name der Krankenkasse" des Hauptmitglieds bleibt die Quelle, die überall automatisch übernommen wird. Sobald jedoch bei Ehegatte oder einem Kind ein abweichender Wert manuell eingetragen wurde, darf ein späteres Ändern der Krankenkasse beim Hauptmitglied diesen individuellen Wert **nicht** mehr überschreiben. Änderungen an Ehegatten-/Kinder-Feldern dürfen außerdem **nicht** rückwärts auf das Hauptmitglied wirken.
+Zwei zusammenhängende Erweiterungen:
+1. Im Sende-Dialog jede Gruppe (Hauptmitglied, Ehegatte, Kind) einzeln nachsenden können — nicht nur „alle auf einmal".
+2. In der Anträge-Liste zusätzlich zum Export-Status auch anzeigen, ob per E-Mail bzw. an die WhatsApp-Gruppe erfolgreich gesendet wurde (ja/nein), pro Person.
 
-## Analyse (aktuelles Verhalten)
-- `MemberSection.tsx` (Zeile 183–186): Beim Ändern von `mitgliedKrankenkasse` wird **immer** auch `ehegatteKrankenkasse` überschrieben → zerstört individuelle Ehegatten-Krankenkasse.
-- `SpouseSection.tsx` (Zeile 120–123): Beim Ändern von `ehegatteKrankenkasse` wird **rückwärts** auch `mitgliedKrankenkasse` überschrieben → Änderung wirkt „überall".
-- Kinder-Felder (`ChildrenSection.tsx` Z. 134, `ViactivSection.tsx` Z. 345/482/674, `FamilyMemberForm.tsx` Z. 226–229): benutzen bereits das Fallback-Muster `kind.bisherigBestandBei || formData.mitgliedKrankenkasse`. Ein individuell eingetragener Wert bleibt technisch erhalten, aber die Anzeige „synchronisiert" sich visuell — das ist gewünscht.
+## Analyse (relevanter Ist-Zustand)
+- `application_events.event_type` hat einen CHECK, der **nur** `created, updated, exported, opened, decrypted, deleted` erlaubt. Die Edge-Functions `send-application-email` und `send-whatsapp-summary` versuchen bereits `emailed` bzw. `whatsapp_sent` einzufügen, aber der Insert schlägt still fehl (try/catch schluckt den CHECK-Fehler). Deshalb existiert bis heute **keine** Audit-Zeile für E-Mail-/WhatsApp-Versand — die geplante Statusanzeige braucht dies als Datenquelle.
+- `applications-api` `list` liefert bisher pro Antrag u. a. `status, pdf_count, source` — aber keine Aggregation über `application_events`.
+- `SendEmailDialog` sendet in `handleSend` alle Gruppen in einer Schleife. Ein einzelnes Nachsenden ist nur möglich, indem man alle anderen Gruppen manuell deaktiviert.
 
 ## Änderungen
 
-### 1) `src/components/MemberSection.tsx`
-Der `onChange`-Handler für `mitgliedKrankenkasse` überschreibt `ehegatteKrankenkasse` nur noch, wenn dort noch kein eigener Wert steht bzw. der bisherige Wert identisch mit dem alten `mitgliedKrankenkasse` war (also noch nie manuell abgewandelt).
+### 1) Migration — erlaubte Event-Typen erweitern
+`application_events_event_type_check` neu setzen auf:
+`created, updated, exported, opened, decrypted, deleted, emailed, whatsapp_sent, whatsapp_intake`.
+(`whatsapp_intake` wird bereits von `whatsapp-intake` benutzt — auch legalisieren.)
 
-```ts
-onChange={(value) => {
-  const prev = formData.mitgliedKrankenkasse ?? '';
-  const spouseUntouched =
-    !formData.ehegatteKrankenkasse || formData.ehegatteKrankenkasse === prev;
-  updateFormData({
-    mitgliedKrankenkasse: value,
-    ...(spouseUntouched ? { ehegatteKrankenkasse: value } : {}),
-  });
-}}
-```
+### 2) `supabase/functions/send-application-email/index.ts`
+- Neuen optionalen Payload-Feldern akzeptieren: `person_role` (`"main" | "spouse" | "kind"`), `person_index` (number), `person_label` (string, z. B. „Ehegatte – Mahasen Alhamad").
+- Beim Audit-Insert `meta` erweitern:
+  ```
+  { to_domain, attachments, gmail_id, person_role, person_index, person_label, subject }
+  ```
+- Fehlermeldungen bei Audit-Insert nicht nur `console.error`, sondern auch im Response-Body als optionales `audit_error` zurückgeben (nur zur Diagnose, ändert `ok:true` nicht).
 
-### 2) `src/components/SpouseSection.tsx`
-Rückwärts-Sync entfernen. `ehegatteKrankenkasse` schreibt nur noch sich selbst — das Hauptmitglied bleibt unangetastet.
+### 3) `supabase/functions/send-whatsapp-summary/index.ts`
+- Selbe Erweiterung: `person_role`, `person_index`, `person_label` in `meta`.
 
-```ts
-onChange={(value) => updateFormData({ ehegatteKrankenkasse: value })}
-```
+### 4) `src/components/SendEmailDialog.tsx`
+- `SendGroup` bekommt Felder `personRole: 'main'|'spouse'|'kind'` und `personIndex?: number`.
+- Neue Helferfunktion `sendGroup(g)` extrahieren, die genau **eine** Gruppe versendet (E-Mail + optional WhatsApp), inkl. Toast + Console-Log.
+- Pro Gruppen-Card im UI einen kleinen Button „Nur diese senden" (rechts oben in der Gruppe) — sendet nur diese Gruppe, lässt den Dialog offen.
+- Bestehender Fuß-Button „Senden" bleibt und iteriert weiterhin alle Gruppen via `sendGroup`.
+- `person_role/index/label` werden bei jedem Aufruf mitgeschickt, damit Audit-Events sauber zugeordnet sind.
 
-### 3) Kinder- und Viactiv-Felder
-Keine Änderung nötig. Das bestehende Fallback-Muster `kind.bisherigBestandBei || formData.mitgliedKrankenkasse` erfüllt die Anforderung bereits:
-- Solange nichts eingetragen wurde, wird die Krankenkasse des Hauptmitglieds angezeigt und exportiert.
-- Sobald man einen abweichenden Wert einträgt, bleibt dieser dauerhaft — spätere Änderungen am Hauptmitglied wirken sich auf dieses Kind nicht mehr aus.
+### 5) `supabase/functions/applications-api/index.ts` (Aktion `list`)
+- Nach dem Laden der Anträge zusätzlich alle `application_events` mit `event_type IN ('emailed','whatsapp_sent')` für diese IDs holen.
+- Pro Antragszeile in der Response ergänzen:
+  - `emailed_at`: letztes `emailed`-Event für die Kombination `(application_id, person_role, person_index)`
+  - `whatsapp_sent_at`: analog
+- Zuordnung:
+  - Hauptantrag-Zeile ⇒ Events mit `meta.person_role='main'` **oder ohne person_role** (Legacy-Fallback).
+  - Sub-Zeile Ehegatte ⇒ `meta.person_role='spouse'`.
+  - Sub-Zeile Kind ⇒ `meta.person_role='kind'` und `meta.person_index = row.person_index`.
 
-Analog für die Ehegatten-Felder `bisherigBestandBei` / `bisherigBestehtWeiterBei` in `ViactivSection.tsx` und `FamilyMemberForm.tsx` (bereits Fallback, kein Overwrite).
+### 6) `src/components/ApplicationDetailDrawer.tsx` / `src/pages/Applications.tsx`
+- `ApplicationRow` um `emailed_at?: string | null` und `whatsapp_sent_at?: string | null` erweitern.
+- In `Applications.tsx` zwei neue Spalten:
+  - „E-Mail" — grüner Haken + Datum (kurz) wenn `emailed_at`, sonst grauer Strich.
+  - „WhatsApp" — analog aus `whatsapp_sent_at`.
+- Excel-Export ebenfalls um die zwei Felder ergänzen.
+- Im Detail-Drawer im Header eine kleine Info-Zeile: „Zuletzt per E-Mail gesendet: …" bzw. „WhatsApp: …".
 
-## Nicht betroffen
-- Import-Logik (`JsonImportDialog`, `FreitextImportDialog`, `krankenkassenMapping.ts`): initiales Vorbelegen bleibt wie gehabt.
-- PDF-Exporte (`viactivExport.ts`, `dakExport.ts`, `novitasExport.ts`, `bigFamversExport.ts`, `viactivFamilyExport.ts`, `pdfExport.ts`): nutzen bereits person-spezifische Werte mit Fallback auf `mitgliedKrankenkasse`.
-- Provider-Auswahl (`selectedKrankenkasse`) und Antragsform-Logik.
+## Technische Details
+- Migration verwendet `ALTER TABLE ... DROP CONSTRAINT` + neuen CHECK. Keine GRANT-Änderung nötig (bestehende Tabelle).
+- `application_events` ist append-only (Trigger vorhanden) — Statusermittlung erfolgt einfach über MAX(created_at) je Kombination.
+- Keine Änderung an Verschlüsselung, RLS oder Formularlogik.
+- WhatsApp-Gruppe (Empfänger) unverändert — nur das Audit wird per Person granularer.
 
 ## Betroffene Dateien
-- `src/components/MemberSection.tsx`
-- `src/components/SpouseSection.tsx`
+- neue Migration (CHECK-Constraint erweitern)
+- `supabase/functions/send-application-email/index.ts`
+- `supabase/functions/send-whatsapp-summary/index.ts`
+- `supabase/functions/applications-api/index.ts`
+- `src/components/SendEmailDialog.tsx`
+- `src/components/ApplicationDetailDrawer.tsx`
+- `src/pages/Applications.tsx`
+
+## Nicht betroffen
+- PDF-Exportlogik, Krankenkassen-Mapping, Import-Dialoge, Formular-Sync-Logik.

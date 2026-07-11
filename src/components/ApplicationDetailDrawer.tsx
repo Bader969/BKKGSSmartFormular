@@ -21,6 +21,8 @@ export type ApplicationRow = {
   person_role: string | null;
   person_index: number | null;
   source?: string | null;
+  emailed_at?: string | null;
+  whatsapp_sent_at?: string | null;
 };
 
 export function ApplicationDetailDrawer({
@@ -228,6 +230,16 @@ export function ApplicationDetailDrawer({
                 )}
                 {isSub && <Badge variant="outline">Untereintrag</Badge>}
                 {userEmail && <Badge variant="outline">{userEmail}</Badge>}
+                {application.emailed_at && (
+                  <Badge variant="outline" className="border-green-500 text-green-700 dark:text-green-400">
+                    E-Mail: {new Date(application.emailed_at).toLocaleString("de-DE")}
+                  </Badge>
+                )}
+                {application.whatsapp_sent_at && (
+                  <Badge variant="outline" className="border-green-500 text-green-700 dark:text-green-400">
+                    WhatsApp: {new Date(application.whatsapp_sent_at).toLocaleString("de-DE")}
+                  </Badge>
+                )}
               </div>
 
               {isSub && (
