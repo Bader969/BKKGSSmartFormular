@@ -159,6 +159,9 @@ Deno.serve(async (req) => {
     to?: string; cc?: string; bcc?: string;
     subject?: string; body?: string;
     attachments?: Attachment[];
+    person_role?: string | null;
+    person_index?: number | null;
+    person_label?: string | null;
   };
   try { payload = await req.json(); } catch { return json(400, { error: 'invalid_json' }); }
 
@@ -216,21 +219,34 @@ Deno.serve(async (req) => {
 
   const gmailData = await gmailResp.json().catch(() => ({}));
 
-  // Audit event (no PII): krankenkasse, recipient domain, attachment count
+  // Audit event (no PII): recipient domain, attachment count, person mapping
+  let audit_error: string | null = null;
   if (payload.application_id) {
     try {
       const admin = createClient(supaUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
       const domain = to.split('@')[1] || '';
+      const role = typeof payload.person_role === 'string' ? payload.person_role : 'main';
+      const pIndex = typeof payload.person_index === 'number' ? payload.person_index : null;
+      const pLabel = typeof payload.person_label === 'string' ? payload.person_label.slice(0, 160) : null;
       await admin.from('application_events').insert({
         application_id: payload.application_id,
         user_id: userData.user.id,
         event_type: 'emailed',
-        meta: { to_domain: domain, attachments: attachments.length, gmail_id: gmailData.id ?? null },
+        meta: {
+          to_domain: domain,
+          attachments: attachments.length,
+          gmail_id: gmailData.id ?? null,
+          person_role: role,
+          person_index: pIndex,
+          person_label: pLabel,
+          subject: subject.slice(0, 200),
+        },
       });
     } catch (e) {
-      console.error('Audit insert failed', (e as Error).message);
+      audit_error = (e as Error).message;
+      console.error('Audit insert failed', audit_error);
     }
   }
 
-  return json(200, { ok: true, gmail_id: gmailData.id ?? null });
+  return json(200, { ok: true, gmail_id: gmailData.id ?? null, audit_error });
 });
