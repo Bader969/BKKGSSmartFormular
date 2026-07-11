@@ -248,6 +248,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
       subject: groupSubjects[mainKey] ?? applyTemplate(mainSubjectTpl, mainVars),
       body: applyTemplate(mainBodyTpl, mainVars),
       attachmentIndices: mainAttIdx,
+      personRole: 'main',
     });
 
     // BIG Variante B: pro Ehegatte/Kind mit eigener Mitgliedschaft
