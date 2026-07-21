@@ -109,7 +109,7 @@ export const KRANKENKASSEN_OPTIONS = [
 ] as const;
 
 // VIACTIV-spezifische Typen
-export type ViactivGeschlecht = 'weiblich' | 'maennlich' | 'divers' | '';
+export type ViactivGeschlecht = 'weiblich' | 'maennlich' | 'divers' | 'unbestimmt' | '';
 
 export type ViactivBeschaeftigung = 
   | 'beschaeftigt'
@@ -137,6 +137,22 @@ export const VIACTIV_GESCHLECHT_OPTIONS = [
   { value: 'weiblich' as ViactivGeschlecht, label: 'Weiblich' },
   { value: 'maennlich' as ViactivGeschlecht, label: 'Männlich' },
   { value: 'divers' as ViactivGeschlecht, label: 'Divers' },
+] as const;
+
+/** Novitas-Werte laut Website: maennlich | weiblich | unbestimmt | divers. */
+export const NOVITAS_GESCHLECHT_OPTIONS = [
+  { value: 'maennlich' as ViactivGeschlecht, label: 'Männlich' },
+  { value: 'weiblich' as ViactivGeschlecht, label: 'Weiblich' },
+  { value: 'unbestimmt' as ViactivGeschlecht, label: 'Unbestimmt' },
+  { value: 'divers' as ViactivGeschlecht, label: 'Divers' },
+] as const;
+
+/** Novitas-Arbeitsentgelt-Werte, exakt wie im Novitas-Formular. */
+export const NOVITAS_ARBEITSENTGELT_OPTIONS = [
+  { value: '', label: 'keine Auswahl' },
+  { value: 'bis_zu_603_Euro', label: 'Bis zu 608 Euro (Minijob)' },
+  { value: 'mitte', label: 'zwischen 608 Euro und 6.450 Euro' },
+  { value: 'mehr_als_6450_Euro', label: 'Mehr als 6.450 Euro monatlich' },
 ] as const;
 
 export const VIACTIV_BESCHAEFTIGUNG_OPTIONS = [
