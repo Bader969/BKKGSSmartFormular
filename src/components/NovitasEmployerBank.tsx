@@ -2,6 +2,7 @@ import React from 'react';
 import { FormSection } from './FormSection';
 import { FormField } from './FormField';
 import type { ArbeitgeberDaten } from '@/types/form';
+import { NOVITAS_ARBEITSENTGELT_OPTIONS } from '@/types/form';
 import { validateName, validateOrt, validatePlz, validateStrasse, validateHausnummer } from '@/utils/validation';
 
 export interface NovitasEmployerBankValue {
@@ -46,12 +47,13 @@ export const NovitasEmployerBank: React.FC<Props> = ({ title, idPrefix, value, o
           validate={required ? validateName : undefined}
         />
         <FormField
-          type="text"
+          type="select"
           label="Monatliches Arbeitsentgelt (EUR)"
           id={`${idPrefix}-arbeitsentgelt`}
           value={value.arbeitsentgelt}
-          onChange={(v) => onChange({ arbeitsentgelt: v.replace(/[^\d,.]/g, '') })}
-          placeholder="z.B. 2500"
+          onChange={(v) => onChange({ arbeitsentgelt: v })}
+          options={NOVITAS_ARBEITSENTGELT_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+          placeholder="keine Auswahl"
           required={required}
         />
       </div>

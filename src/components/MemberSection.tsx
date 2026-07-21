@@ -5,6 +5,7 @@ import { FormData } from '@/types/form';
 import { CopyBlockButton } from './CopyBlockButton';
 import { countries } from '@/utils/countries';
 import { normalizeInsuranceNumber } from '@/utils/insuranceNumbers';
+import { NOVITAS_GESCHLECHT_OPTIONS } from '@/types/form';
 import { 
   validateName, 
   validateGeburtsdatum, 
@@ -200,13 +201,23 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
       {formData.selectedKrankenkasse === 'novitas' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           <FormField
+            type="select"
+            label="Geschlecht"
+            id="novitasGeschlecht"
+            value={formData.viactivGeschlecht}
+            onChange={(value) => updateFormData({ viactivGeschlecht: value as FormData['viactivGeschlecht'] })}
+            options={NOVITAS_GESCHLECHT_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+            placeholder="bitte auswählen"
+            required
+            validate={validateSelect}
+          />
+          <FormField
             type="text"
-            label="Rentenversicherungsnummer"
+            label="Rentenversicherungsnummer (optional)"
             id="mitgliedRentenversicherungsnummer"
             value={formData.mitgliedRentenversicherungsnummer}
             onChange={(value) => updateFormData({ mitgliedRentenversicherungsnummer: value.toUpperCase().replace(/\s+/g, '') })}
             placeholder="z.B. 12345678A123"
-            required
           />
         </div>
       )}

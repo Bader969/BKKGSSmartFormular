@@ -208,10 +208,11 @@ const BOOKMARKLET_BODY = /* js */ `
   results.push(fill(["geburtsland"], p.geburtsland, "Geburtsland"));
   results.push(fill(["staatsangehoerigkeit","staatsangehörigkeit","nationalitaet","nationalität"], p.staatsangehoerigkeit, "Staatsangehörigkeit"));
 
-  // Anrede / Geschlecht
-  var anredeTexts = p.geschlecht === "w" ? ["frau","weiblich"]
-    : p.geschlecht === "m" ? ["herr","männlich","mannlich"]
-    : p.geschlecht === "d" ? ["divers"]
+  // Anrede / Geschlecht (Novitas-Werte: maennlich | weiblich | unbestimmt | divers)
+  var anredeTexts = p.geschlecht === "weiblich" ? ["frau","weiblich"]
+    : p.geschlecht === "maennlich" ? ["herr","männlich","mannlich"]
+    : p.geschlecht === "unbestimmt" ? ["unbestimmt"]
+    : p.geschlecht === "divers" ? ["divers"]
     : [];
   results.push(selectByValueOrText(["anrede","geschlecht"], p.geschlecht, anredeTexts, "Anrede/Geschlecht"));
 
@@ -224,8 +225,10 @@ const BOOKMARKLET_BODY = /* js */ `
     : [];
   results.push(selectByValueOrText(["familienstand"], p.familienstand, famTexts, "Familienstand"));
 
-  // Adresse
-  results.push(fill(["strasse","straße"], addr.strasse, "Straße"));
+  // Adresse — Novitas nutzt EIN Feld "Straße und Hausnummer"
+  var strasseKombiniert = [addr.strasse, addr.hausnummer].filter(Boolean).join(" ").trim();
+  results.push(fill(["strasse","straße"], strasseKombiniert, "Straße und Hausnummer"));
+  // Fallback: falls doch getrenntes Hausnummer-Feld existiert
   results.push(fill(["hausnummer","hausnr","hnr"], addr.hausnummer, "Hausnummer"));
   results.push(fill(["plz","postleitzahl"], addr.plz, "PLZ"));
   results.push(fill(["wohnort","ort","stadt"], addr.ort, "Wohnort"));
@@ -256,7 +259,16 @@ const BOOKMARKLET_BODY = /* js */ `
   results.push(fill(["arbeitgeber hausnummer","hausnummer arbeitgeber"], ag.hausnummer, "Arbeitgeber Hausnummer"));
   results.push(fill(["arbeitgeber plz","plz arbeitgeber"], ag.plz, "Arbeitgeber PLZ"));
   results.push(fill(["arbeitgeber ort","ort arbeitgeber","stadt arbeitgeber"], ag.ort, "Arbeitgeber Ort"));
-  results.push(fill(["arbeitsentgeld","arbeitsentgelt","monatliches entgelt","monatliches einkommen","brutto"], ag.arbeitsentgeltMonatlich, "Monatliches Arbeitsentgelt"));
+  // Arbeitsentgelt ist auf Novitas ein Dropdown mit festen Werten
+  results.push(selectByValueOrText(
+    ["arbeitsentgeld","arbeitsentgelt","monatliches entgelt","monatliches einkommen","brutto"],
+    ag.arbeitsentgeltMonatlich,
+    ag.arbeitsentgeltMonatlich === "bis_zu_603_Euro" ? ["minijob","608","603"]
+      : ag.arbeitsentgeltMonatlich === "mitte" ? ["zwischen"]
+      : ag.arbeitsentgeltMonatlich === "mehr_als_6450_Euro" ? ["mehr als","6.450","6450"]
+      : [],
+    "Monatliches Arbeitsentgelt"
+  ));
 
   // Bank
   results.push(fill(["kontoinhaber"], bank.kontoinhaber, "Kontoinhaber"));

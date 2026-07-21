@@ -477,10 +477,6 @@ const Index = () => {
         toast.error('Bitte geben Sie den Geburtsort ein.');
         return;
       }
-      if (!formData.mitgliedRentenversicherungsnummer) {
-        toast.error('Bitte geben Sie die Rentenversicherungsnummer ein.');
-        return;
-      }
       const ag = formData.viactivArbeitgeber;
       if (!ag?.name || !ag?.strasse || !ag?.plz || !ag?.ort || !formData.novitasArbeitsentgelt) {
         toast.error('Bitte Arbeitgeberdaten (Name, Anschrift, monatliches Arbeitsentgelt) vollständig eingeben.');

@@ -15,7 +15,7 @@ export interface NovitasAutofillPayload {
     geburtsort: string;
     geburtsland: string;
     staatsangehoerigkeit: string;
-    geschlecht: 'm' | 'w' | 'd' | '';
+    geschlecht: 'maennlich' | 'weiblich' | 'unbestimmt' | 'divers' | '';
     familienstand: string;
     kvNummer: string;
     rentenversicherungsnummer: string;
@@ -56,13 +56,15 @@ const toIso = (dateStr: string): string => {
   return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
 };
 
+/** Liefert exakt die Werte, die das Novitas-Dropdown erwartet. */
 const geschlechtFromString = (
   g: FormData['bigGeschlecht'] | FormData['viactivGeschlecht'] | FamilyMember['geschlecht'] | '' | undefined,
-): 'm' | 'w' | 'd' | '' => {
+): 'maennlich' | 'weiblich' | 'unbestimmt' | 'divers' | '' => {
   const s = String(g || '').toLowerCase();
-  if (s === 'm' || s.startsWith('mann')) return 'm';
-  if (s === 'w' || s.startsWith('weib')) return 'w';
-  if (s === 'd' || s === 'x' || s === 'divers') return 'd';
+  if (s === 'm' || s === 'maennlich' || s === 'männlich' || s.startsWith('mann')) return 'maennlich';
+  if (s === 'w' || s === 'weiblich' || s.startsWith('weib')) return 'weiblich';
+  if (s === 'unbestimmt') return 'unbestimmt';
+  if (s === 'd' || s === 'x' || s === 'divers') return 'divers';
   return '';
 };
 
