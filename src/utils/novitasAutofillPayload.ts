@@ -18,6 +18,7 @@ export interface NovitasAutofillPayload {
     geschlecht: 'm' | 'w' | 'd' | '';
     familienstand: string;
     kvNummer: string;
+    rentenversicherungsnummer: string;
     bisherigeKrankenkasse: string;
     status: NovitasStatus;
   };
@@ -30,6 +31,7 @@ export interface NovitasAutofillPayload {
     hausnummer: string;
     plz: string;
     ort: string;
+    arbeitsentgeltMonatlich: string;
   };
   bank: { kontoinhaber: string; iban: string; bic: string; kreditinstitut: string };
   daten: {
@@ -88,6 +90,11 @@ export function buildNovitasAutofillPayload(
   let kvNummer = formData.mitgliedKvNummer;
   let bisherigeKrankenkasse = formData.mitgliedKrankenkasse;
   let beschaeftigung: FormData['viactivBeschaeftigung'] | FamilyMember['beschaeftigung'] = formData.viactivBeschaeftigung;
+  let rentenversicherungsnummer = formData.mitgliedRentenversicherungsnummer || '';
+  // Sub-Person-spezifische AG/Bank/Arbeitsentgelt-Fallbacks
+  let personAg: typeof formData.viactivArbeitgeber | undefined;
+  let personArbeitsentgelt: string | undefined;
+  let personBank: { kontoinhaber: string; iban: string } | undefined;
 
   if (person.role === 'ehegatte' && formData.ehegatte) {
     const eh = formData.ehegatte;
@@ -102,6 +109,10 @@ export function buildNovitasAutofillPayload(
     kvNummer = ''; // Ehegatte hat i.d.R. eigene KVNR nicht in Novitas-Feldern
     bisherigeKrankenkasse = eh.bisherigBestandBei || formData.mitgliedKrankenkasse;
     beschaeftigung = eh.beschaeftigung;
+    rentenversicherungsnummer = eh.rentenversicherungsnummer || '';
+    personAg = eh.novitasArbeitgeber;
+    personArbeitsentgelt = eh.novitasArbeitsentgelt;
+    personBank = eh.novitasBank;
   } else if (person.role === 'kind' && person.index) {
     const k = formData.kinder[person.index - 1];
     if (k) {
@@ -116,19 +127,25 @@ export function buildNovitasAutofillPayload(
       kvNummer = '';
       bisherigeKrankenkasse = k.bisherigBestandBei || formData.mitgliedKrankenkasse;
       beschaeftigung = k.beschaeftigung;
+      rentenversicherungsnummer = k.rentenversicherungsnummer || '';
+      personAg = k.novitasArbeitgeber;
+      personArbeitsentgelt = k.novitasArbeitsentgelt;
+      personBank = k.novitasBank;
     }
   }
 
   const status = deriveNovitasStatus(beschaeftigung);
 
-  // Arbeitgeber: bei Jobcenter → Jobcenter-Name + Adresse; sonst User-Eingabe (viactivArbeitgeber)
-  const ag = formData.viactivArbeitgeber || { name: '', strasse: '', hausnummer: '', plz: '', ort: '', beschaeftigtSeit: '' };
+  // Arbeitgeber: bei Sub-Person eigenen AG bevorzugen, sonst Hauptmitglied.
+  const ag = personAg || formData.viactivArbeitgeber || { name: '', strasse: '', hausnummer: '', plz: '', ort: '', beschaeftigtSeit: '' };
+  const arbeitsentgeltMonatlich = personArbeitsentgelt ?? formData.novitasArbeitsentgelt ?? '';
   let arbeitgeber = {
     name: ag.name || '',
     strasse: ag.strasse || '',
     hausnummer: ag.hausnummer || '',
     plz: ag.plz || '',
     ort: ag.ort || '',
+    arbeitsentgeltMonatlich,
   };
   if (status === 'Arbeitslose_r_Jobcenter') {
     arbeitgeber = {
@@ -137,6 +154,7 @@ export function buildNovitasAutofillPayload(
       hausnummer: ag.hausnummer || '',
       plz: ag.plz || formData.mitgliedPlz || '',
       ort: ag.ort || formData.ort || '',
+      arbeitsentgeltMonatlich,
     };
   } else if (status === 'Arbeitslose_r_AgenturArbeit') {
     arbeitgeber = {
@@ -145,13 +163,14 @@ export function buildNovitasAutofillPayload(
       hausnummer: ag.hausnummer || '',
       plz: ag.plz || formData.mitgliedPlz || '',
       ort: ag.ort || formData.ort || '',
+      arbeitsentgeltMonatlich,
     };
   }
 
-  // Bank: primär bigBank, sonst rundumSicherPaket
+  // Bank: primär person-eigen, sonst bigBank/rundum-Fallback
   const bank = {
-    kontoinhaber: formData.bigBank?.kontoinhaber || formData.rundumSicherPaket?.kontoinhaber || '',
-    iban: formData.bigBank?.iban || formData.rundumSicherPaket?.iban || '',
+    kontoinhaber: personBank?.kontoinhaber || formData.bigBank?.kontoinhaber || formData.rundumSicherPaket?.kontoinhaber || '',
+    iban: personBank?.iban || formData.bigBank?.iban || formData.rundumSicherPaket?.iban || '',
     bic: formData.bigBank?.bic || '',
     kreditinstitut: formData.bigBank?.kreditinstitut || '',
   };
@@ -172,6 +191,7 @@ export function buildNovitasAutofillPayload(
       geschlecht,
       familienstand: familienstand || '',
       kvNummer: kvNummer || '',
+      rentenversicherungsnummer: rentenversicherungsnummer || '',
       bisherigeKrankenkasse: bisherigeKrankenkasse || '',
       status,
     },
