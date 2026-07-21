@@ -7,6 +7,8 @@ import { ApplicationAuditTimeline } from "./ApplicationAuditTimeline";
 import { toast } from "sonner";
 import { useNavigate, Link } from "react-router-dom";
 import type { BigAutofillPayload } from "@/bookmarklets/bigAutofillSource";
+import { buildNovitasAutofillPayload } from "@/utils/novitasAutofillPayload";
+import { splitNovitasPersons, type NovitasPerson } from "@/utils/novitasSplit";
 import { ExternalLink } from "lucide-react";
 
 export type ApplicationRow = {
@@ -43,6 +45,7 @@ export function ApplicationDetailDrawer({
   const open = !!application;
   const isSub = !!application?.parent_application_id;
   const isBig = application?.krankenkasse === "big_plusbonus";
+  const isNovitas = application?.krankenkasse === "novitas";
   const subLabel = isSub
     ? application?.person_role === "ehegatte"
       ? "Ehegatte"
@@ -84,6 +87,40 @@ export function ApplicationDetailDrawer({
       toast.error(`Konnte nicht löschen: ${msg}`);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleNovitasOnlineAusfuellen = async (person: NovitasPerson) => {
+    if (!application) return;
+    setBusy(true);
+    try {
+      const { payload } = await decrypt(application.id);
+      const autofill = buildNovitasAutofillPayload(payload, person);
+      await navigator.clipboard.writeText(JSON.stringify(autofill));
+      toast.success(
+        `Daten für ${person.label} in Zwischenablage. Im neuen Tab „Novitas Autofill" klicken.`,
+      );
+      window.open(
+        "https://www.novitas-bkk.de/formulare/kundenservice?form_lang=de&f.send.mitarbeiter=1393",
+        "_blank",
+        "noopener,noreferrer",
+      );
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Konnte nicht kopieren: ${msg}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const [novitasPersons, setNovitasPersons] = useState<NovitasPerson[] | null>(null);
+  const loadNovitasPersons = async () => {
+    if (!application || novitasPersons) return;
+    try {
+      const { payload } = await decrypt(application.id);
+      setNovitasPersons(splitNovitasPersons(payload));
+    } catch {
+      /* ignore */
     }
   };
 
@@ -272,6 +309,44 @@ export function ApplicationDetailDrawer({
                       <Link to="/big-autofill-setup">Einrichten</Link>
                     </Button>
                   </div>
+                </div>
+              )}
+
+              {isNovitas && !isSub && (
+                <div className="rounded-xl border border-border p-3 space-y-2 bg-muted/30">
+                  <div className="text-sm font-medium">Novitas BKK — Online-Antrag</div>
+                  <p className="text-xs text-muted-foreground">
+                    Kopiert die Antragsdaten der jeweiligen Person in die Zwischenablage und öffnet das
+                    Novitas-Formular. Auf der Novitas-Seite dann dein Lesezeichen <b>„Novitas Autofill"</b> klicken.
+                  </p>
+                  {!novitasPersons ? (
+                    <Button size="sm" variant="outline" onClick={loadNovitasPersons} disabled={busy} className="w-full">
+                      Personen laden…
+                    </Button>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {novitasPersons.map((pers) => (
+                        <div key={`${pers.role}-${pers.index ?? 0}`} className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleNovitasOnlineAusfuellen(pers)}
+                            disabled={busy}
+                            className="flex-1 gap-1 justify-start"
+                          >
+                            <ExternalLink className="h-3 w-3" /> {pers.label}
+                            {pers.role !== 'main' && (
+                              <span className="ml-auto text-[10px] opacity-80">
+                                {pers.ownMembership ? 'eigene Mitgliedschaft' : 'familienversichert'}
+                              </span>
+                            )}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <Button size="sm" variant="outline" asChild className="w-full">
+                    <Link to="/novitas-autofill-setup">Einrichten</Link>
+                  </Button>
                 </div>
               )}
 
