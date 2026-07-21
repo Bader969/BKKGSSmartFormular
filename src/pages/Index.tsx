@@ -374,8 +374,8 @@ const Index = () => {
       return;
     }
     
-    // Geburtsdatum nur prüfen wenn NICHT Novitas (bei Novitas ausgeblendet)
-    if (formData.selectedKrankenkasse !== 'novitas' && formData.selectedKrankenkasse !== 'big_plusbonus' && !formData.mitgliedGeburtsdatum) {
+    // Geburtsdatum ist Pflicht für alle Krankenkassen außer BIG-Plusbonus-Minimal (separat geprüft)
+    if (formData.selectedKrankenkasse !== 'big_plusbonus' && !formData.mitgliedGeburtsdatum) {
       toast.error('Bitte geben Sie das Geburtsdatum des Mitglieds ein.');
       return;
     }
@@ -466,7 +466,28 @@ const Index = () => {
         toast.error('Bitte wählen Sie den Familienstand aus.');
         return;
       }
-      // Ort-Validierung entfernt - Feld ist für Novitas ausgeblendet
+      if (!formData.mitgliedStrasse || !formData.mitgliedHausnummer || !formData.mitgliedPlz || !formData.ort) {
+        toast.error('Bitte vollständige Adresse (Straße, Hausnr., PLZ, Ort) eingeben.');
+        return;
+      }
+      if (!formData.mitgliedGeburtsort) {
+        toast.error('Bitte geben Sie den Geburtsort ein.');
+        return;
+      }
+      if (!formData.mitgliedRentenversicherungsnummer) {
+        toast.error('Bitte geben Sie die Rentenversicherungsnummer ein.');
+        return;
+      }
+      const ag = formData.viactivArbeitgeber;
+      if (!ag?.name || !ag?.strasse || !ag?.plz || !ag?.ort || !formData.novitasArbeitsentgelt) {
+        toast.error('Bitte Arbeitgeberdaten (Name, Anschrift, monatliches Arbeitsentgelt) vollständig eingeben.');
+        return;
+      }
+      const nbank = formData.bigBank;
+      if (!nbank?.kontoinhaber || !nbank?.iban) {
+        toast.error('Bitte Bankverbindung (Kontoinhaber, IBAN) eingeben.');
+        return;
+      }
     }
     // DAK-spezifische Validierung
     else if (formData.selectedKrankenkasse === 'dak') {
