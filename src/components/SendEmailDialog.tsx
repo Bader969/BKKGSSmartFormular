@@ -608,18 +608,28 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
 
     if (sendToWhatsApp) {
       const isViactiv = formData.selectedKrankenkasse === 'viactiv';
-      const summary = isViactiv
-        ? active.find((a) => {
-            const fn = a.filename.toLowerCase();
-            return fn.startsWith('viactiv_') && fn.includes('_be_') &&
-              fileBelongsToPerson(a.filename, g.person.vorname, g.person.name);
-          })
-        : active.find((a) => a.filename.toLowerCase().startsWith('zusammenfassung_mitgliedsantrag'));
+      const isNovitas = formData.selectedKrankenkasse === 'novitas';
+      let summary: Attachment | undefined;
+      let waFilenameOverride: string | undefined;
+      if (isViactiv) {
+        summary = active.find((a) => {
+          const fn = a.filename.toLowerCase();
+          return fn.startsWith('viactiv_') && fn.includes('_be_') &&
+            fileBelongsToPerson(a.filename, g.person.vorname, g.person.name);
+        });
+      } else if (isNovitas) {
+        summary = active.find((a) => a.filename.toLowerCase().startsWith('novitas_familienversicherung'));
+        waFilenameOverride = 'NovitasBKK_Beitritt.pdf';
+      } else {
+        summary = active.find((a) => a.filename.toLowerCase().startsWith('zusammenfassung_mitgliedsantrag'));
+      }
       if (!summary) {
         toast.info(
           isViactiv
             ? `"${g.label}": keine Beitrittserklärung (BE) gefunden — WhatsApp übersprungen.`
-            : `"${g.label}": keine „Zusammenfassung_Mitgliedsantrag" angehängt — WhatsApp übersprungen.`,
+            : isNovitas
+              ? `"${g.label}": keine Novitas-Antragsdatei angehängt — WhatsApp übersprungen.`
+              : `"${g.label}": keine „Zusammenfassung_Mitgliedsantrag" angehängt — WhatsApp übersprungen.`,
         );
       } else {
         try {
@@ -634,7 +644,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
               application_id: applicationId,
               chatId: WA_CHAT_ID,
               pdfBase64,
-              pdfFilename: summary.filename,
+              pdfFilename: waFilenameOverride || summary.filename,
               textLines,
               person_role: g.personRole,
               person_index: g.personIndex ?? null,
