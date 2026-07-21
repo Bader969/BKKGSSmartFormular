@@ -920,8 +920,60 @@ const Index = () => {
               {/* Novitas BKK spezifische Sektionen */}
               {formData.selectedKrankenkasse === 'novitas' && (
                 <>
-                  <div id="sec-ehegatte"><SpouseSection formData={formData} updateFormData={updateFormData} /></div>
-                  <div id="sec-kinder"><ChildrenSection formData={formData} updateFormData={updateFormData} /></div>
+                  <div className="bg-card rounded-2xl shadow-card border border-border/60 p-6 mb-4 animate-fade-in-up">
+                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-primary" />
+                      Antragsvariante wählen
+                    </h2>
+                    <RadioGroup
+                      value={formData.novitasMode ?? 'familie'}
+                      onValueChange={(value) => updateFormData({ novitasMode: value as 'einzeln' | 'familie' })}
+                      className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                    >
+                      <Label
+                        htmlFor="novitas-mode-familie"
+                        className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                          (formData.novitasMode ?? 'familie') === 'familie'
+                            ? 'border-primary bg-primary/5 shadow-card'
+                            : 'border-border hover:border-accent/60'
+                        }`}
+                      >
+                        <RadioGroupItem value="familie" id="novitas-mode-familie" className="mt-1" />
+                        <div>
+                          <div className="flex items-center gap-2 font-medium">
+                            <Users className="h-4 w-4 text-primary" /> Familienversicherung
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Hauptmitglied + Ehegatte + Kinder. Bei Jobcenter erhalten Ehegatte und Kinder ≥ 16 automatisch eine eigene Mitgliedschaft.
+                          </p>
+                        </div>
+                      </Label>
+                      <Label
+                        htmlFor="novitas-mode-einzeln"
+                        className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                          formData.novitasMode === 'einzeln'
+                            ? 'border-primary bg-primary/5 shadow-card'
+                            : 'border-border hover:border-accent/60'
+                        }`}
+                      >
+                        <RadioGroupItem value="einzeln" id="novitas-mode-einzeln" className="mt-1" />
+                        <div>
+                          <div className="flex items-center gap-2 font-medium">
+                            <User className="h-4 w-4 text-primary" /> Einzelperson
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Nur das Hauptmitglied. Ehegatte und Kinder werden im Antrag ausgeblendet.
+                          </p>
+                        </div>
+                      </Label>
+                    </RadioGroup>
+                  </div>
+                  {(formData.novitasMode ?? 'familie') === 'familie' && (
+                    <>
+                      <div id="sec-ehegatte"><SpouseSection formData={formData} updateFormData={updateFormData} /></div>
+                      <div id="sec-kinder"><ChildrenSection formData={formData} updateFormData={updateFormData} /></div>
+                    </>
+                  )}
                 </>
               )}
               
