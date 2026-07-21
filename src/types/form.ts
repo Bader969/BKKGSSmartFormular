@@ -468,5 +468,6 @@ export const createInitialFormData = (): FormData => {
     bigMitgliedBeschaeftigt: '',
     vertriebspartner: '',
     novitasMode: 'familie',
+    novitasBonus400: false,
   };
 };
