@@ -7,6 +7,9 @@ import { SignatureSection } from '@/components/SignatureSection';
 import { RundumSicherPaketSection } from '@/components/RundumSicherPaketSection';
 import { ViactivSection } from '@/components/ViactivSection';
 import { BigPlusbonusSection } from '@/components/BigPlusbonusSection';
+import { NovitasEmployerBank, type NovitasEmployerBankValue } from '@/components/NovitasEmployerBank';
+import { splitNovitasPersons } from '@/utils/novitasSplit';
+import { createEmptyArbeitgeberDaten } from '@/types/form';
 import { Button } from '@/components/ui/button';
 import { FileDown, FileText, AlertCircle, Users, User, Building2, LogOut, ShieldCheck, Sparkles, ChevronRight, Save, Archive, Settings } from 'lucide-react';
 import { Mail } from 'lucide-react';
@@ -374,8 +377,8 @@ const Index = () => {
       return;
     }
     
-    // Geburtsdatum nur prüfen wenn NICHT Novitas (bei Novitas ausgeblendet)
-    if (formData.selectedKrankenkasse !== 'novitas' && formData.selectedKrankenkasse !== 'big_plusbonus' && !formData.mitgliedGeburtsdatum) {
+    // Geburtsdatum ist Pflicht für alle Krankenkassen außer BIG-Plusbonus-Minimal (separat geprüft)
+    if (formData.selectedKrankenkasse !== 'big_plusbonus' && !formData.mitgliedGeburtsdatum) {
       toast.error('Bitte geben Sie das Geburtsdatum des Mitglieds ein.');
       return;
     }
@@ -466,7 +469,28 @@ const Index = () => {
         toast.error('Bitte wählen Sie den Familienstand aus.');
         return;
       }
-      // Ort-Validierung entfernt - Feld ist für Novitas ausgeblendet
+      if (!formData.mitgliedStrasse || !formData.mitgliedHausnummer || !formData.mitgliedPlz || !formData.ort) {
+        toast.error('Bitte vollständige Adresse (Straße, Hausnr., PLZ, Ort) eingeben.');
+        return;
+      }
+      if (!formData.mitgliedGeburtsort) {
+        toast.error('Bitte geben Sie den Geburtsort ein.');
+        return;
+      }
+      if (!formData.mitgliedRentenversicherungsnummer) {
+        toast.error('Bitte geben Sie die Rentenversicherungsnummer ein.');
+        return;
+      }
+      const ag = formData.viactivArbeitgeber;
+      if (!ag?.name || !ag?.strasse || !ag?.plz || !ag?.ort || !formData.novitasArbeitsentgelt) {
+        toast.error('Bitte Arbeitgeberdaten (Name, Anschrift, monatliches Arbeitsentgelt) vollständig eingeben.');
+        return;
+      }
+      const nbank = formData.bigBank;
+      if (!nbank?.kontoinhaber || !nbank?.iban) {
+        toast.error('Bitte Bankverbindung (Kontoinhaber, IBAN) eingeben.');
+        return;
+      }
     }
     // DAK-spezifische Validierung
     else if (formData.selectedKrankenkasse === 'dak') {
@@ -974,6 +998,69 @@ const Index = () => {
                       <div id="sec-kinder"><ChildrenSection formData={formData} updateFormData={updateFormData} /></div>
                     </>
                   )}
+                  {/* Novitas: Arbeitgeber + Bank für Hauptmitglied und jede eigene Mitgliedschaft */}
+                  <div id="sec-novitas-ag-bank" className="space-y-4">
+                    {splitNovitasPersons(formData).filter(p => p.ownMembership).map((p) => {
+                      if (p.role === 'main') {
+                        const val: NovitasEmployerBankValue = {
+                          arbeitgeber: formData.viactivArbeitgeber ?? createEmptyArbeitgeberDaten(),
+                          arbeitsentgelt: formData.novitasArbeitsentgelt,
+                          bank: {
+                            kontoinhaber: formData.bigBank?.kontoinhaber ?? '',
+                            iban: formData.bigBank?.iban ?? '',
+                          },
+                        };
+                        return (
+                          <NovitasEmployerBank
+                            key="main"
+                            title={`Arbeitgeber & Bank — ${p.label}`}
+                            idPrefix="novitas-main"
+                            value={val}
+                            onChange={(u) => updateFormData({
+                              ...(u.arbeitgeber ? { viactivArbeitgeber: { ...(formData.viactivArbeitgeber ?? createEmptyArbeitgeberDaten()), ...u.arbeitgeber } } : {}),
+                              ...(u.arbeitsentgelt !== undefined ? { novitasArbeitsentgelt: u.arbeitsentgelt } : {}),
+                              ...(u.bank ? { bigBank: { ...formData.bigBank, ...u.bank } } : {}),
+                            })}
+                            autofilledHint={(formData.viactivBeschaeftigung === 'al_geld_2' || formData.viactivBeschaeftigung === 'al_geld_1')
+                              ? 'Bei Bezug von Jobcenter/Agentur für Arbeit bitte hier den Namen und die Anschrift der Behörde eintragen.'
+                              : undefined}
+                          />
+                        );
+                      }
+                      const isSpouse = p.role === 'ehegatte';
+                      const idx = p.index ? p.index - 1 : 0;
+                      const person = isSpouse ? formData.ehegatte : formData.kinder[idx];
+                      if (!person) return null;
+                      const val: NovitasEmployerBankValue = {
+                        arbeitgeber: person.novitasArbeitgeber ?? createEmptyArbeitgeberDaten(),
+                        arbeitsentgelt: person.novitasArbeitsentgelt ?? '',
+                        bank: person.novitasBank ?? { kontoinhaber: '', iban: '' },
+                      };
+                      const onChange = (u: Partial<NovitasEmployerBankValue>) => {
+                        const merged = {
+                          ...person,
+                          ...(u.arbeitgeber ? { novitasArbeitgeber: { ...(person.novitasArbeitgeber ?? createEmptyArbeitgeberDaten()), ...u.arbeitgeber } } : {}),
+                          ...(u.arbeitsentgelt !== undefined ? { novitasArbeitsentgelt: u.arbeitsentgelt } : {}),
+                          ...(u.bank ? { novitasBank: { ...(person.novitasBank ?? { kontoinhaber: '', iban: '' }), ...u.bank } } : {}),
+                        };
+                        if (isSpouse) updateFormData({ ehegatte: merged });
+                        else {
+                          const next = [...formData.kinder];
+                          next[idx] = merged;
+                          updateFormData({ kinder: next });
+                        }
+                      };
+                      return (
+                        <NovitasEmployerBank
+                          key={`${p.role}-${p.index ?? 0}`}
+                          title={`Arbeitgeber & Bank — ${p.label} (eigene Mitgliedschaft)`}
+                          idPrefix={`novitas-${p.role}-${p.index ?? 0}`}
+                          value={val}
+                          onChange={onChange}
+                        />
+                      );
+                    })}
+                  </div>
                 </>
               )}
               

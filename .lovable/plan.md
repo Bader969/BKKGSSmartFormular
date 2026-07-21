@@ -1,73 +1,97 @@
-# Novitas BKK – Externes Autofill + Personenauswahl
 
-Ziel: Auf `novitas-bkk.de/formulare/kundenservice?...&f.send.mitarbeiter=1393` per Ein-Klick alle Pflichtfelder + Kontakt/AG/Bank ausfüllen, parallel im eigenen Antrag befüllen; einzelne Person oder Familienversicherung wählbar; Kinder ≥16 & Ehegatte bei Jobcenter → eigene Mitgliedschaft.
+## Ziel
 
-## Umfang der zu befüllenden Felder (extern + intern)
+Im UI (bei Krankenkasse = Novitas BKK) alle Pflichtfelder aus dem hochgeladenen Novitas-HTML-Formular sowie die zusätzlich genannten Felder (KV-Nummer, Familienstand, Telefon, komplette Arbeitgeberdaten außer „Beschäftigt seit", Bankverbindung) erfassbar machen. Diese Felder müssen sowohl in die Zwischenablage/Bookmarklet-Payload einfließen als auch beim „Entwurf speichern" 1:1 im verschlüsselten Applications-Datensatz landen.
 
-Pflicht (*), zusätzlich immer: KV-Nummer, Familienstand, Telefon, alle Arbeitgeberdaten außer „Beschäftigt seit", Bankverbindung.
+## Feld-Inventar aus der hochgeladenen Novitas-Form
 
-Feste Werte:
-- Versicherungsbeginn: 1. des Monats +3 Kalendermonate (heute Referenz-„today")
-- Zuletzt versichert **bis**: letzter Tag des Monats vor Versicherungsbeginn; **vom** bleibt leer
-- Anlass Kassenwechsel: „Ablauf der Bindungsfrist (12 Monate)"
-- Vertriebspartner: „Ich bin Vertriebspartner", Vermittler-ID `011062257459`
-- Familienangehörige-Checkbox „Ja, Fragebogen zusenden": nur wenn Modus = Familienversicherung
-- Status (Ich bin…): einer von `pflichtversicherter_Arbeitnehmer`, `Auszubildender`, `Arbeitslose_r_Jobcenter`, `Arbeitslose_r_AgenturArbeit`
+Aus `form-page_class_blockform-group_cla.txt` extrahierte Feldnamen (`ng.form0.*`), aufgeteilt in Rollen:
 
-## Arbeitgeber-Logik
+- Mitglied: `mitglied.Beginndatum` (auto), `mitglied.Versicherungsart` (aus Beschäftigung abgeleitet)
+- Person: `Vorname`, `Name`, `Geschlecht`, `Geburtsdatum`, `Geburtsort`, `Strasse`, `PLZ`, `Ort`, `Telefonnummer`, `E_Mail_Adresse`, `Familienstand`, `Krankenversicherungsnummer`, `Rentenversicherungsnummer`
+- Bisherige KV: `zuletzt_krankenkasse`, `zuletzt_versichert` (bool), `zuletzt_versichert_vom` (leer), `zuletzt_versichert_bis` (auto)
+- Anlass: `Anlass_Wechsel.anlass` = `Ablauf_Bindungsfrist` (fix)
+- AG: `Name_Arbeitgeber`, `Strasse_Arbeitgeber`, `PLZ_Arbeitgeber`, `Ort_Arbeitgeber`, `Arbeitsentgeld`, `beschaeftigt_seit` (letzteres bewusst NICHT ins UI)
+- Bank: `bankverbindung.kontoinhaber`, `bankverbindung.IBAN`
+- Weitere: `weitere_angaben.fami` (nur wenn Modus „Familie" ✓), `weitere_angaben.mwm`
+- Vertrieb (fix): `send.KEV=1`, `send.mitarbeiter=1393`, `send.vertriebspartner=011062257459`
 
-- Beschäftigt / Ausbildung → reguläre AG-Daten (Name + Anschrift) aus dem Formular, **ohne** „Beschäftigt seit".
-- Status = **Jobcenter** (kein Arbeitgeber im klassischen Sinne) → das Jobcenter wird als „Arbeitgeber" eingetragen: Name des Jobcenters + vollständige Anschrift (Straße, Hausnr., PLZ, Ort). Gilt für Hauptmitglied wie für jede eigenständige Mitgliedschaft (Ehegatte / Kind ≥16), die selbst Jobcenter-Leistungen bezieht.
-- Status = Agentur für Arbeit → analog Agentur-Adresse als AG-Feld, falls vorhanden; sonst leer lassen.
-- Bei Einzelperson-Modus greift die Logik pro ausgewählter Person unabhängig.
+## UI-Änderungen (nur bei `selectedKrankenkasse === 'novitas'`)
 
-## Änderungen
+`src/components/MemberSection.tsx`
+- Aktuell für Novitas ausgeblendet: Geburtsdatum, Geburtsort, Adresse. Diese Blöcke wieder sichtbar & pflichtig machen (Novitas erwartet sie).
+- Zusätzlich neues Pflichtfeld „Rentenversicherungsnummer" (`mitgliedRentenversicherungsnummer`).
+- Für Novitas ein explizites Feld „Geschlecht" (Dropdown: männlich/weiblich/unbestimmt/divers) — mappt intern auf `viactivGeschlecht` (Wiederverwendung, kein neues Feld nötig, aber Option „unbestimmt" ergänzen).
 
-### 1. Modus-Umschaltung (Novitas)
-`src/pages/Index.tsx` (Novitas-Zweig): Toggle „Einzelperson" vs. „Familienversicherung". Bei Einzelperson werden Ehegatte/Kinder-Sektionen ausgeblendet; Autofill/Export nutzen nur das Hauptmitglied. Toggle in `FormData` als `novitasMode: 'einzeln' | 'familie'`.
+Neue Sektion `NovitasEmployerBankSection` (nur bei Novitas) — nach dem Ehegatte/Kinder-Block und vor der Unterschrift:
+- Arbeitgeber (Novitas-relevant): Name, Straße, Hausnummer, PLZ, Ort, **Arbeitsentgelt (monatlich, EUR)**. Kein „Beschäftigt seit"-Feld.
+- Auto-Prefill wenn Beschäftigung = Jobcenter/AgenturArbeit → Name „Jobcenter …" / „Agentur für Arbeit …", Adresse = Mitgliedsadresse; bleibt editierbar.
+- Bankverbindung: Kontoinhaber, IBAN (schreibt/liest `formData.bigBank.kontoinhaber` und `.iban`, damit keine Feld-Duplikate zwischen Krankenkassen entstehen).
 
-### 2. Auto-Split bei Jobcenter
-Neuer Helper `src/utils/novitasSplit.ts`: wenn `familie`-Modus und Hauptmitglied-Status = Jobcenter, dann Ehegatte + jedes Kind ≥16 Jahre = **eigene Mitgliedschaft**; Kinder <16 bleiben familienversichert. Verwendet in Antragslisten-Split und im Autofill-Payload.
+Bei Antragsvariante „Familienversicherung" gibt es diese AG/Bank-Sektion **einmal für das Hauptmitglied** und zusätzlich für jede Person mit eigener Mitgliedschaft (Ehegatte + Kinder ≥ 16 wenn Jobcenter). Für die Sub-Personen werden AG-Daten in `formData.ehegatte`/`formData.kinder[i]` gespeichert:
+- Zwei neue Felder pro `FamilyMember`: `novitasArbeitgeber?: ArbeitgeberDaten`, `novitasArbeitsentgelt?: string`.
+- Bank wird pro Sub-Person ebenfalls neu erfasst: `novitasBank?: { kontoinhaber, iban }` (fallback auf `formData.bigBank`).
 
-### 3. Autofill-Bookmarklet
-Neu: `src/bookmarklets/novitasAutofillSource.ts` (Struktur wie `bigAutofillSource.ts`, Vanilla-JS-IIFE, aus Zwischenablage).
-- Payload-Typ: `novitas-autofill/v1`
-- Selektor-Strategie primär über `name="ng.form0.mitglied.<Feld>"` / `id`-Präfix `novitas-form-*`, Labels als Fallback (wortweises Matching wie im BIG-Bookmarklet)
-- Setter: nativer value-Setter + `input`/`change`/`blur` (Angular-kompatibel)
-- `<select>`: `option value` setzen; Datum als `YYYY-MM-DD`
-- Checkbox „Familienangehörige-Fragebogen": nur bei `mode: 'familie'`
-- Vertriebspartner-Radio „Ich bin Vertriebspartner" + Vermittler-ID `011062257459`
-- Statusfeld inkl. Jobcenter-/Agentur-Optionen
-- Arbeitgeber-Block: bei Jobcenter Jobcenter-Name+Anschrift statt AG-Daten
-- Overlay-Statusmeldung wie bei BIG
+## Datenmodell (`src/types/form.ts`)
 
-Setup-Seite analog `BigAutofillSetup.tsx` → `NovitasAutofillSetup.tsx`, Route in `App.tsx`.
+Neue Felder auf `FormData`:
+- `mitgliedRentenversicherungsnummer: string`
+- `novitasArbeitsentgelt: string` (Hauptmitglied, monatlich EUR)
 
-### 4. Copy-Button + JSON-Payload
-`src/components/ApplicationDetailDrawer.tsx`: bei `krankenkasse === 'novitas'` Button „Novitas online ausfüllen" pro Person (Haupt + jede eigene Mitgliedschaft aus Split). Kopiert JSON in Zwischenablage, öffnet Novitas-Formular-URL im neuen Tab.
+Neue optionale Felder auf `FamilyMember`:
+- `rentenversicherungsnummer?: string`
+- `novitasArbeitgeber?: ArbeitgeberDaten`
+- `novitasArbeitsentgelt?: string`
+- `novitasBank?: { kontoinhaber: string; iban: string }`
 
-Neue Datei `src/utils/novitasAutofillPayload.ts`: baut `NovitasAutofillPayload` aus `FormData` + gewählter Person inkl. berechneter Daten (Beginn, „bis"), Status-Mapping, AG-Daten (inkl. Jobcenter-Fallback), Bank.
+`createInitialFormData` / `createEmptyFamilyMember` entsprechend initialisieren (leere Strings / `undefined`).
 
-### 5. JSON-Import Beispiel
-`src/components/JsonImportDialog.tsx`: `createNovitasExampleJson()` erweitern um Pflichtfelder + KV-Nr, Familienstand, Telefon, AG-Daten (ohne „Beschäftigt seit"), Bankverbindung, `novitasMode`, Beispielzeile mit Jobcenter als „Arbeitgeber".
+## Autofill-Payload (`src/utils/novitasAutofillPayload.ts`)
 
-## Technische Details
+Payload-Interface erweitern:
+- `person.rentenversicherungsnummer: string`
+- `arbeitgeber.arbeitsentgeltMonatlich: string`
+- Für Sub-Personen: AG- und Bank-Daten aus deren eigenen Feldern lesen, sonst Fallback auf Hauptmitglied.
 
-- **Datum-Berechnung**: `getBeginDate` / `getEndDate` aus `dateUtils.ts`.
-- **Status-Ableitung** aus vorhandenem Beschäftigungsstatus (VIACTIV-kompatibel).
-- **Jobcenter-AG-Mapping**: eigene Felder `jobcenterName`, `jobcenterStrasse`, `jobcenterHausnummer`, `jobcenterPlz`, `jobcenterOrt` bereits vorhanden bzw. neu — Payload greift bei Status=Jobcenter darauf zu, sonst auf `arbeitgeber*`-Felder.
-- **Bookmarklet-Build**: bestehende `buildBookmarkletHref`-Logik wiederverwenden.
-- **Keine Persistenz sensibler Daten**: Payload bleibt Clipboard-only.
+Werte-Auflösung pro Rolle:
+- `main`: `formData.mitgliedRentenversicherungsnummer`, `formData.viactivArbeitgeber`, `formData.novitasArbeitsentgelt`, `formData.bigBank`.
+- `ehegatte`/`kind`: `person.rentenversicherungsnummer`, `person.novitasArbeitgeber ?? formData.viactivArbeitgeber`, `person.novitasArbeitsentgelt ?? formData.novitasArbeitsentgelt`, `person.novitasBank ?? formData.bigBank`.
 
-## Betroffene Dateien
-- `src/types/form.ts` (`novitasMode`, ggf. Jobcenter-AG-Felder)
-- `src/pages/Index.tsx` (Modus-Toggle Novitas)
-- `src/utils/novitasSplit.ts` (neu)
-- `src/utils/novitasAutofillPayload.ts` (neu)
-- `src/bookmarklets/novitasAutofillSource.ts` (neu)
-- `src/pages/NovitasAutofillSetup.tsx` (neu) + Route in `src/App.tsx`
-- `src/components/ApplicationDetailDrawer.tsx` (Copy-Button pro Person)
-- `src/components/JsonImportDialog.tsx` (Novitas-Beispiel erweitern)
+## Bookmarklet (`src/bookmarklets/novitasAutofillSource.ts`)
 
-## Nicht betroffen
-- PDF-Export, RLS, Verschlüsselung, andere Krankenkassen, E-Mail/WhatsApp-Versand.
+Neue Selektoren/Mappings ergänzen:
+- `personen_angabe.Rentenversicherungsnummer` ← `person.rentenversicherungsnummer`
+- `ag.Arbeitsentgeld` ← `arbeitgeber.arbeitsentgeltMonatlich`
+- Sicherstellen, dass `bankverbindung.kontoinhaber`, `bankverbindung.IBAN` gesetzt werden.
+
+## Validierung (`src/pages/Index.tsx`, Novitas-Zweig)
+
+Bei Novitas als Pflicht prüfen:
+- Geburtsdatum, Geburtsort, Straße, Hausnummer, PLZ, Ort
+- Rentenversicherungsnummer (Format-Check: 1 Buchstabe + 9 Ziffern + 1 Buchstabe, sonst Warnung)
+- Arbeitgeber (Name/Straße/PLZ/Ort/Arbeitsentgelt), außer die Sub-Person hat keine eigene Mitgliedschaft
+- Bank (Kontoinhaber, IBAN)
+
+## Entwurf-Speicherung / Audit
+
+`useApplicationPersistence.save()` sendet bereits das gesamte `formData` an die Edge-Funktion `applications-api`, wo es AES-GCM-verschlüsselt in `applications.payload_ct` abgelegt wird. Da die neuen Felder Teil von `FormData` werden, landen sie automatisch verschlüsselt im Datensatz — kein Migrationsbedarf. Zusätzlich wird ein `application_events`-Eintrag `created`/`updated` geschrieben (Meta bleibt PII-frei). Kein Feld-für-Feld-Event nötig; der komplette Payload ist über „Entschlüsseln" jederzeit einsehbar.
+
+Kein DB-Schema-Change. Keine Änderung am Grant-/RLS-Setup.
+
+## Technische Details (kurz)
+
+Betroffene Dateien:
+
+```text
+src/types/form.ts                          neue FormData/FamilyMember-Felder
+src/components/MemberSection.tsx           Novitas-Felder wieder einblenden + RVNR
+src/components/SpouseSection.tsx           RVNR-Feld + optionale AG/Bank bei eig. MS
+src/components/FamilyMemberForm.tsx        RVNR + optionale AG/Bank bei eig. MS
+src/components/NovitasEmployerBank.tsx     NEU: AG-/Bank-Block für Novitas
+src/pages/Index.tsx                        Block einbinden, Validierung
+src/utils/novitasAutofillPayload.ts        neue Payload-Felder + Sub-Person-Fallbacks
+src/bookmarklets/novitasAutofillSource.ts  Mapping RVNR + Arbeitsentgeld + Bank
+src/components/JsonImportDialog.tsx        Beispiel-JSON um neue Felder ergänzen
+```
+
+Kein neues Secret, keine Migration, keine Edge-Function-Änderung.

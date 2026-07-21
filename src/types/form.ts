@@ -28,6 +28,12 @@ export interface FamilyMember {
   eigeneMitgliedschaft: boolean;
   // BIG Variante B: pro Person eigene Plusbonus-Daten, wenn eigeneMitgliedschaft=true
   eigenePlusbonus?: EigenePlusbonusDaten;
+  // Novitas BKK: pro Person (bei eigener Mitgliedschaft) eigene AG-/Bank-Daten und
+  // Rentenversicherungsnummer. Optional – fallen sonst auf Hauptmitglied zurück.
+  rentenversicherungsnummer?: string;
+  novitasArbeitgeber?: ArbeitgeberDaten;
+  novitasArbeitsentgelt?: string;
+  novitasBank?: { kontoinhaber: string; iban: string };
 }
 
 export interface EigenePlusbonusDaten {
@@ -241,6 +247,10 @@ export interface FormData {
   mitgliedPlz: string;
   mitgliedKvNummer: string;
   mitgliedKrankenkasse: string;
+  // Novitas BKK: Rentenversicherungsnummer (Pflichtfeld auf der Novitas-Online-Form)
+  mitgliedRentenversicherungsnummer: string;
+  // Novitas BKK: Monatliches Arbeitsentgelt (EUR) für das Hauptmitglied
+  novitasArbeitsentgelt: string;
   
   familienstand: 'ledig' | 'verheiratet' | 'getrennt' | 'geschieden' | 'verwitwet' | '';
   
@@ -392,6 +402,8 @@ export const createInitialFormData = (): FormData => {
     mitgliedPlz: '',
     mitgliedKvNummer: '',
     mitgliedKrankenkasse: '',
+    mitgliedRentenversicherungsnummer: '',
+    novitasArbeitsentgelt: '',
     familienstand: '',
     telefon: '',
     email: '',
