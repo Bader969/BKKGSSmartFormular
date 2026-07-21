@@ -10,6 +10,7 @@ import Applications from "./pages/Applications";
 import Admin from "./pages/Admin";
 import EmailSettings from "./pages/EmailSettings";
 import BigAutofillSetup from "./pages/BigAutofillSetup";
+import NovitasAutofillSetup from "./pages/NovitasAutofillSetup";
 import { RequireAuth } from "./components/RequireAuth";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/admin" element={<RequireAuth><Admin /></RequireAuth>} />
           <Route path="/empfaenger" element={<RequireAuth><EmailSettings /></RequireAuth>} />
           <Route path="/big-autofill-setup" element={<RequireAuth><BigAutofillSetup /></RequireAuth>} />
+          <Route path="/novitas-autofill-setup" element={<RequireAuth><NovitasAutofillSetup /></RequireAuth>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
