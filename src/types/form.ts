@@ -402,6 +402,8 @@ export const createInitialFormData = (): FormData => {
     mitgliedPlz: '',
     mitgliedKvNummer: '',
     mitgliedKrankenkasse: '',
+    mitgliedRentenversicherungsnummer: '',
+    novitasArbeitsentgelt: '',
     familienstand: '',
     telefon: '',
     email: '',
