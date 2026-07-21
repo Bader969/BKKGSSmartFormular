@@ -110,6 +110,12 @@ const VIACTIV_BODY_TEMPLATE =
   `Mit freundlichen Grüßen\n\n` +
   `BlitzVox Team`;
 
+const NOVITAS_BONUS_BODY_TEMPLATE =
+  `Hallo Stefanie,\n\n` +
+  `der im Betreff genannte Kunde wünscht sich den Bonus in Höhe von 400€ bzw. (300€ + 100€).\n\n` +
+  `Mit freundlichen Grüßen\n` +
+  `BlitzVox Team`;
+
 function todayDdMmYyyy(): string {
   const d = new Date();
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
@@ -238,8 +244,11 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
       { hasPhotos: mainHasPhotos },
     );
     const isViactiv = formData.selectedKrankenkasse === 'viactiv';
+    const isNovitasBonus = formData.selectedKrankenkasse === 'novitas' && formData.novitasBonus400;
     const mainSubjectTpl = isViactiv ? VIACTIV_SUBJECT_TEMPLATE : subjTpl;
-    const mainBodyTpl = body || (isViactiv ? VIACTIV_BODY_TEMPLATE : DEFAULT_BODY_TEMPLATE);
+    const mainBodyTpl = isNovitasBonus
+      ? NOVITAS_BONUS_BODY_TEMPLATE
+      : (body || (isViactiv ? VIACTIV_BODY_TEMPLATE : DEFAULT_BODY_TEMPLATE));
     result.push({
       id: mainKey,
       label: `Hauptmitglied — ${formData.mitgliedVorname} ${formData.mitgliedName}`.trim(),
