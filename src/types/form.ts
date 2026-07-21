@@ -225,6 +225,10 @@ export interface FormData {
   
   // Ausgewählte Krankenkasse für Export
   selectedKrankenkasse: Krankenkasse;
+
+  // Novitas BKK: entweder Einzelperson (nur Hauptmitglied) oder komplette Familienversicherung.
+  // Für alle anderen Krankenkassen irrelevant.
+  novitasMode?: 'einzeln' | 'familie';
   
   // Mitglied Angaben
   mitgliedName: string;
@@ -433,5 +437,6 @@ export const createInitialFormData = (): FormData => {
     bigHoeheEuroSelfRandom: '',
     bigMitgliedBeschaeftigt: '',
     vertriebspartner: '',
+    novitasMode: 'familie',
   };
 };

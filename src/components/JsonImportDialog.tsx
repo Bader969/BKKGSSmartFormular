@@ -132,14 +132,46 @@ const createViactivExampleJson = (): Partial<FormData> => ({
 
 // Novitas BKK Beispiel-JSON (ohne Versichertennummer für Familie)
 const createNovitasExampleJson = (): Partial<FormData> => ({
+  novitasMode: 'familie',
+  selectedKrankenkasse: 'novitas',
   mitgliedName: 'Mustermann',
   mitgliedVorname: 'Max',
+  mitgliedGeburtsdatum: '15.05.1985',
+  mitgliedGeburtsort: 'Berlin',
+  mitgliedGeburtsland: 'Deutschland',
+  mitgliedStrasse: 'Musterstraße',
+  mitgliedHausnummer: '12a',
+  mitgliedPlz: '12345',
   mitgliedKvNummer: 'A123456789',
   mitgliedKrankenkasse: 'Novitas BKK',
   familienstand: 'verheiratet',
   telefon: '0123456789',
   email: 'max.mustermann@example.com',
   ort: 'Musterstadt',
+  viactivGeschlecht: 'maennlich',
+  viactivStaatsangehoerigkeit: 'deutsch',
+  // Beschäftigungsstatus: 'beschaeftigt' | 'ausbildung' | 'al_geld_2' (Jobcenter) | 'al_geld_1' (Agentur für Arbeit)
+  viactivBeschaeftigung: 'al_geld_2',
+  // Arbeitgeber-Daten (bei Jobcenter/Agentur wird Name+Anschrift des Jobcenters als AG verwendet)
+  viactivArbeitgeber: {
+    name: 'Jobcenter Kiel',
+    strasse: 'Adolf-Westphal-Straße',
+    hausnummer: '2',
+    plz: '24143',
+    ort: 'Kiel',
+    beschaeftigtSeit: '',
+  },
+  // Bankverbindung
+  bigBank: {
+    kontoinhaber: 'Max Mustermann',
+    kontoinhaberVorname: 'Max',
+    kontoinhaberNachname: 'Mustermann',
+    kreditinstitut: 'Sparkasse Kiel',
+    iban: 'DE89 3704 0044 0532 0130 00',
+    bic: 'COBADEFFXXX',
+    ort: 'Kiel',
+    datum: '',
+  },
   ehegatte: {
     name: 'Mustermann',
     vorname: 'Maria',

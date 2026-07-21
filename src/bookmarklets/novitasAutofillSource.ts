@@ -1,0 +1,302 @@
+/**
+ * Source code of the "Novitas Autofill" bookmarklet.
+ *
+ * Wird auf `novitas-bkk.de/formulare/kundenservice?...` ausgeführt und befüllt
+ * das Formular anhand eines JSON-Payloads aus der Zwischenablage.
+ * Der Payload muss dem Typ `novitas-autofill/v1` entsprechen.
+ */
+const BOOKMARKLET_BODY = /* js */ `
+(async function(){
+  var LOG_PREFIX = "[Novitas-Autofill]";
+  function log(){ try { console.log.apply(console, [LOG_PREFIX].concat([].slice.call(arguments))); } catch(_){} }
+
+  function showOverlay(html){
+    var id = "novitas-autofill-overlay";
+    var el = document.getElementById(id);
+    if (!el){
+      el = document.createElement("div");
+      el.id = id;
+      el.style.cssText = "position:fixed;top:12px;right:12px;z-index:2147483647;background:#7a1f2b;color:#fff;font:13px/1.4 system-ui,sans-serif;padding:12px 14px;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.25);max-width:340px;";
+      document.body.appendChild(el);
+      var close = document.createElement("button");
+      close.textContent = "×";
+      close.style.cssText = "position:absolute;top:4px;right:8px;background:transparent;border:0;color:#fff;font-size:18px;cursor:pointer;";
+      close.onclick = function(){ el.remove(); };
+      el.appendChild(close);
+    }
+    var body = el.querySelector(".body");
+    if (!body){ body = document.createElement("div"); body.className = "body"; el.appendChild(body); }
+    body.innerHTML = html;
+  }
+
+  var raw;
+  try { raw = await navigator.clipboard.readText(); }
+  catch(e){ showOverlay("❌ <b>Zwischenablage nicht lesbar.</b><br>Bitte in deiner App den 'Novitas online ausfüllen'-Button erneut klicken."); return; }
+  var data; try { data = JSON.parse(raw); } catch(_){ showOverlay("❌ Zwischenablage enthält kein gültiges JSON."); return; }
+  if (!data || data.__type !== "novitas-autofill/v1"){ showOverlay("❌ Kein Novitas-Autofill-Payload in der Zwischenablage."); return; }
+  log("payload", data);
+
+  function norm(s){ return (s||"").toString().toLowerCase().replace(/[^a-z0-9]+/g," ").trim(); }
+  function hayHas(hay, pat){
+    if (!pat) return false;
+    var padded = " " + hay + " ";
+    var tokens = pat.split(" ").filter(Boolean);
+    for (var t=0; t<tokens.length; t++){ if (padded.indexOf(" " + tokens[t] + " ") === -1) return false; }
+    return true;
+  }
+
+  function setNative(el, val){
+    try {
+      var tag = el.tagName;
+      var proto = tag === "TEXTAREA" ? HTMLTextAreaElement.prototype
+        : tag === "SELECT" ? HTMLSelectElement.prototype
+        : HTMLInputElement.prototype;
+      var setter = Object.getOwnPropertyDescriptor(proto, "value").set;
+      setter.call(el, val == null ? "" : String(val));
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      el.dispatchEvent(new Event("blur", { bubbles: true }));
+      return true;
+    } catch(e){ log("setNative fail", e); return false; }
+  }
+
+  /** Findet ein Feld primär über 'name' (form0.<key>) oder id/label. */
+  function findField(patterns, opts){
+    opts = opts || {};
+    var wantTypes = opts.types; // z.B. ['select','checkbox','radio','date','text']
+    var pats = patterns.map(norm).filter(Boolean);
+    var candidates = Array.prototype.slice.call(document.querySelectorAll("input, textarea, select"));
+    var attrMatch = null, labelMatch = null;
+    for (var i=0; i<candidates.length; i++){
+      var el = candidates[i];
+      if (el.disabled) continue;
+      if (el.offsetParent === null && el.type !== "hidden") continue;
+      if (wantTypes && wantTypes.length){
+        var t = el.tagName === "SELECT" ? "select" : (el.type||"text").toLowerCase();
+        if (wantTypes.indexOf(t) === -1) continue;
+      }
+      var attrHay = [
+        el.getAttribute("name"),
+        el.id,
+        el.getAttribute("placeholder"),
+        el.getAttribute("aria-label"),
+      ].map(norm).join(" ");
+      var labelHay = "";
+      if (el.id){
+        var lbl = document.querySelector('label[for="'+CSS.escape(el.id)+'"]');
+        if (lbl) labelHay += " " + norm(lbl.textContent);
+      }
+      var wrap = el.closest("form-date-input, form-dropdown, form-text-input, form-checkbox, form-radio-group, .form-field, label");
+      if (wrap) labelHay += " " + norm(wrap.textContent).slice(0, 300);
+      for (var p=0; p<pats.length; p++){
+        if (!attrMatch && hayHas(attrHay, pats[p])) { attrMatch = el; break; }
+      }
+      if (attrMatch) break;
+      if (!labelMatch){
+        for (var q=0; q<pats.length; q++){
+          if (hayHas(labelHay, pats[q])) { labelMatch = el; break; }
+        }
+      }
+    }
+    return attrMatch || labelMatch;
+  }
+
+  function fill(patterns, value, label, opts){
+    if (value == null || value === "") return { filled:false, skipped:true, label: label };
+    var el = findField(patterns, opts);
+    if (!el) return { filled:false, missing:true, label: label };
+    var ok = setNative(el, value);
+    return { filled: ok, label: label };
+  }
+
+  function selectByValueOrText(patterns, value, textAlternatives, label){
+    var el = findField(patterns, { types: ["select"] });
+    if (!el) return { filled:false, missing:true, label: label };
+    var opts = Array.prototype.slice.call(el.options);
+    var target = null;
+    if (value){
+      for (var i=0; i<opts.length; i++){
+        if (opts[i].value === value){ target = opts[i]; break; }
+      }
+    }
+    if (!target && textAlternatives && textAlternatives.length){
+      var alts = textAlternatives.map(norm);
+      for (var j=0; j<opts.length; j++){
+        var t = norm(opts[j].textContent);
+        for (var k=0; k<alts.length; k++){
+          if (alts[k] && t.indexOf(alts[k]) !== -1){ target = opts[j]; break; }
+        }
+        if (target) break;
+      }
+    }
+    if (!target) return { filled:false, missing:true, label: label };
+    var ok = setNative(el, target.value);
+    return { filled: ok, label: label };
+  }
+
+  function setCheckbox(patterns, checked, label){
+    var el = findField(patterns, { types: ["checkbox"] });
+    if (!el) return { filled:false, missing:true, label: label };
+    if (el.checked !== !!checked){ el.click(); }
+    return { filled:true, label: label };
+  }
+
+  function selectRadioByValueOrLabel(patterns, valueCandidates, labelTexts, label){
+    var pats = patterns.map(norm).filter(Boolean);
+    var radios = Array.prototype.slice.call(document.querySelectorAll('input[type="radio"]'));
+    var vals = (valueCandidates||[]).map(function(v){ return String(v||""); });
+    var texts = (labelTexts||[]).map(norm);
+    for (var i=0; i<radios.length; i++){
+      var r = radios[i];
+      if (r.disabled) continue;
+      var nameHay = norm(r.getAttribute("name")||"") + " " + norm(r.id||"");
+      var wrap = r.closest("form-radio-group, .form-field, label, fieldset");
+      var wrapText = wrap ? norm(wrap.textContent).slice(0,300) : "";
+      var matchesGroup = false;
+      for (var p=0; p<pats.length; p++){
+        if (hayHas(nameHay, pats[p]) || hayHas(wrapText, pats[p])){ matchesGroup = true; break; }
+      }
+      if (!matchesGroup) continue;
+      // Wert-Match
+      if (vals.length && vals.indexOf(r.value) !== -1){
+        if (!r.checked){ r.click(); }
+        return { filled:true, label: label };
+      }
+      // Label-Match
+      if (texts.length){
+        var lbl = r.id ? document.querySelector('label[for="'+CSS.escape(r.id)+'"]') : null;
+        var lblText = lbl ? norm(lbl.textContent) : (r.parentElement ? norm(r.parentElement.textContent) : "");
+        for (var t=0; t<texts.length; t++){
+          if (texts[t] && lblText.indexOf(texts[t]) !== -1){
+            if (!r.checked){ r.click(); }
+            return { filled:true, label: label };
+          }
+        }
+      }
+    }
+    return { filled:false, missing:true, label: label };
+  }
+
+  var results = [];
+  var p = data.person || {};
+  var addr = data.adresse || {};
+  var ag = data.arbeitgeber || {};
+  var bank = data.bank || {};
+  var daten = data.daten || {};
+
+  // 1) Versicherungsbeginn (Datum)
+  results.push(fill(["Beginndatum","versicherungsbeginn","gewuenschter versicherungsbeginn"], daten.beginn, "Versicherungsbeginn"));
+
+  // 2) Status "Ich bin..." Dropdown
+  results.push(selectByValueOrText(
+    ["Versicherungsart","ich bin"],
+    p.status,
+    p.status === "pflichtversicherter_Arbeitnehmer" ? ["pflichtversicherte"]
+      : p.status === "Auszubildender" ? ["auszubildende"]
+      : p.status === "Arbeitslose_r_Jobcenter" ? ["jobcenter"]
+      : p.status === "Arbeitslose_r_AgenturArbeit" ? ["agentur"]
+      : [],
+    "Ich bin (Status)"
+  ));
+
+  // Persönliche Daten
+  results.push(fill(["vorname"], p.vorname, "Vorname"));
+  results.push(fill(["nachname","familienname"], p.nachname, "Nachname"));
+  results.push(fill(["geburtsname"], p.geburtsname, "Geburtsname"));
+  results.push(fill(["geburtsdatum"], p.geburtsdatum, "Geburtsdatum", { types: ["date","text"] }));
+  results.push(fill(["geburtsort"], p.geburtsort, "Geburtsort"));
+  results.push(fill(["geburtsland"], p.geburtsland, "Geburtsland"));
+  results.push(fill(["staatsangehoerigkeit","staatsangehörigkeit","nationalitaet","nationalität"], p.staatsangehoerigkeit, "Staatsangehörigkeit"));
+
+  // Anrede / Geschlecht
+  var anredeTexts = p.geschlecht === "w" ? ["frau","weiblich"]
+    : p.geschlecht === "m" ? ["herr","männlich","mannlich"]
+    : p.geschlecht === "d" ? ["divers"]
+    : [];
+  results.push(selectByValueOrText(["anrede","geschlecht"], p.geschlecht, anredeTexts, "Anrede/Geschlecht"));
+
+  // Familienstand
+  var famTexts = p.familienstand === "verheiratet" ? ["verheiratet"]
+    : p.familienstand === "ledig" ? ["ledig"]
+    : p.familienstand === "geschieden" ? ["geschieden"]
+    : p.familienstand === "verwitwet" ? ["verwitwet"]
+    : p.familienstand === "getrennt" ? ["getrennt"]
+    : [];
+  results.push(selectByValueOrText(["familienstand"], p.familienstand, famTexts, "Familienstand"));
+
+  // Adresse
+  results.push(fill(["strasse","straße"], addr.strasse, "Straße"));
+  results.push(fill(["hausnummer","hausnr","hnr"], addr.hausnummer, "Hausnummer"));
+  results.push(fill(["plz","postleitzahl"], addr.plz, "PLZ"));
+  results.push(fill(["wohnort","ort","stadt"], addr.ort, "Wohnort"));
+
+  // Kontakt
+  results.push(fill(["telefon","rufnummer","mobil","handy"], data.telefon, "Telefon"));
+  results.push(fill(["email","e-mail"], data.email, "E-Mail"));
+
+  // KV-Nr / bisherige Krankenkasse
+  results.push(fill(["versichertennummer","krankenversichertennummer","kvnr","kv nummer"], p.kvNummer, "Versichertennummer"));
+  results.push(fill(["bisherige krankenkasse","aktuelle krankenkasse","name krankenkasse","vorherige krankenkasse"], p.bisherigeKrankenkasse, "Bisherige Krankenkasse"));
+
+  // Zuletzt versichert bis
+  results.push(fill(["zuletzt versichert bis","versichert bis","bis"], daten.zuletztVersichertBis, "Zuletzt versichert bis"));
+
+  // Anlass Kassenwechsel
+  results.push(selectByValueOrText(
+    ["anlass","kassenwechsel","grund"],
+    "Ablauf_Bindungsfrist",
+    ["ablauf der bindungsfrist","bindungsfrist"],
+    "Anlass Kassenwechsel"
+  ));
+
+  // Arbeitgeber (bei Jobcenter: Jobcenter-Name+Anschrift)
+  results.push(fill(["arbeitgeber name","name arbeitgeber","name des arbeitgebers","arbeitgeber"], ag.name, "Arbeitgeber Name"));
+  results.push(fill(["arbeitgeber strasse","arbeitgeber straße","strasse arbeitgeber"], ag.strasse, "Arbeitgeber Straße"));
+  results.push(fill(["arbeitgeber hausnummer","hausnummer arbeitgeber"], ag.hausnummer, "Arbeitgeber Hausnummer"));
+  results.push(fill(["arbeitgeber plz","plz arbeitgeber"], ag.plz, "Arbeitgeber PLZ"));
+  results.push(fill(["arbeitgeber ort","ort arbeitgeber","stadt arbeitgeber"], ag.ort, "Arbeitgeber Ort"));
+
+  // Bank
+  results.push(fill(["kontoinhaber"], bank.kontoinhaber, "Kontoinhaber"));
+  results.push(fill(["iban"], bank.iban, "IBAN"));
+  results.push(fill(["bic","swift"], bank.bic, "BIC"));
+  results.push(fill(["kreditinstitut","bankname","bank"], bank.kreditinstitut, "Kreditinstitut"));
+
+  // Vertriebspartner: "Ich bin Vertriebspartner" + Vermittler-ID
+  var vpRes = selectRadioByValueOrLabel(
+    ["vertriebspartner"],
+    ["1","true","ja","ich_bin","vermittler"],
+    ["ich bin vertriebspartner","vertriebspartner"],
+    "Vertriebspartner (Radio)"
+  );
+  results.push(vpRes);
+  if (data.vertriebspartner && data.vertriebspartner.vermittlerId){
+    results.push(fill(["vermittler id","vermittlerid","vermittler nummer","vermittler nr"], data.vertriebspartner.vermittlerId, "Vermittler-ID"));
+  }
+
+  // Familienangehörige-Fragebogen (nur bei mode=familie)
+  if (data.familienangehoerigeFragebogen){
+    results.push(setCheckbox(["familienangehoerige","familienangehörige","fragebogen zusenden","familie mitversichert"], true, "Familienangehörige-Fragebogen"));
+  }
+
+  var filled = results.filter(function(r){ return r.filled; }).length;
+  var missing = results.filter(function(r){ return r.missing; }).map(function(r){ return r.label; });
+  var skipped = results.filter(function(r){ return r.skipped; }).map(function(r){ return r.label; });
+  var total = results.length;
+
+  var html = "<b>✅ "+filled+" / "+total+" Felder befüllt</b>";
+  html += "<br><small>Person: " + (p.label||"") + " · Modus: " + (data.mode||"") + "</small>";
+  if (missing.length) html += "<br><br><b>Nicht gefunden:</b><br>" + missing.map(function(x){return "• "+x;}).join("<br>");
+  if (skipped.length) html += "<br><br><span style='opacity:.7'><b>Kein Wert vorhanden:</b><br>" + skipped.map(function(x){return "• "+x;}).join("<br>") + "</span>";
+  html += "<br><br><span style='opacity:.7;font-size:11px'>Nach 'Weiter' im Novitas-Assistenten das Bookmarklet erneut klicken.</span>";
+
+  showOverlay(html);
+})();
+`;
+
+/** Baut das `javascript:`-URI für den Lesezeichen-Anker. */
+export function buildNovitasBookmarkletHref(): string {
+  return "javascript:" + encodeURIComponent(BOOKMARKLET_BODY.trim());
+}
+
+export type { NovitasAutofillPayload } from '@/utils/novitasAutofillPayload';
