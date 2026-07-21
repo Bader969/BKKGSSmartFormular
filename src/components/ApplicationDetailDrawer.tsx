@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -114,15 +114,19 @@ export function ApplicationDetailDrawer({
   };
 
   const [novitasPersons, setNovitasPersons] = useState<NovitasPerson[] | null>(null);
-  const loadNovitasPersons = async () => {
-    if (!application || novitasPersons) return;
-    try {
-      const { payload } = await decrypt(application.id);
-      setNovitasPersons(splitNovitasPersons(payload));
-    } catch {
-      /* ignore */
-    }
-  };
+  useEffect(() => {
+    setNovitasPersons(null);
+    if (!application || application.krankenkasse !== 'novitas' || application.parent_application_id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { payload } = await decrypt(application.id);
+        if (!cancelled) setNovitasPersons(splitNovitasPersons(payload));
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [application?.id]);
 
   const handleBigOnlineAusfuellen = async () => {
     if (!application) return;
@@ -320,9 +324,7 @@ export function ApplicationDetailDrawer({
                     Novitas-Formular. Auf der Novitas-Seite dann dein Lesezeichen <b>„Novitas Autofill"</b> klicken.
                   </p>
                   {!novitasPersons ? (
-                    <Button size="sm" variant="outline" onClick={loadNovitasPersons} disabled={busy} className="w-full">
-                      Personen laden…
-                    </Button>
+                    <p className="text-xs text-muted-foreground italic">Personen werden geladen…</p>
                   ) : (
                     <div className="space-y-1.5">
                       {novitasPersons.map((pers) => (
