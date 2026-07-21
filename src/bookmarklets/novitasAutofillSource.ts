@@ -236,6 +236,7 @@ const BOOKMARKLET_BODY = /* js */ `
 
   // KV-Nr / bisherige Krankenkasse
   results.push(fill(["versichertennummer","krankenversichertennummer","kvnr","kv nummer"], p.kvNummer, "Versichertennummer"));
+  results.push(fill(["rentenversicherungsnummer","rentenversicherungs nummer","rv nummer","rvnr"], p.rentenversicherungsnummer, "Rentenversicherungsnummer"));
   results.push(fill(["bisherige krankenkasse","aktuelle krankenkasse","name krankenkasse","vorherige krankenkasse"], p.bisherigeKrankenkasse, "Bisherige Krankenkasse"));
 
   // Zuletzt versichert bis
@@ -255,6 +256,7 @@ const BOOKMARKLET_BODY = /* js */ `
   results.push(fill(["arbeitgeber hausnummer","hausnummer arbeitgeber"], ag.hausnummer, "Arbeitgeber Hausnummer"));
   results.push(fill(["arbeitgeber plz","plz arbeitgeber"], ag.plz, "Arbeitgeber PLZ"));
   results.push(fill(["arbeitgeber ort","ort arbeitgeber","stadt arbeitgeber"], ag.ort, "Arbeitgeber Ort"));
+  results.push(fill(["arbeitsentgeld","arbeitsentgelt","monatliches entgelt","monatliches einkommen","brutto"], ag.arbeitsentgeltMonatlich, "Monatliches Arbeitsentgelt"));
 
   // Bank
   results.push(fill(["kontoinhaber"], bank.kontoinhaber, "Kontoinhaber"));
