@@ -164,7 +164,13 @@ const createNovitasExampleJson = (): Partial<FormData> => ({
   // Bankverbindung
   bigBank: {
     kontoinhaber: 'Max Mustermann',
+    kontoinhaberVorname: 'Max',
+    kontoinhaberNachname: 'Mustermann',
+    kreditinstitut: '',
     iban: 'DE89 3704 0044 0532 0130 00',
+    bic: '',
+    ort: '',
+    datum: '',
   },
   ehegatte: {
     name: 'Mustermann',

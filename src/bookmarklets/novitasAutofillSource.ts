@@ -189,12 +189,12 @@ const BOOKMARKLET_BODY = /* js */ `
 
   // 2) Status "Ich bin..." Dropdown
   results.push(selectByValueOrText(
-    ["Versicherungsart","ich bin"],
+    ["versicherungsart","ich bin","personen angabe versicherungsart"],
     p.status,
-    p.status === "pflichtversicherter_Arbeitnehmer" ? ["pflichtversicherte"]
+    p.status === "pflichtversicherter_Arbeitnehmer" ? ["pflichtversicherte","pflichtversicherter arbeitnehmer"]
       : p.status === "Auszubildender" ? ["auszubildende"]
-      : p.status === "Arbeitslose_r_Jobcenter" ? ["jobcenter"]
-      : p.status === "Arbeitslose_r_AgenturArbeit" ? ["agentur"]
+      : p.status === "Arbeitslose_r_Jobcenter" ? ["arbeitslose r jobcenter","jobcenter"]
+      : p.status === "Arbeitslose_r_AgenturArbeit" ? ["agentur fuer arbeit","agentur","arbeitslose r agentur"]
       : [],
     "Ich bin (Status)"
   ));
@@ -202,11 +202,8 @@ const BOOKMARKLET_BODY = /* js */ `
   // Persönliche Daten
   results.push(fill(["vorname"], p.vorname, "Vorname"));
   results.push(fill(["nachname","familienname"], p.nachname, "Nachname"));
-  results.push(fill(["geburtsname"], p.geburtsname, "Geburtsname"));
   results.push(fill(["geburtsdatum"], p.geburtsdatum, "Geburtsdatum", { types: ["date","text"] }));
   results.push(fill(["geburtsort"], p.geburtsort, "Geburtsort"));
-  results.push(fill(["geburtsland"], p.geburtsland, "Geburtsland"));
-  results.push(fill(["staatsangehoerigkeit","staatsangehörigkeit","nationalitaet","nationalität"], p.staatsangehoerigkeit, "Staatsangehörigkeit"));
 
   // Anrede / Geschlecht (Novitas-Werte: maennlich | weiblich | unbestimmt | divers)
   var anredeTexts = p.geschlecht === "weiblich" ? ["frau","weiblich"]
@@ -214,7 +211,7 @@ const BOOKMARKLET_BODY = /* js */ `
     : p.geschlecht === "unbestimmt" ? ["unbestimmt"]
     : p.geschlecht === "divers" ? ["divers"]
     : [];
-  results.push(selectByValueOrText(["anrede","geschlecht"], p.geschlecht, anredeTexts, "Anrede/Geschlecht"));
+  results.push(selectByValueOrText(["personen angabe geschlecht","anrede","geschlecht"], p.geschlecht, anredeTexts, "Geschlecht"));
 
   // Familienstand
   var famTexts = p.familienstand === "verheiratet" ? ["verheiratet"]
@@ -228,8 +225,6 @@ const BOOKMARKLET_BODY = /* js */ `
   // Adresse — Novitas nutzt EIN Feld "Straße und Hausnummer"
   var strasseKombiniert = [addr.strasse, addr.hausnummer].filter(Boolean).join(" ").trim();
   results.push(fill(["strasse","straße"], strasseKombiniert, "Straße und Hausnummer"));
-  // Fallback: falls doch getrenntes Hausnummer-Feld existiert
-  results.push(fill(["hausnummer","hausnr","hnr"], addr.hausnummer, "Hausnummer"));
   results.push(fill(["plz","postleitzahl"], addr.plz, "PLZ"));
   results.push(fill(["wohnort","ort","stadt"], addr.ort, "Wohnort"));
 
@@ -239,24 +234,23 @@ const BOOKMARKLET_BODY = /* js */ `
 
   // KV-Nr / bisherige Krankenkasse
   results.push(fill(["versichertennummer","krankenversichertennummer","kvnr","kv nummer"], p.kvNummer, "Versichertennummer"));
-  results.push(fill(["rentenversicherungsnummer","rentenversicherungs nummer","rv nummer","rvnr"], p.rentenversicherungsnummer, "Rentenversicherungsnummer"));
-  results.push(fill(["bisherige krankenkasse","aktuelle krankenkasse","name krankenkasse","vorherige krankenkasse"], p.bisherigeKrankenkasse, "Bisherige Krankenkasse"));
+  results.push(fill(["kv zuletzt krankenkasse","zuletzt krankenkasse","bisherige krankenkasse","aktuelle krankenkasse","name krankenkasse","vorherige krankenkasse","bei der krankenkasse"], p.bisherigeKrankenkasse, "Bisherige Krankenkasse"));
 
   // Zuletzt versichert bis
   results.push(fill(["zuletzt versichert bis","versichert bis","bis"], daten.zuletztVersichertBis, "Zuletzt versichert bis"));
 
-  // Anlass Kassenwechsel
-  results.push(selectByValueOrText(
-    ["anlass","kassenwechsel","grund"],
-    "Ablauf_Bindungsfrist",
+  // Anlass Kassenwechsel — Radio, value="Kuendigung", Label "Ablauf der Bindungsfrist (12 Monate)"
+  results.push(selectRadioByValueOrLabel(
+    ["anlass wechsel","anlass","kassenwechsel","grund"],
+    ["Kuendigung"],
     ["ablauf der bindungsfrist","bindungsfrist"],
     "Anlass Kassenwechsel"
   ));
 
   // Arbeitgeber (bei Jobcenter: Jobcenter-Name+Anschrift)
   results.push(fill(["arbeitgeber name","name arbeitgeber","name des arbeitgebers","arbeitgeber"], ag.name, "Arbeitgeber Name"));
-  results.push(fill(["arbeitgeber strasse","arbeitgeber straße","strasse arbeitgeber"], ag.strasse, "Arbeitgeber Straße"));
-  results.push(fill(["arbeitgeber hausnummer","hausnummer arbeitgeber"], ag.hausnummer, "Arbeitgeber Hausnummer"));
+  var agStrasseKombi = [ag.strasse, ag.hausnummer].filter(Boolean).join(" ").trim();
+  results.push(fill(["arbeitgeber strasse","arbeitgeber straße","strasse arbeitgeber","arbeitgeber anschrift"], agStrasseKombi, "Arbeitgeber Straße und Hausnummer"));
   results.push(fill(["arbeitgeber plz","plz arbeitgeber"], ag.plz, "Arbeitgeber PLZ"));
   results.push(fill(["arbeitgeber ort","ort arbeitgeber","stadt arbeitgeber"], ag.ort, "Arbeitgeber Ort"));
   // Arbeitsentgelt ist auf Novitas ein Dropdown mit festen Werten
@@ -270,22 +264,20 @@ const BOOKMARKLET_BODY = /* js */ `
     "Monatliches Arbeitsentgelt"
   ));
 
-  // Bank
+  // Bank — nur Kontoinhaber + IBAN auf Novitas
   results.push(fill(["kontoinhaber"], bank.kontoinhaber, "Kontoinhaber"));
   results.push(fill(["iban"], bank.iban, "IBAN"));
-  results.push(fill(["bic","swift"], bank.bic, "BIC"));
-  results.push(fill(["kreditinstitut","bankname","bank"], bank.kreditinstitut, "Kreditinstitut"));
 
   // Vertriebspartner: "Ich bin Vertriebspartner" + Vermittler-ID
   var vpRes = selectRadioByValueOrLabel(
-    ["vertriebspartner"],
-    ["1","true","ja","ich_bin","vermittler"],
+    ["send vertriebspartner","vertriebspartner"],
+    ["ja"],
     ["ich bin vertriebspartner","vertriebspartner"],
     "Vertriebspartner (Radio)"
   );
   results.push(vpRes);
   if (data.vertriebspartner && data.vertriebspartner.vermittlerId){
-    results.push(fill(["vermittler id","vermittlerid","vermittler nummer","vermittler nr"], data.vertriebspartner.vermittlerId, "Vermittler-ID"));
+    results.push(fill(["send vermittler id","vermittler id","vermittlerid","vermittler nummer","vermittler nr"], data.vertriebspartner.vermittlerId, "Vermittler-ID"));
   }
 
   // Familienangehörige-Fragebogen (nur bei mode=familie)
