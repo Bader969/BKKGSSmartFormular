@@ -149,7 +149,6 @@ export const NOVITAS_GESCHLECHT_OPTIONS = [
 
 /** Novitas-Arbeitsentgelt-Werte, exakt wie im Novitas-Formular. */
 export const NOVITAS_ARBEITSENTGELT_OPTIONS = [
-  { value: '', label: 'keine Auswahl' },
   { value: 'bis_zu_603_Euro', label: 'Bis zu 608 Euro (Minijob)' },
   { value: 'mitte', label: 'zwischen 608 Euro und 6.450 Euro' },
   { value: 'mehr_als_6450_Euro', label: 'Mehr als 6.450 Euro monatlich' },
