@@ -121,6 +121,7 @@ export const NovitasEmployerBank: React.FC<Props> = ({ title, idPrefix, value, o
             required={required}
           />
         </div>
+        <p className="text-xs text-muted-foreground mt-2">BIC und Kreditinstitut werden auf der Novitas-BKK-Seite nicht benötigt.</p>
       </div>
     </FormSection>
   );

@@ -101,17 +101,19 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
             required={formData.selectedKrankenkasse === 'viactiv' || formData.selectedKrankenkasse === 'novitas' || bigFull}
             validate={validateOrt}
           />
-          <FormField
-            type="select"
-            label="Geburtsland"
-            id="mitgliedGeburtsland"
-            value={formData.mitgliedGeburtsland}
-            onChange={(value) => updateFormData({ mitgliedGeburtsland: value })}
-            options={countries.map(c => ({ value: c.code, label: c.name }))}
-            placeholder="Land auswählen"
-            required={formData.selectedKrankenkasse === 'viactiv' || bigFull}
-            validate={formData.selectedKrankenkasse === 'viactiv' || bigFull ? validateSelect : undefined}
-          />
+          {formData.selectedKrankenkasse !== 'novitas' && (
+            <FormField
+              type="select"
+              label="Geburtsland"
+              id="mitgliedGeburtsland"
+              value={formData.mitgliedGeburtsland}
+              onChange={(value) => updateFormData({ mitgliedGeburtsland: value })}
+              options={countries.map(c => ({ value: c.code, label: c.name }))}
+              placeholder="Land auswählen"
+              required={formData.selectedKrankenkasse === 'viactiv' || bigFull}
+              validate={formData.selectedKrankenkasse === 'viactiv' || bigFull ? validateSelect : undefined}
+            />
+          )}
         </div>
       )}
       

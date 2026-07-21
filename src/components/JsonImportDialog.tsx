@@ -166,10 +166,10 @@ const createNovitasExampleJson = (): Partial<FormData> => ({
     kontoinhaber: 'Max Mustermann',
     kontoinhaberVorname: 'Max',
     kontoinhaberNachname: 'Mustermann',
-    kreditinstitut: 'Sparkasse Kiel',
+    kreditinstitut: '',
     iban: 'DE89 3704 0044 0532 0130 00',
-    bic: 'COBADEFFXXX',
-    ort: 'Kiel',
+    bic: '',
+    ort: '',
     datum: '',
   },
   ehegatte: {

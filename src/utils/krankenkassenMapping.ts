@@ -126,7 +126,28 @@ export const applyKrankenkassenMapping = (
     case 'novitas':
       return {
         ...baseMapping,
-        // Novitas: KEINE Adress-/Geburts-Felder für Mitglied (sind im UI hidden)
+        // Novitas: Adress-, Geburts-, Geschlecht-, Beschäftigungs-, Arbeitgeber-, Bank- und Entgelt-Felder übernehmen
+        mitgliedGeburtsdatum: extractedData.mitgliedGeburtsdatum || currentFormData.mitgliedGeburtsdatum,
+        mitgliedGeburtsort: extractedData.mitgliedGeburtsort || currentFormData.mitgliedGeburtsort,
+        mitgliedStrasse: extractedData.mitgliedStrasse || currentFormData.mitgliedStrasse,
+        mitgliedHausnummer: extractedData.mitgliedHausnummer || currentFormData.mitgliedHausnummer,
+        mitgliedPlz: extractedData.mitgliedPlz || currentFormData.mitgliedPlz,
+        ort: extractedData.ort || currentFormData.ort,
+        viactivGeschlecht: extractedData.viactivGeschlecht || currentFormData.viactivGeschlecht,
+        viactivBeschaeftigung: extractedData.viactivBeschaeftigung || currentFormData.viactivBeschaeftigung,
+        viactivArbeitgeber: extractedData.viactivArbeitgeber
+          ? { ...currentFormData.viactivArbeitgeber, ...extractedData.viactivArbeitgeber }
+          : currentFormData.viactivArbeitgeber,
+        novitasArbeitsentgelt: extractedData.novitasArbeitsentgelt || currentFormData.novitasArbeitsentgelt,
+        bigBank: (() => {
+          const ex = extractedData.bigBank || {};
+          const cur = currentFormData.bigBank;
+          return {
+            ...cur,
+            kontoinhaber: ex.kontoinhaber || cur.kontoinhaber,
+            iban: (ex.iban || cur.iban || '').toString().replace(/\s+/g, '').toUpperCase(),
+          };
+        })(),
         ehegatte: extractedData.ehegatte
           ? {
               ...currentFormData.ehegatte,
