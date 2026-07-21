@@ -156,11 +156,31 @@ const viactivSchema = `{
 const novitasSchema = `{
   "mitgliedVorname": "",
   "mitgliedName": "",
+  "mitgliedGeburtsdatum": "TT.MM.JJJJ",
+  "mitgliedGeburtsort": "",
+  "mitgliedStrasse": "",
+  "mitgliedHausnummer": "",
+  "mitgliedPlz": "",
+  "ort": "",
   "mitgliedKvNummer": "",
   "mitgliedKrankenkasse": "",
   "familienstand": "ledig|verheiratet|geschieden|verwitwet",
   "telefon": "",
   "email": "",
+  "viactivGeschlecht": "maennlich|weiblich|unbestimmt|divers",
+  "viactivBeschaeftigung": "beschaeftigt|ausbildung|al_geld_2|al_geld_1",
+  "viactivArbeitgeber": {
+    "name": "",
+    "strasse": "",
+    "hausnummer": "",
+    "plz": "",
+    "ort": ""
+  },
+  "novitasArbeitsentgelt": "bis_zu_603_Euro|mitte|mehr_als_6450_Euro",
+  "bigBank": {
+    "kontoinhaber": "",
+    "iban": ""
+  },
   "ehegatte": {
     "vorname": "",
     "name": "",
@@ -431,10 +451,24 @@ Falls für Ehegatte/Kinder ebenfalls eine eGK vorliegt, deren KV-Nummer zwingend
         schema: novitasSchema,
         prompt: `Extrahiere Daten für Novitas BKK Familienversicherung.
 
-WICHTIG - NUR DIESE FELDER FÜR MITGLIED:
-- Vorname, Name (KEINE Adresse, KEIN Geburtsdatum!)
+MITGLIED (alle Felder wenn erkennbar):
+- Vorname, Name, Geburtsdatum, Geburtsort
+- Adresse: Straße, Hausnummer, PLZ, Ort. WICHTIG: Wenn Straße und Hausnummer in einer Zeile
+  stehen (z.B. "Musterstraße 12a"), trotzdem sauber in strasse + hausnummer aufteilen.
 - KV-Nummer, Krankenkasse
 - Familienstand, Telefon, Email
+- viactivGeschlecht (maennlich/weiblich/unbestimmt/divers)
+- viactivBeschaeftigung: pflichtversicherter Arbeitnehmer→"beschaeftigt", Auszubildender→"ausbildung",
+  Arbeitslose/r mit Jobcenter/Bürgergeld/ALG II→"al_geld_2", Arbeitslose/r Agentur für Arbeit/ALG I→"al_geld_1".
+- viactivArbeitgeber (Name + Anschrift):
+  * Bei Beschäftigung: der reguläre Arbeitgeber.
+  * Bei Jobcenter (al_geld_2): Name UND vollständige Anschrift des zuständigen Jobcenters als Arbeitgeber.
+  * Bei Agentur für Arbeit (al_geld_1): Name UND Anschrift der Agentur für Arbeit als Arbeitgeber.
+- novitasArbeitsentgelt: monatliches Brutto-Arbeitsentgelt:
+  * Minijob / bis 608 EUR → "bis_zu_603_Euro"
+  * zwischen 608 und 6.450 EUR → "mitte"
+  * mehr als 6.450 EUR → "mehr_als_6450_Euro"
+- bigBank: Kontoinhaber (voller Name) und IBAN (Großbuchstaben, ohne Leerzeichen). BIC/Kreditinstitut nicht nötig.
 
 EHEGATTE (alle Felder):
 - Vorname, Name, Geburtsdatum, Geschlecht
