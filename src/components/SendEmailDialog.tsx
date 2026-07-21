@@ -217,6 +217,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
       const fn = a.filename.toLowerCase();
       if (fn.startsWith('zusammenfassung_familienversicherung')) mainIdx.push(i);
       else if (fn.startsWith('antrag plusbonus') && fileBelongsToPerson(a.filename, formData.mitgliedVorname, formData.mitgliedName)) mainIdx.push(i);
+      else if (fn.startsWith('novitas_beitritt')) mainIdx.push(i);
       else if (formData.selectedKrankenkasse === 'viactiv') {
         // VIACTIV: Datei gehört zu Hauptmitglied, wenn sie nicht einem separaten Mitglied zugeordnet ist
         const belongsToOther = viactivOwnMembers.some((p) => fileBelongsToPerson(a.filename, p.vorname, p.name));
@@ -244,11 +245,8 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
       { hasPhotos: mainHasPhotos },
     );
     const isViactiv = formData.selectedKrankenkasse === 'viactiv';
-    const isNovitasBonus = formData.selectedKrankenkasse === 'novitas' && formData.novitasBonus400;
     const mainSubjectTpl = isViactiv ? VIACTIV_SUBJECT_TEMPLATE : subjTpl;
-    const mainBodyTpl = isNovitasBonus
-      ? NOVITAS_BONUS_BODY_TEMPLATE
-      : (body || (isViactiv ? VIACTIV_BODY_TEMPLATE : DEFAULT_BODY_TEMPLATE));
+    const mainBodyTpl = body || (isViactiv ? VIACTIV_BODY_TEMPLATE : DEFAULT_BODY_TEMPLATE);
     result.push({
       id: mainKey,
       label: `Hauptmitglied — ${formData.mitgliedVorname} ${formData.mitgliedName}`.trim(),
@@ -402,7 +400,15 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
 
         if (!cancelled) {
           setSubjTpl(nextSubjTpl);
-          setBody(formData.selectedKrankenkasse === 'viactiv' ? VIACTIV_BODY_TEMPLATE : bodyTpl);
+          const isNovitasBonus =
+            formData.selectedKrankenkasse === 'novitas' && formData.novitasBonus400;
+          setBody(
+            isNovitasBonus
+              ? NOVITAS_BONUS_BODY_TEMPLATE
+              : formData.selectedKrankenkasse === 'viactiv'
+                ? VIACTIV_BODY_TEMPLATE
+                : bodyTpl,
+          );
           setGroupSubjects({});
         }
 
@@ -618,7 +624,10 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
             fileBelongsToPerson(a.filename, g.person.vorname, g.person.name);
         });
       } else if (isNovitas) {
-        summary = active.find((a) => a.filename.toLowerCase().startsWith('novitas_familienversicherung'));
+        summary = active.find((a) => {
+          const fn = a.filename.toLowerCase();
+          return fn.startsWith('novitas_familienversicherung') || fn.startsWith('novitas_beitritt');
+        });
         waFilenameOverride = 'NovitasBKK_Beitritt.pdf';
       } else {
         summary = active.find((a) => a.filename.toLowerCase().startsWith('zusammenfassung_mitgliedsantrag'));

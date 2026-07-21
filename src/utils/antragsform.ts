@@ -13,7 +13,7 @@ export function deriveAntragsform(formData: FormData): string {
       return parts.join(' + ');
     }
     case 'novitas':
-      return 'Familienvers.';
+      return formData.novitasMode === 'einzeln' ? 'Beitritt' : 'Familienvers.';
     case 'dak':
       return 'Familienvers.';
     case 'bkk_gs':
