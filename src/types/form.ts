@@ -337,6 +337,9 @@ export interface FormData {
 
   // Vertriebspartner (intern, für Antragsliste — wird nicht in PDFs gerendert)
   vertriebspartner: string;
+
+  // Novitas BKK: Kunde wünscht Bonus in Höhe von 400€ (300€ + 100€)
+  novitasBonus400: boolean;
 }
 
 export const createEmptyArztDaten = (): ArztDaten => ({
