@@ -110,6 +110,12 @@ const VIACTIV_BODY_TEMPLATE =
   `Mit freundlichen Grüßen\n\n` +
   `BlitzVox Team`;
 
+const NOVITAS_BONUS_BODY_TEMPLATE =
+  `Hallo Stefanie,\n\n` +
+  `der im Betreff genannte Kunde wünscht sich den Bonus in Höhe von 400€ bzw. (300€ + 100€).\n\n` +
+  `Mit freundlichen Grüßen\n` +
+  `BlitzVox Team`;
+
 function todayDdMmYyyy(): string {
   const d = new Date();
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
@@ -238,8 +244,11 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
       { hasPhotos: mainHasPhotos },
     );
     const isViactiv = formData.selectedKrankenkasse === 'viactiv';
+    const isNovitasBonus = formData.selectedKrankenkasse === 'novitas' && formData.novitasBonus400;
     const mainSubjectTpl = isViactiv ? VIACTIV_SUBJECT_TEMPLATE : subjTpl;
-    const mainBodyTpl = body || (isViactiv ? VIACTIV_BODY_TEMPLATE : DEFAULT_BODY_TEMPLATE);
+    const mainBodyTpl = isNovitasBonus
+      ? NOVITAS_BONUS_BODY_TEMPLATE
+      : (body || (isViactiv ? VIACTIV_BODY_TEMPLATE : DEFAULT_BODY_TEMPLATE));
     result.push({
       id: mainKey,
       label: `Hauptmitglied — ${formData.mitgliedVorname} ${formData.mitgliedName}`.trim(),
@@ -599,18 +608,28 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
 
     if (sendToWhatsApp) {
       const isViactiv = formData.selectedKrankenkasse === 'viactiv';
-      const summary = isViactiv
-        ? active.find((a) => {
-            const fn = a.filename.toLowerCase();
-            return fn.startsWith('viactiv_') && fn.includes('_be_') &&
-              fileBelongsToPerson(a.filename, g.person.vorname, g.person.name);
-          })
-        : active.find((a) => a.filename.toLowerCase().startsWith('zusammenfassung_mitgliedsantrag'));
+      const isNovitas = formData.selectedKrankenkasse === 'novitas';
+      let summary: Attachment | undefined;
+      let waFilenameOverride: string | undefined;
+      if (isViactiv) {
+        summary = active.find((a) => {
+          const fn = a.filename.toLowerCase();
+          return fn.startsWith('viactiv_') && fn.includes('_be_') &&
+            fileBelongsToPerson(a.filename, g.person.vorname, g.person.name);
+        });
+      } else if (isNovitas) {
+        summary = active.find((a) => a.filename.toLowerCase().startsWith('novitas_familienversicherung'));
+        waFilenameOverride = 'NovitasBKK_Beitritt.pdf';
+      } else {
+        summary = active.find((a) => a.filename.toLowerCase().startsWith('zusammenfassung_mitgliedsantrag'));
+      }
       if (!summary) {
         toast.info(
           isViactiv
             ? `"${g.label}": keine Beitrittserklärung (BE) gefunden — WhatsApp übersprungen.`
-            : `"${g.label}": keine „Zusammenfassung_Mitgliedsantrag" angehängt — WhatsApp übersprungen.`,
+            : isNovitas
+              ? `"${g.label}": keine Novitas-Antragsdatei angehängt — WhatsApp übersprungen.`
+              : `"${g.label}": keine „Zusammenfassung_Mitgliedsantrag" angehängt — WhatsApp übersprungen.`,
         );
       } else {
         try {
@@ -625,7 +644,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
               application_id: applicationId,
               chatId: WA_CHAT_ID,
               pdfBase64,
-              pdfFilename: summary.filename,
+              pdfFilename: waFilenameOverride || summary.filename,
               textLines,
               person_role: g.personRole,
               person_index: g.personIndex ?? null,

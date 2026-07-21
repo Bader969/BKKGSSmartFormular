@@ -987,6 +987,22 @@ const Index = () => {
                         </div>
                       </Label>
                     </RadioGroup>
+                    <div className="mt-4 pt-4 border-t border-border/40">
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="mt-1 h-4 w-4 rounded border-border accent-primary"
+                          checked={!!formData.novitasBonus400}
+                          onChange={(e) => updateFormData({ novitasBonus400: e.target.checked })}
+                        />
+                        <div>
+                          <div className="font-medium">Kunde wünscht Bonus in Höhe von 400€</div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            (300€ + 100€) — Aktiviert eine separate E-Mail-Vorlage an Stefanie und sendet den Antrag als „NovitasBKK_Beitritt.pdf" an die WhatsApp-Gruppe.
+                          </p>
+                        </div>
+                      </label>
+                    </div>
                   </div>
                   {(formData.novitasMode ?? 'familie') === 'familie' && (
                     <>
