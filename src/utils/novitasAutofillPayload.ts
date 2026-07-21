@@ -15,7 +15,7 @@ export interface NovitasAutofillPayload {
     geburtsort: string;
     geburtsland: string;
     staatsangehoerigkeit: string;
-    geschlecht: 'm' | 'w' | 'd' | '';
+    geschlecht: 'maennlich' | 'weiblich' | 'unbestimmt' | 'divers' | '';
     familienstand: string;
     kvNummer: string;
     rentenversicherungsnummer: string;
