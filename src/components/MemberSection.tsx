@@ -79,7 +79,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
       )}
 
       {/* Geburtsdatum, Geburtsort, Geburtsland - NICHT für Novitas, nicht für BIG-Minimal */}
-      {formData.selectedKrankenkasse !== 'novitas' && !isBigMinimal && (
+      {!isBigMinimal && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
           <FormField
             type="date"
@@ -97,7 +97,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
             value={formData.mitgliedGeburtsort}
             onChange={(value) => updateFormData({ mitgliedGeburtsort: value })}
             placeholder="z.B. Berlin"
-            required={formData.selectedKrankenkasse === 'viactiv' || bigFull}
+            required={formData.selectedKrankenkasse === 'viactiv' || formData.selectedKrankenkasse === 'novitas' || bigFull}
             validate={validateOrt}
           />
           <FormField
@@ -115,7 +115,7 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
       )}
       
       {/* Adresse - NICHT für Novitas */}
-      {formData.selectedKrankenkasse !== 'novitas' && (
+      {!isBigMinimal && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
           <FormField
             type="text"
@@ -194,6 +194,21 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
           validate={validateKrankenkasse}
         />
       </div>
+      )}
+
+      {/* Novitas: Rentenversicherungsnummer */}
+      {formData.selectedKrankenkasse === 'novitas' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <FormField
+            type="text"
+            label="Rentenversicherungsnummer"
+            id="mitgliedRentenversicherungsnummer"
+            value={formData.mitgliedRentenversicherungsnummer}
+            onChange={(value) => updateFormData({ mitgliedRentenversicherungsnummer: value.toUpperCase().replace(/\s+/g, '') })}
+            placeholder="z.B. 12345678A123"
+            required
+          />
+        </div>
       )}
       
       {!isBigMinimal && (
