@@ -1,70 +1,73 @@
-## Ziel
-Zwei zusammenhängende Erweiterungen:
-1. Im Sende-Dialog jede Gruppe (Hauptmitglied, Ehegatte, Kind) einzeln nachsenden können — nicht nur „alle auf einmal".
-2. In der Anträge-Liste zusätzlich zum Export-Status auch anzeigen, ob per E-Mail bzw. an die WhatsApp-Gruppe erfolgreich gesendet wurde (ja/nein), pro Person.
+# Novitas BKK – Externes Autofill + Personenauswahl
 
-## Analyse (relevanter Ist-Zustand)
-- `application_events.event_type` hat einen CHECK, der **nur** `created, updated, exported, opened, decrypted, deleted` erlaubt. Die Edge-Functions `send-application-email` und `send-whatsapp-summary` versuchen bereits `emailed` bzw. `whatsapp_sent` einzufügen, aber der Insert schlägt still fehl (try/catch schluckt den CHECK-Fehler). Deshalb existiert bis heute **keine** Audit-Zeile für E-Mail-/WhatsApp-Versand — die geplante Statusanzeige braucht dies als Datenquelle.
-- `applications-api` `list` liefert bisher pro Antrag u. a. `status, pdf_count, source` — aber keine Aggregation über `application_events`.
-- `SendEmailDialog` sendet in `handleSend` alle Gruppen in einer Schleife. Ein einzelnes Nachsenden ist nur möglich, indem man alle anderen Gruppen manuell deaktiviert.
+Ziel: Auf `novitas-bkk.de/formulare/kundenservice?...&f.send.mitarbeiter=1393` per Ein-Klick alle Pflichtfelder + Kontakt/AG/Bank ausfüllen, parallel im eigenen Antrag befüllen; einzelne Person oder Familienversicherung wählbar; Kinder ≥16 & Ehegatte bei Jobcenter → eigene Mitgliedschaft.
+
+## Umfang der zu befüllenden Felder (extern + intern)
+
+Pflicht (*), zusätzlich immer: KV-Nummer, Familienstand, Telefon, alle Arbeitgeberdaten außer „Beschäftigt seit", Bankverbindung.
+
+Feste Werte:
+- Versicherungsbeginn: 1. des Monats +3 Kalendermonate (heute Referenz-„today")
+- Zuletzt versichert **bis**: letzter Tag des Monats vor Versicherungsbeginn; **vom** bleibt leer
+- Anlass Kassenwechsel: „Ablauf der Bindungsfrist (12 Monate)"
+- Vertriebspartner: „Ich bin Vertriebspartner", Vermittler-ID `011062257459`
+- Familienangehörige-Checkbox „Ja, Fragebogen zusenden": nur wenn Modus = Familienversicherung
+- Status (Ich bin…): einer von `pflichtversicherter_Arbeitnehmer`, `Auszubildender`, `Arbeitslose_r_Jobcenter`, `Arbeitslose_r_AgenturArbeit`
+
+## Arbeitgeber-Logik
+
+- Beschäftigt / Ausbildung → reguläre AG-Daten (Name + Anschrift) aus dem Formular, **ohne** „Beschäftigt seit".
+- Status = **Jobcenter** (kein Arbeitgeber im klassischen Sinne) → das Jobcenter wird als „Arbeitgeber" eingetragen: Name des Jobcenters + vollständige Anschrift (Straße, Hausnr., PLZ, Ort). Gilt für Hauptmitglied wie für jede eigenständige Mitgliedschaft (Ehegatte / Kind ≥16), die selbst Jobcenter-Leistungen bezieht.
+- Status = Agentur für Arbeit → analog Agentur-Adresse als AG-Feld, falls vorhanden; sonst leer lassen.
+- Bei Einzelperson-Modus greift die Logik pro ausgewählter Person unabhängig.
 
 ## Änderungen
 
-### 1) Migration — erlaubte Event-Typen erweitern
-`application_events_event_type_check` neu setzen auf:
-`created, updated, exported, opened, decrypted, deleted, emailed, whatsapp_sent, whatsapp_intake`.
-(`whatsapp_intake` wird bereits von `whatsapp-intake` benutzt — auch legalisieren.)
+### 1. Modus-Umschaltung (Novitas)
+`src/pages/Index.tsx` (Novitas-Zweig): Toggle „Einzelperson" vs. „Familienversicherung". Bei Einzelperson werden Ehegatte/Kinder-Sektionen ausgeblendet; Autofill/Export nutzen nur das Hauptmitglied. Toggle in `FormData` als `novitasMode: 'einzeln' | 'familie'`.
 
-### 2) `supabase/functions/send-application-email/index.ts`
-- Neuen optionalen Payload-Feldern akzeptieren: `person_role` (`"main" | "spouse" | "kind"`), `person_index` (number), `person_label` (string, z. B. „Ehegatte – Mahasen Alhamad").
-- Beim Audit-Insert `meta` erweitern:
-  ```
-  { to_domain, attachments, gmail_id, person_role, person_index, person_label, subject }
-  ```
-- Fehlermeldungen bei Audit-Insert nicht nur `console.error`, sondern auch im Response-Body als optionales `audit_error` zurückgeben (nur zur Diagnose, ändert `ok:true` nicht).
+### 2. Auto-Split bei Jobcenter
+Neuer Helper `src/utils/novitasSplit.ts`: wenn `familie`-Modus und Hauptmitglied-Status = Jobcenter, dann Ehegatte + jedes Kind ≥16 Jahre = **eigene Mitgliedschaft**; Kinder <16 bleiben familienversichert. Verwendet in Antragslisten-Split und im Autofill-Payload.
 
-### 3) `supabase/functions/send-whatsapp-summary/index.ts`
-- Selbe Erweiterung: `person_role`, `person_index`, `person_label` in `meta`.
+### 3. Autofill-Bookmarklet
+Neu: `src/bookmarklets/novitasAutofillSource.ts` (Struktur wie `bigAutofillSource.ts`, Vanilla-JS-IIFE, aus Zwischenablage).
+- Payload-Typ: `novitas-autofill/v1`
+- Selektor-Strategie primär über `name="ng.form0.mitglied.<Feld>"` / `id`-Präfix `novitas-form-*`, Labels als Fallback (wortweises Matching wie im BIG-Bookmarklet)
+- Setter: nativer value-Setter + `input`/`change`/`blur` (Angular-kompatibel)
+- `<select>`: `option value` setzen; Datum als `YYYY-MM-DD`
+- Checkbox „Familienangehörige-Fragebogen": nur bei `mode: 'familie'`
+- Vertriebspartner-Radio „Ich bin Vertriebspartner" + Vermittler-ID `011062257459`
+- Statusfeld inkl. Jobcenter-/Agentur-Optionen
+- Arbeitgeber-Block: bei Jobcenter Jobcenter-Name+Anschrift statt AG-Daten
+- Overlay-Statusmeldung wie bei BIG
 
-### 4) `src/components/SendEmailDialog.tsx`
-- `SendGroup` bekommt Felder `personRole: 'main'|'spouse'|'kind'` und `personIndex?: number`.
-- Neue Helferfunktion `sendGroup(g)` extrahieren, die genau **eine** Gruppe versendet (E-Mail + optional WhatsApp), inkl. Toast + Console-Log.
-- Pro Gruppen-Card im UI einen kleinen Button „Nur diese senden" (rechts oben in der Gruppe) — sendet nur diese Gruppe, lässt den Dialog offen.
-- Bestehender Fuß-Button „Senden" bleibt und iteriert weiterhin alle Gruppen via `sendGroup`.
-- `person_role/index/label` werden bei jedem Aufruf mitgeschickt, damit Audit-Events sauber zugeordnet sind.
+Setup-Seite analog `BigAutofillSetup.tsx` → `NovitasAutofillSetup.tsx`, Route in `App.tsx`.
 
-### 5) `supabase/functions/applications-api/index.ts` (Aktion `list`)
-- Nach dem Laden der Anträge zusätzlich alle `application_events` mit `event_type IN ('emailed','whatsapp_sent')` für diese IDs holen.
-- Pro Antragszeile in der Response ergänzen:
-  - `emailed_at`: letztes `emailed`-Event für die Kombination `(application_id, person_role, person_index)`
-  - `whatsapp_sent_at`: analog
-- Zuordnung:
-  - Hauptantrag-Zeile ⇒ Events mit `meta.person_role='main'` **oder ohne person_role** (Legacy-Fallback).
-  - Sub-Zeile Ehegatte ⇒ `meta.person_role='spouse'`.
-  - Sub-Zeile Kind ⇒ `meta.person_role='kind'` und `meta.person_index = row.person_index`.
+### 4. Copy-Button + JSON-Payload
+`src/components/ApplicationDetailDrawer.tsx`: bei `krankenkasse === 'novitas'` Button „Novitas online ausfüllen" pro Person (Haupt + jede eigene Mitgliedschaft aus Split). Kopiert JSON in Zwischenablage, öffnet Novitas-Formular-URL im neuen Tab.
 
-### 6) `src/components/ApplicationDetailDrawer.tsx` / `src/pages/Applications.tsx`
-- `ApplicationRow` um `emailed_at?: string | null` und `whatsapp_sent_at?: string | null` erweitern.
-- In `Applications.tsx` zwei neue Spalten:
-  - „E-Mail" — grüner Haken + Datum (kurz) wenn `emailed_at`, sonst grauer Strich.
-  - „WhatsApp" — analog aus `whatsapp_sent_at`.
-- Excel-Export ebenfalls um die zwei Felder ergänzen.
-- Im Detail-Drawer im Header eine kleine Info-Zeile: „Zuletzt per E-Mail gesendet: …" bzw. „WhatsApp: …".
+Neue Datei `src/utils/novitasAutofillPayload.ts`: baut `NovitasAutofillPayload` aus `FormData` + gewählter Person inkl. berechneter Daten (Beginn, „bis"), Status-Mapping, AG-Daten (inkl. Jobcenter-Fallback), Bank.
+
+### 5. JSON-Import Beispiel
+`src/components/JsonImportDialog.tsx`: `createNovitasExampleJson()` erweitern um Pflichtfelder + KV-Nr, Familienstand, Telefon, AG-Daten (ohne „Beschäftigt seit"), Bankverbindung, `novitasMode`, Beispielzeile mit Jobcenter als „Arbeitgeber".
 
 ## Technische Details
-- Migration verwendet `ALTER TABLE ... DROP CONSTRAINT` + neuen CHECK. Keine GRANT-Änderung nötig (bestehende Tabelle).
-- `application_events` ist append-only (Trigger vorhanden) — Statusermittlung erfolgt einfach über MAX(created_at) je Kombination.
-- Keine Änderung an Verschlüsselung, RLS oder Formularlogik.
-- WhatsApp-Gruppe (Empfänger) unverändert — nur das Audit wird per Person granularer.
+
+- **Datum-Berechnung**: `getBeginDate` / `getEndDate` aus `dateUtils.ts`.
+- **Status-Ableitung** aus vorhandenem Beschäftigungsstatus (VIACTIV-kompatibel).
+- **Jobcenter-AG-Mapping**: eigene Felder `jobcenterName`, `jobcenterStrasse`, `jobcenterHausnummer`, `jobcenterPlz`, `jobcenterOrt` bereits vorhanden bzw. neu — Payload greift bei Status=Jobcenter darauf zu, sonst auf `arbeitgeber*`-Felder.
+- **Bookmarklet-Build**: bestehende `buildBookmarkletHref`-Logik wiederverwenden.
+- **Keine Persistenz sensibler Daten**: Payload bleibt Clipboard-only.
 
 ## Betroffene Dateien
-- neue Migration (CHECK-Constraint erweitern)
-- `supabase/functions/send-application-email/index.ts`
-- `supabase/functions/send-whatsapp-summary/index.ts`
-- `supabase/functions/applications-api/index.ts`
-- `src/components/SendEmailDialog.tsx`
-- `src/components/ApplicationDetailDrawer.tsx`
-- `src/pages/Applications.tsx`
+- `src/types/form.ts` (`novitasMode`, ggf. Jobcenter-AG-Felder)
+- `src/pages/Index.tsx` (Modus-Toggle Novitas)
+- `src/utils/novitasSplit.ts` (neu)
+- `src/utils/novitasAutofillPayload.ts` (neu)
+- `src/bookmarklets/novitasAutofillSource.ts` (neu)
+- `src/pages/NovitasAutofillSetup.tsx` (neu) + Route in `src/App.tsx`
+- `src/components/ApplicationDetailDrawer.tsx` (Copy-Button pro Person)
+- `src/components/JsonImportDialog.tsx` (Novitas-Beispiel erweitern)
 
 ## Nicht betroffen
-- PDF-Exportlogik, Krankenkassen-Mapping, Import-Dialoge, Formular-Sync-Logik.
+- PDF-Export, RLS, Verschlüsselung, andere Krankenkassen, E-Mail/WhatsApp-Versand.
