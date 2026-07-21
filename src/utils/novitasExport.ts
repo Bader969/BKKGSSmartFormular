@@ -373,20 +373,28 @@ export const exportNovitasFamilienversicherung = async (formData: FormData): Pro
   await ensureSignatureFontReady();
   const _sigs = getAutoSignatures(formData);
   formData = { ...formData, unterschrift: _sigs.member ?? '', unterschriftFamilie: _sigs.family ?? '' };
+  const sanitizedVorname = formData.mitgliedVorname.replace(/[^a-zA-ZäöüÄÖÜß]/g, '_');
+  const sanitizedName = formData.mitgliedName.replace(/[^a-zA-ZäöüÄÖÜß]/g, '_');
+  const isEinzeln = formData.novitasMode === 'einzeln';
+
+  if (isEinzeln) {
+    // Einzelbeitritt — nur Hauptmitglied, kein Kinder-Chunking
+    const pdfBytes = await createNovitasFamilyPDF(formData, []);
+    downloadPDF(pdfBytes, `Novitas_Beitritt_${sanitizedVorname}_${sanitizedName}.pdf`);
+    return;
+  }
+
   const children = formData.kinder;
   const numberOfPDFs = Math.max(1, Math.ceil(children.length / 3));
-  
+
   for (let pdfIndex = 0; pdfIndex < numberOfPDFs; pdfIndex++) {
     const childrenForThisPDF = children.slice(pdfIndex * 3, (pdfIndex + 1) * 3);
     const pdfBytes = await createNovitasFamilyPDF(formData, childrenForThisPDF);
-    
-    const sanitizedVorname = formData.mitgliedVorname.replace(/[^a-zA-ZäöüÄÖÜß]/g, '_');
-    const sanitizedName = formData.mitgliedName.replace(/[^a-zA-ZäöüÄÖÜß]/g, '_');
-    
-    const filename = numberOfPDFs > 1 
+
+    const filename = numberOfPDFs > 1
       ? `Novitas_Familienversicherung_${sanitizedVorname}_${sanitizedName}_Teil${pdfIndex + 1}.pdf`
       : `Novitas_Familienversicherung_${sanitizedVorname}_${sanitizedName}.pdf`;
-    
+
     downloadPDF(pdfBytes, filename);
   }
 };
