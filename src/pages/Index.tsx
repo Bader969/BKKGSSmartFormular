@@ -761,26 +761,6 @@ const Index = () => {
                 <p className="text-xs text-muted-foreground">Das Formular passt sich automatisch an.</p>
               </div>
             </div>
-            {/* Quick-pick chips */}
-            <div className="flex flex-wrap gap-2 mb-3">
-              {KRANKENKASSEN_OPTIONS.map((opt) => {
-                const active = formData.selectedKrankenkasse === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => updateFormData({ selectedKrankenkasse: opt.value as Krankenkasse })}
-                    className={`px-3 py-1.5 rounded-full text-sm border transition-all ${
-                      active
-                        ? 'bg-primary text-primary-foreground border-primary shadow-card'
-                        : 'bg-card text-foreground border-border hover:border-accent hover:text-accent'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
             <Select
               value={formData.selectedKrankenkasse}
               onValueChange={(value) => updateFormData({ selectedKrankenkasse: value as Krankenkasse })}
