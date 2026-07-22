@@ -1,29 +1,29 @@
-# BIG direkt gesund — Mitgliedsfelder in Variante A wiederherstellen
 
 ## Ziel
-In `MemberSection` werden bei `selectedKrankenkasse === 'big_plusbonus'` und **ausgeschalteter** Familienversicherung (Variante A) aktuell viele Felder ausgeblendet (via `isBigMinimal`): Geburtsdatum, Geburtsort/-land, KV-Nummer, Name der Krankenkasse, Familienstand, Telefon, E-Mail sowie der Infoblock „Automatisch ausgefüllte Angaben". Diese Ausblendung war ursprünglich Absicht (siehe Memory `big-direkt-integration`), soll aber jetzt entfernt werden: Auch in Variante A müssen alle relevanten Mitgliedsfelder sichtbar sein — analog zu VIACTIV/DAK/BKK GS.
+Die Seite `/antraege` um zusätzliche Filter (Vertriebspartner, Monat, Zeitraum) und eine fortlaufende Nummerierungsspalte erweitern, die sich nach Filterung dynamisch anpasst.
 
-Novitas BKK bleibt **unangetastet**.
+## Änderungen in `src/pages/Applications.tsx`
 
-## Änderungen
+### 1. Neue Filter oberhalb der Tabelle
+Zusätzlich zu den bestehenden Filtern (Suche, Krankenkasse, Status, Herkunft):
 
-### 1. `src/components/MemberSection.tsx`
-- `isBigMinimal` auf konstant `false` setzen (bzw. Variable entfernen und alle `!isBigMinimal`-Guards auflösen), sodass alle Felder für BIG immer gerendert werden.
-- `bigFull` bleibt für `required`/`validate`-Logik erhalten (Geschlecht, Familienstand Pflichtfelder nur in Variante B) — hier keine Änderung an Pflichtfeld-Logik.
-- Der `isBigMinimal`-Block (Zeilen ~68–82, der aktuell nur Vorname/Name/Adresse für Variante A rendert) wird entfernt; stattdessen fällt Variante A in den regulären Render-Pfad.
+- **Vertriebspartner** (Dropdown): „Alle" + alle in den geladenen Zeilen vorkommenden Vertriebspartner (analog zur bestehenden Krankenkassen-Ableitung).
+- **Monat** (Dropdown): „Alle Monate" + die Liste der Monate, in denen tatsächlich Anträge erstellt wurden (Format `MM.YYYY`, absteigend sortiert). Bezugsdatum: `created_at`.
+- **Zeitraum** (zwei Datumsfelder „Von" / „Bis"): filtert per `created_at`. Beide optional; wenn „Monat" gesetzt ist, wird der Zeitraum-Filter deaktiviert (und umgekehrt), damit sich beide nicht widersprechen.
+- Alle Filter wirken wie die bestehenden nur auf Hauptanträge; Sub-Einträge (Ehegatte/Kinder) folgen automatisch ihrem Elternantrag über die vorhandene `grouped`-Logik.
 
-### 2. `src/pages/Index.tsx` — Validierung
-- Bestehende Ausnahme `formData.selectedKrankenkasse !== 'big_plusbonus'` für `mitgliedGeburtsdatum` (Zeile ~382) beibehalten: Geburtsdatum bleibt in Variante A **optional** (nicht Pflicht), damit das Formular weiterhin ohne Geburtsdatum exportierbar bleibt. Feld ist aber sichtbar und ausfüllbar.
-- Keine Änderung an bestehenden Pflichtfeldregeln (Kontoinhaber, IBAN, Ort, Datum, Unterschrift bleiben Pflicht).
+Der Excel-Export nutzt weiterhin die gefilterte/gruppierte Liste (`grouped`) — keine Änderung nötig, außer neue Nummer-Spalte (siehe unten).
 
-### 3. Trennlogik / Sicherheit
-- Alle Anpassungen sind ausschließlich an `selectedKrankenkasse === 'big_plusbonus'` gebunden. Keine Berührung von Novitas-, VIACTIV-, DAK-, BKK-GS-Zweigen.
-- Kein Export-Code (`bigPlusbonusExport.ts`, `bigFamversExport.ts`) wird geändert — AcroField-Mapping bleibt identisch, die Felder werden bereits korrekt ins PDF geschrieben, falls Werte vorhanden sind.
+### 2. Fortlaufende Nummerierung
+Neue erste Spalte **„Nr."** in der Tabelle:
 
-## Memory-Update nach Umsetzung
-Memory `mem://features/big-direkt-integration` Absatz „Variante A" → Passus „HIDDEN in MemberSection for big_plusbonus …" entfernen und durch „Variante A zeigt vollständige MemberSection wie andere Provider; Geburtsdatum bleibt optional" ersetzen.
+- Nummer wird pro Hauptantrag in der Reihenfolge von `grouped` vergeben (1, 2, 3, …).
+- Sub-Einträge zeigen die Nummer des Elternantrags mit Suffix (z.B. `3.1`, `3.2`), damit die Zuordnung sichtbar bleibt.
+- Bei Filteränderung wird neu von 1 durchnummeriert.
+- Spalte wird auch im Excel-Export als erste Spalte „Nr." mit ausgegeben.
+- Tabellen-`colSpan` der Leer-/Ladezeilen von 13 auf 14 erhöhen.
 
-## Nicht betroffen
-- Novitas BKK (UI + Autofill + Export)
-- BIG Variante B (Familienversicherung) — Verhalten bleibt exakt gleich
-- Alle anderen Kassen
+## Nicht Teil dieses Plans
+- Keine Änderung am Backend / an `applications-api`.
+- Keine Änderung am Datenmodell.
+- Keine Änderung an der Detail-Drawer-Ansicht.
