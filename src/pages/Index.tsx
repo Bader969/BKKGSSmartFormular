@@ -922,27 +922,7 @@ const Index = () => {
                 </div>
               )}
 
-              <div id="sec-mitglied"><MemberSection formData={formData} updateFormData={updateFormData} /></div>
-              
-              {/* BKK GS spezifische Sektionen */}
-              {formData.selectedKrankenkasse === 'bkk_gs' && (
-                <>
-                  {formData.mode === 'familienversicherung_und_rundum' && (
-                    <>
-                      <div id="sec-ehegatte"><SpouseSection formData={formData} updateFormData={updateFormData} /></div>
-                      <div id="sec-kinder"><ChildrenSection formData={formData} updateFormData={updateFormData} /></div>
-                    </>
-                  )}
-                  <div id="sec-rundum"><RundumSicherPaketSection formData={formData} updateFormData={updateFormData} /></div>
-                </>
-              )}
-              
-              {/* VIACTIV-spezifische Sektionen */}
-              {formData.selectedKrankenkasse === 'viactiv' && (
-                <div id="sec-ehegatte"><ViactivSection formData={formData} updateFormData={updateFormData} /></div>
-              )}
-              
-              {/* Novitas BKK spezifische Sektionen */}
+              {/* Novitas: Antragsvariante + Beschäftigungsstatus zuerst abfragen */}
               {formData.selectedKrankenkasse === 'novitas' && (
                 <>
                   <div className="bg-card rounded-2xl shadow-card border border-border/60 p-6 mb-4 animate-fade-in-up">
@@ -1010,33 +990,61 @@ const Index = () => {
                     </div>
                   </div>
                   {(formData.novitasMode ?? 'familie') === 'familie' && (
+                    <div className="bg-card rounded-2xl shadow-card border border-border/60 p-6 mb-4 animate-fade-in-up">
+                      <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <User className="h-5 w-5 text-primary" />
+                        Beschäftigungsstatus Hauptmitglied
+                      </h2>
+                      <FormField
+                        type="select"
+                        id="novitas-hauptmitglied-beschaeftigung"
+                        label="Ich bin ..."
+                        required
+                        value={formData.viactivBeschaeftigung ?? ''}
+                        onChange={(v) => updateFormData({ viactivBeschaeftigung: v as FormData['viactivBeschaeftigung'] })}
+                        options={[
+                          { value: 'beschaeftigt', label: 'Pflichtversicherter Arbeitnehmer' },
+                          { value: 'ausbildung', label: 'Auszubildender' },
+                          { value: 'al_geld_2', label: 'Arbeitslos – Jobcenter (AL-Geld II)' },
+                          { value: 'al_geld_1', label: 'Arbeitslos – Agentur für Arbeit (AL-Geld I)' },
+                        ]}
+                        placeholder="Bitte auswählen"
+                      />
+                      {formData.viactivBeschaeftigung === 'al_geld_2' && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Jobcenter-Regel: Ehegatte und Kinder älter als 15 Jahre erhalten automatisch eine <b>eigene Mitgliedschaft</b> und werden <b>nicht</b> in die Familienversicherungs-PDF eingetragen — sie werden über den Novitas-Online-Antrag (Autofill) übermittelt.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div id="sec-mitglied"><MemberSection formData={formData} updateFormData={updateFormData} /></div>
+              
+              {/* BKK GS spezifische Sektionen */}
+              {formData.selectedKrankenkasse === 'bkk_gs' && (
+                <>
+                  {formData.mode === 'familienversicherung_und_rundum' && (
                     <>
-                      <div className="bg-card rounded-2xl shadow-card border border-border/60 p-6 mb-4 animate-fade-in-up">
-                        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                          <User className="h-5 w-5 text-primary" />
-                          Beschäftigungsstatus Hauptmitglied
-                        </h2>
-                        <FormField
-                          type="select"
-                          id="novitas-hauptmitglied-beschaeftigung"
-                          label="Ich bin ..."
-                          required
-                          value={formData.viactivBeschaeftigung ?? ''}
-                          onChange={(v) => updateFormData({ viactivBeschaeftigung: v as FormData['viactivBeschaeftigung'] })}
-                          options={[
-                            { value: 'beschaeftigt', label: 'Pflichtversicherter Arbeitnehmer' },
-                            { value: 'ausbildung', label: 'Auszubildender' },
-                            { value: 'al_geld_2', label: 'Arbeitslos – Jobcenter (AL-Geld II)' },
-                            { value: 'al_geld_1', label: 'Arbeitslos – Agentur für Arbeit (AL-Geld I)' },
-                          ]}
-                          placeholder="Bitte auswählen"
-                        />
-                        {formData.viactivBeschaeftigung === 'al_geld_2' && (
-                          <p className="text-xs text-muted-foreground mt-2">
-                            Jobcenter-Regel: Ehegatte und Kinder älter als 15 Jahre erhalten automatisch eine <b>eigene Mitgliedschaft</b> und werden <b>nicht</b> in die Familienversicherungs-PDF eingetragen — sie werden über den Novitas-Online-Antrag (Autofill) übermittelt.
-                          </p>
-                        )}
-                      </div>
+                      <div id="sec-ehegatte"><SpouseSection formData={formData} updateFormData={updateFormData} /></div>
+                      <div id="sec-kinder"><ChildrenSection formData={formData} updateFormData={updateFormData} /></div>
+                    </>
+                  )}
+                  <div id="sec-rundum"><RundumSicherPaketSection formData={formData} updateFormData={updateFormData} /></div>
+                </>
+              )}
+              
+              {/* VIACTIV-spezifische Sektionen */}
+              {formData.selectedKrankenkasse === 'viactiv' && (
+                <div id="sec-ehegatte"><ViactivSection formData={formData} updateFormData={updateFormData} /></div>
+              )}
+              
+              {/* Novitas BKK spezifische Sektionen */}
+              {formData.selectedKrankenkasse === 'novitas' && (
+                <>
+                  {(formData.novitasMode ?? 'familie') === 'familie' && (
+                    <>
                       <div id="sec-ehegatte"><SpouseSection formData={formData} updateFormData={updateFormData} /></div>
                       <div id="sec-kinder"><ChildrenSection formData={formData} updateFormData={updateFormData} /></div>
                     </>
