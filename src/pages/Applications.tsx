@@ -25,6 +25,10 @@ export default function Applications() {
   const [kkFilter, setKkFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [vpFilter, setVpFilter] = useState<string>("all");
+  const [monthFilter, setMonthFilter] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
   const [selected, setSelected] = useState<ApplicationRow | null>(null);
 
   const reload = () => {
@@ -45,6 +49,23 @@ export default function Applications() {
     // Status filter applies only to parent entries; sub-entries follow parent.
     if (statusFilter !== "all" && !r.parent_application_id && r.status !== statusFilter) return false;
     if (sourceFilter !== "all" && !r.parent_application_id && (r.source ?? "manual") !== sourceFilter) return false;
+    if (vpFilter !== "all" && !r.parent_application_id && (r.vertriebspartner ?? "") !== vpFilter) return false;
+    if (!r.parent_application_id) {
+      const created = new Date(r.created_at);
+      if (monthFilter !== "all") {
+        const key = `${String(created.getMonth() + 1).padStart(2, "0")}.${created.getFullYear()}`;
+        if (key !== monthFilter) return false;
+      } else {
+        if (dateFrom) {
+          const from = new Date(dateFrom + "T00:00:00");
+          if (created < from) return false;
+        }
+        if (dateTo) {
+          const to = new Date(dateTo + "T23:59:59");
+          if (created > to) return false;
+        }
+      }
+    }
     if (search) {
       const s = search.toLowerCase();
       const haystacks = [
@@ -59,7 +80,7 @@ export default function Applications() {
       if (!haystacks.some((h) => h.toLowerCase().includes(s))) return false;
     }
     return true;
-  }), [rows, kkFilter, statusFilter, sourceFilter, search, emails, displayNames]);
+  }), [rows, kkFilter, statusFilter, sourceFilter, vpFilter, monthFilter, dateFrom, dateTo, search, emails, displayNames]);
 
   // Group sub-entries under their parent, preserving the existing top-level sort order.
   const grouped = useMemo(() => {
@@ -98,9 +119,50 @@ export default function Applications() {
   }, [filtered]);
 
   const kks = Array.from(new Set(rows.map((r) => r.krankenkasse)));
+  const vps = Array.from(new Set(rows.filter((r) => !r.parent_application_id && r.vertriebspartner).map((r) => r.vertriebspartner as string))).sort();
+  const months = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rows) {
+      if (r.parent_application_id) continue;
+      const d = new Date(r.created_at);
+      set.add(`${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`);
+    }
+    return Array.from(set).sort((a, b) => {
+      const [ma, ya] = a.split(".").map(Number);
+      const [mb, yb] = b.split(".").map(Number);
+      return yb - ya || mb - ma;
+    });
+  }, [rows]);
+
+  // Number map: parent → "1", sub → "1.1", "1.2"
+  const numberMap = useMemo(() => {
+    const map = new Map<string, string>();
+    let parentNo = 0;
+    const subCount = new Map<string, number>();
+    for (const r of grouped) {
+      if (!r.parent_application_id) {
+        parentNo += 1;
+        map.set(r.id, String(parentNo));
+      }
+    }
+    for (const r of grouped) {
+      if (r.parent_application_id) {
+        const parentLabel = map.get(r.parent_application_id);
+        if (parentLabel) {
+          const n = (subCount.get(r.parent_application_id) ?? 0) + 1;
+          subCount.set(r.parent_application_id, n);
+          map.set(r.id, `${parentLabel}.${n}`);
+        } else {
+          map.set(r.id, "—");
+        }
+      }
+    }
+    return map;
+  }, [grouped]);
 
   const handleExportXlsx = () => {
     const data = grouped.map((r) => ({
+      "Nr.": numberMap.get(r.id) ?? "",
       Typ: r.parent_application_id
         ? r.person_role === "ehegatte" ? "Ehegatte" : `Kind ${r.person_index ?? ""}`.trim()
         : "Hauptantrag",
@@ -190,6 +252,34 @@ export default function Applications() {
               </SelectContent>
             </Select>
           </div>
+          <div className="w-full md:w-48">
+            <label className="text-xs text-muted-foreground">Vertriebspartner</label>
+            <Select value={vpFilter} onValueChange={setVpFilter}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle</SelectItem>
+                {vps.map((vp) => <SelectItem key={vp} value={vp}>{vp}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full md:w-40">
+            <label className="text-xs text-muted-foreground">Monat</label>
+            <Select value={monthFilter} onValueChange={(v) => { setMonthFilter(v); if (v !== "all") { setDateFrom(""); setDateTo(""); } }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle Monate</SelectItem>
+                {months.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full md:w-40">
+            <label className="text-xs text-muted-foreground">Von</label>
+            <Input type="date" value={dateFrom} disabled={monthFilter !== "all"} onChange={(e) => setDateFrom(e.target.value)} />
+          </div>
+          <div className="w-full md:w-40">
+            <label className="text-xs text-muted-foreground">Bis</label>
+            <Input type="date" value={dateTo} disabled={monthFilter !== "all"} onChange={(e) => setDateTo(e.target.value)} />
+          </div>
           <Button
             variant="outline"
             onClick={handleExportXlsx}
@@ -204,6 +294,7 @@ export default function Applications() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-16">Nr.</TableHead>
                 <TableHead>Typ</TableHead>
                 <TableHead>Krankenkasse</TableHead>
                 <TableHead>Status</TableHead>
@@ -221,10 +312,10 @@ export default function Applications() {
             </TableHeader>
             <TableBody>
               {loading && (
-                <TableRow><TableCell colSpan={13} className="text-center text-muted-foreground py-8">Lädt…</TableCell></TableRow>
+                <TableRow><TableCell colSpan={14} className="text-center text-muted-foreground py-8">Lädt…</TableCell></TableRow>
               )}
               {!loading && grouped.length === 0 && (
-                <TableRow><TableCell colSpan={13} className="text-center text-muted-foreground py-8">
+                <TableRow><TableCell colSpan={14} className="text-center text-muted-foreground py-8">
                   <FileText className="inline h-4 w-4 mr-1" /> Noch keine Anträge gespeichert.
                 </TableCell></TableRow>
               )}
@@ -235,6 +326,7 @@ export default function Applications() {
                   : "Hauptantrag";
                 return (
                 <TableRow key={r.id} className={`cursor-pointer ${isSub ? "bg-muted/30" : ""}`} onClick={() => setSelected(r)}>
+                  <TableCell className="text-muted-foreground text-xs font-mono">{numberMap.get(r.id) ?? ""}</TableCell>
                   <TableCell>
                     <Badge variant={isSub ? "outline" : "secondary"} className="text-xs">{typLabel}</Badge>
                     {!isSub && r.source === "whatsapp" && (
