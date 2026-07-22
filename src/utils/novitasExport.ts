@@ -140,7 +140,8 @@ const fillBasicFields = (
 const fillSpouseFields = (
   formData: FormData,
   helpers: ReturnType<typeof createPDFHelpers>,
-  dates: ReturnType<typeof calculateNovitasDates>
+  dates: ReturnType<typeof calculateNovitasDates>,
+  opts: { forceMitgliedschaft?: boolean } = {}
 ) => {
   const { setTextField, setRadioButton } = helpers;
   const ehegatte = formData.ehegatte;
@@ -189,12 +190,14 @@ const fillSpouseFields = (
     familienversicherung: 'GesetzlichFAMI',
     nicht_gesetzlich: 'NichtGesetzlich'
   };
-  if (ehegatte.bisherigArt && versArtMap[ehegatte.bisherigArt]) {
-    setRadioButton("fna_PartnerVersArt", versArtMap[ehegatte.bisherigArt]);
+  // Jobcenter-Regel: Ehegatte hat eigene Mitgliedschaft → Art immer "Mitgliedschaft"
+  const effectiveArt = opts.forceMitgliedschaft ? 'mitgliedschaft' : ehegatte.bisherigArt;
+  if (effectiveArt && versArtMap[effectiveArt]) {
+    setRadioButton("fna_PartnerVersArt", versArtMap[effectiveArt]);
   }
   
   // If family insurance: sync first/last name from main member
-  if (ehegatte.bisherigArt === 'familienversicherung') {
+  if (effectiveArt === 'familienversicherung') {
     setTextField("famv_vorname_bisher_kv_partner", formData.mitgliedVorname);
     setTextField("famv_name_bisher_kv_partner", formData.mitgliedName);
   }
@@ -320,7 +323,7 @@ const addSignature = async (
 const createNovitasFamilyPDF = async (
   formData: FormData,
   childrenSubset: FamilyMember[],
-  opts: { skipSpouse?: boolean } = {}
+  opts: { skipSpouse?: boolean; spouseForceMitgliedschaft?: boolean } = {}
 ): Promise<Uint8Array> => {
   // Load template
   const templateUrl = '/novitas-familienversicherung.pdf';
@@ -334,7 +337,9 @@ const createNovitasFamilyPDF = async (
   // Fill all fields
   fillBasicFields(formData, helpers, dates);
   if (!opts.skipSpouse) {
-    fillSpouseFields(formData, helpers, dates);
+    fillSpouseFields(formData, helpers, dates, {
+      forceMitgliedschaft: opts.spouseForceMitgliedschaft,
+    });
   }
   
   // Fill children (max 3 per PDF)
@@ -391,7 +396,8 @@ export const exportNovitasFamilienversicherung = async (formData: FormData): Pro
   // Jobcenter-Regel: Ehegatte und Kinder ≥16 mit eigener Mitgliedschaft NICHT in die
   // Familienversicherungs-PDF aufnehmen (die laufen als Novitas-Online-Antrag / Autofill).
   const persons = splitNovitasPersons(formData);
-  const skipSpouse = persons.some(p => p.role === 'ehegatte' && p.ownMembership);
+  // Ehegatte mit eigener Mitgliedschaft bleibt in der FV-PDF, aber Art = "Mitgliedschaft"
+  const spouseForceMitgliedschaft = persons.some(p => p.role === 'ehegatte' && p.ownMembership);
   const childOwnMembershipIdx = new Set<number>();
   persons.forEach(p => {
     if (p.role === 'kind' && p.ownMembership && p.index != null) {
@@ -403,7 +409,7 @@ export const exportNovitasFamilienversicherung = async (formData: FormData): Pro
 
   for (let pdfIndex = 0; pdfIndex < numberOfPDFs; pdfIndex++) {
     const childrenForThisPDF = children.slice(pdfIndex * 3, (pdfIndex + 1) * 3);
-    const pdfBytes = await createNovitasFamilyPDF(formData, childrenForThisPDF, { skipSpouse });
+    const pdfBytes = await createNovitasFamilyPDF(formData, childrenForThisPDF, { spouseForceMitgliedschaft });
 
     const filename = numberOfPDFs > 1
       ? `Novitas_Familienversicherung_${sanitizedVorname}_${sanitizedName}_Teil${pdfIndex + 1}.pdf`
