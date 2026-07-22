@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Bookmark, ExternalLink } from "lucide-react";
-import { buildNovitasBookmarkletHref } from "@/bookmarklets/novitasAutofillSource";
+import { buildNovitasBookmarkletHref, NOVITAS_BOOKMARKLET_VERSION } from "@/bookmarklets/novitasAutofillSource";
 
 export default function NovitasAutofillSetup() {
   const href = buildNovitasBookmarkletHref();
@@ -24,6 +24,10 @@ export default function NovitasAutofillSetup() {
             Um Novitas-BKK-Anträge mit einem Klick online zu übertragen, brauchst du ein
             Lesezeichen. Zieh den Button unten in deine Lesezeichenleiste
             (oder rechtsklicke → „Lesezeichen hinzufügen").
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Aktuelle Version: <b>{NOVITAS_BOOKMARKLET_VERSION}</b>. Wenn rechts im Novitas-Overlay eine ältere
+            oder keine Version steht, das alte Lesezeichen löschen und diesen Button neu in die Lesezeichenleiste ziehen.
           </p>
 
           <div className="mt-6 p-6 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 flex flex-col items-center gap-3">
