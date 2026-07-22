@@ -477,6 +477,10 @@ const Index = () => {
         toast.error('Bitte geben Sie den Geburtsort ein.');
         return;
       }
+      if ((formData.novitasMode ?? 'familie') === 'familie' && !formData.viactivBeschaeftigung) {
+        toast.error('Bitte Beschäftigungsstatus des Hauptmitglieds auswählen.');
+        return;
+      }
       const ag = formData.viactivArbeitgeber;
       if (!ag?.name || !ag?.strasse || !ag?.plz || !ag?.ort || !formData.novitasArbeitsentgelt) {
         toast.error('Bitte Arbeitgeberdaten (Name, Anschrift, monatliches Arbeitsentgelt) vollständig eingeben.');
