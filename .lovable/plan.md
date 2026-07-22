@@ -1,32 +1,33 @@
-## Problem
+## Ziel
+Novitas-Autofill-Bookmarklet und Payload so anpassen, dass nur wirklich relevante Felder gemeldet/befüllt werden und die drei bekannten Bugs (bisherige KK, Anlass, Vermittler-ID, kombinierte Straße+Hausnummer) verschwinden.
 
-Bei Novitas BKK mit `novitasMode = 'einzeln'` (nur Hauptmitglied):
+## Änderungen (nur Novitas BKK)
 
-1. **Betreff** enthält "Familienversicherung", obwohl kein FamVers-Antrag entsteht — `deriveAntragsform` liefert für Novitas immer `'Familienvers.'`.
-2. **WhatsApp** wird übersprungen — der Dateisuch-Prefix ist auf `novitas_familienversicherung` fest verdrahtet; im Einzelmodus soll das PDF `Novitas_Beitritt_…` heißen.
-3. **Stefanie-Vorlage** (Novitas + 400 €-Bonus) erscheint nicht im Textfeld — `setBody` schreibt beim Öffnen den Default-Body, die Bonus-Vorlage wird nur intern beim Senden gesetzt. Für den Nutzer sieht der Body falsch aus und lässt sich nicht editieren.
+### 1) `src/utils/novitasAutofillPayload.ts`
+- Entfernen aus dem Payload-Typ und Aufbau:
+  - `person.geburtsname`
+  - `person.geburtsland`
+  - `person.staatsangehoerigkeit`
+  - `person.rentenversicherungsnummer`
+  - `bank.bic`, `bank.kreditinstitut`
+- Adresse und Arbeitgeber-Adresse als **kombinierter String** ins Payload schreiben:
+  - Neues Feld `adresse.strasseHausnummer = "<strasse> <hausnummer>".trim()`
+  - Neues Feld `arbeitgeber.strasseHausnummer` analog
+  - `strasse` / `hausnummer` einzeln entfallen im Payload
+- Bank vereinfachen auf `{ kontoinhaber, iban }`
 
-## Änderungen
+### 2) `src/bookmarklets/novitasAutofillSource.ts`
+- Sämtliche `fill(...)`- bzw. `selectByValueOrText(...)`-Aufrufe zu den entfernten Feldern (Geburtsname, Staatsangehörigkeit, Geburtsland, Rentenversicherungsnummer, BIC, Kreditinstitut) **komplett entfernen** — damit erscheinen sie weder unter "Nicht gefunden" noch unter "Kein Wert vorhanden".
+- **Bisherige Krankenkasse** (`ng.form0.kv.zuletzt_krankenkasse`): Muster ergänzen um `"zuletzt krankenkasse"`, `"kv zuletzt krankenkasse"`, `"bei der krankenkasse"` und der Fallback-Label-Match auf "bei der krankenkasse" schärfen. Nach erfolgreichem `findField` das eindeutige `name="ng.form0.kv.zuletzt_krankenkasse"` bevorzugen (per direkter `document.querySelector('input[name="ng.form0.kv.zuletzt_krankenkasse"]')` vor der Generic-Suche versuchen).
+- **Anlass Kassenwechsel** (Radio `value="Kuendigung"`, `name="ng.form0.Anlass_Wechsel.anlass"`): direktes `document.querySelector('input[name="ng.form0.Anlass_Wechsel.anlass"][value="Kuendigung"]')` mit anschließendem `.click()` vor dem generischen `selectRadioByValueOrLabel` als Fast-Path einbauen.
+- **Vertriebspartner + Vermittler-ID** (`ng.form0.send.vertriebspartner` = "ja" → dann `ng.form0.send.vermittler_id`): Radio direkt per Selector klicken, kurzes `await new Promise(r=>setTimeout(r,300))` warten, damit das bedingt gerenderte Input erscheint, dann per Selector `input[name="ng.form0.send.vermittler_id"]` mit `011062257459` befüllen.
+- **Adresse Mitglied**: statt getrennt Straße/Hausnummer nur noch `adresse.strasseHausnummer` in das Feld schreiben, das per Selector `input[name="ng.form0.adresse.strasse"]` (Fast-Path) bzw. Muster `"strasse"` gefunden wird. Keinen separaten Hausnummer-Fill mehr.
+- **Adresse Arbeitgeber**: analog `arbeitgeber.strasseHausnummer` in ein Feld schreiben (Fast-Path + Muster `"arbeitgeber strasse"`), separaten AG-Hausnummer-Fill entfernen.
 
-### 1. `src/utils/antragsform.ts`
-- Novitas-Case: bei `novitasMode === 'einzeln'` `'Beitritt'` zurückgeben, sonst weiter `'Familienvers.'`.
+### 3) Keine Änderungen an der UI
+Die deutschen Formularfelder in unserer App bleiben unverändert (Straße/Hausnummer weiterhin getrennt eingegeben) — die Kombination passiert ausschließlich im Payload-Builder für Novitas.
 
-### 2. `src/utils/novitasExport.ts`
-- Dateinamen abhängig vom Modus:
-  - `familie` (Standard): `Novitas_Familienversicherung_{Vorname}_{Name}[_TeilN].pdf` (unverändert)
-  - `einzeln`: `Novitas_Beitritt_{Vorname}_{Name}.pdf` (kein Teil-Split, da nur eine Person)
-- Bei `einzeln` PDF nur einmal generieren (kein Kinder-Chunking).
-
-### 3. `src/components/SendEmailDialog.tsx`
-- **WhatsApp-Lookup** (~Zeile 621): Novitas-Summary matched auf `novitas_familienversicherung` **oder** `novitas_beitritt`. `waFilenameOverride = 'NovitasBKK_Beitritt.pdf'` bleibt.
-- **Stefanie-Vorlage sichtbar machen**: In der `useEffect`-Initialisierung (~Zeile 405) prüfen `formData.selectedKrankenkasse === 'novitas' && formData.novitasBonus400` → `setBody(NOVITAS_BONUS_BODY_TEMPLATE)`. Anschließend darf `mainBodyTpl` schlicht `body || …` verwenden (Bonus-Sonderfall entfernen), damit der Nutzer die Vorlage im Textarea sieht/editieren kann und der versendete Text mit dem Angezeigten übereinstimmt.
-- **Hauptmitglied-Anhänge (~Zeile 218)**: zusätzlich Prefix `novitas_beitritt` als Hauptmitglied-Datei erkennen (damit der Anhang der Einzelperson-Gruppe zugeordnet wird).
-
-### 4. Keine Änderungen an
-- `novitasSplit.ts` (liefert im Einzelmodus bereits nur `main`).
-- Bookmarklet/Extraktion.
-- `SEND_TO_WHATSAPP`-Default.
-
-## Technischer Hinweis
-
-Das Novitas-Antragsformular (`novitas-familienversicherung.pdf`) deckt sowohl Einzelbeitritt als auch Familienversicherung ab. Für den Einzelmodus wird also dasselbe PDF-Template verwendet, nur Dateiname + Betreff-Label ändern sich. Für den Bonus-Fall wird der WhatsApp-Dateiname weiter fix zu `NovitasBKK_Beitritt.pdf` überschrieben.
+## Nicht Teil dieses Plans
+- Änderungen an anderen Kassen (BIG, VIACTIV, DAK, BKK GS)
+- Änderungen an Extraktion / KI-Mapping
+- Änderungen an E-Mail-/WhatsApp-Versand

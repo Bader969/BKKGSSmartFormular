@@ -184,6 +184,21 @@ const BOOKMARKLET_BODY = /* js */ `
   var bank = data.bank || {};
   var daten = data.daten || {};
 
+  function fillByName(nameSel, value, label){
+    if (value == null || value === "") return { filled:false, skipped:true, label: label };
+    var el = document.querySelector('input[name="'+nameSel+'"], textarea[name="'+nameSel+'"], select[name="'+nameSel+'"]');
+    if (!el) return null; // signal fallback
+    var ok = setNative(el, value);
+    return { filled: ok, label: label };
+  }
+  function clickRadioByName(nameSel, value, label){
+    var el = document.querySelector('input[type="radio"][name="'+nameSel+'"][value="'+value+'"]');
+    if (!el) return null;
+    if (!el.checked) el.click();
+    return { filled:true, label: label };
+  }
+  function wait(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+
   // 1) Versicherungsbeginn (Datum)
   results.push(fill(["Beginndatum","versicherungsbeginn","gewuenschter versicherungsbeginn"], daten.beginn, "Versicherungsbeginn"));
 
@@ -223,8 +238,10 @@ const BOOKMARKLET_BODY = /* js */ `
   results.push(selectByValueOrText(["familienstand"], p.familienstand, famTexts, "Familienstand"));
 
   // Adresse — Novitas nutzt EIN Feld "Straße und Hausnummer"
-  var strasseKombiniert = [addr.strasse, addr.hausnummer].filter(Boolean).join(" ").trim();
-  results.push(fill(["strasse","straße"], strasseKombiniert, "Straße und Hausnummer"));
+  var addrCombined = addr.strasseHausnummer || "";
+  var addrRes = fillByName("ng.form0.adresse.strasse", addrCombined, "Straße und Hausnummer");
+  if (!addrRes) addrRes = fill(["adresse strasse","strasse","straße"], addrCombined, "Straße und Hausnummer");
+  results.push(addrRes);
   results.push(fill(["plz","postleitzahl"], addr.plz, "PLZ"));
   results.push(fill(["wohnort","ort","stadt"], addr.ort, "Wohnort"));
 
@@ -232,25 +249,32 @@ const BOOKMARKLET_BODY = /* js */ `
   results.push(fill(["telefon","rufnummer","mobil","handy"], data.telefon, "Telefon"));
   results.push(fill(["email","e-mail"], data.email, "E-Mail"));
 
-  // KV-Nr / bisherige Krankenkasse
+  // KV-Nr
   results.push(fill(["versichertennummer","krankenversichertennummer","kvnr","kv nummer"], p.kvNummer, "Versichertennummer"));
-  results.push(fill(["kv zuletzt krankenkasse","zuletzt krankenkasse","bisherige krankenkasse","aktuelle krankenkasse","name krankenkasse","vorherige krankenkasse","bei der krankenkasse"], p.bisherigeKrankenkasse, "Bisherige Krankenkasse"));
+  // Bisherige Krankenkasse — Novitas: name="ng.form0.kv.zuletzt_krankenkasse"
+  var kkRes = fillByName("ng.form0.kv.zuletzt_krankenkasse", p.bisherigeKrankenkasse, "Bisherige Krankenkasse");
+  if (!kkRes) kkRes = fill(["kv zuletzt krankenkasse","zuletzt krankenkasse","bisherige krankenkasse","bei der krankenkasse"], p.bisherigeKrankenkasse, "Bisherige Krankenkasse");
+  results.push(kkRes);
 
   // Zuletzt versichert bis
   results.push(fill(["zuletzt versichert bis","versichert bis","bis"], daten.zuletztVersichertBis, "Zuletzt versichert bis"));
 
-  // Anlass Kassenwechsel — Radio, value="Kuendigung", Label "Ablauf der Bindungsfrist (12 Monate)"
-  results.push(selectRadioByValueOrLabel(
+  // Anlass Kassenwechsel — Radio, value="Kuendigung"
+  var anlassRes = clickRadioByName("ng.form0.Anlass_Wechsel.anlass", "Kuendigung", "Anlass Kassenwechsel");
+  if (!anlassRes) anlassRes = selectRadioByValueOrLabel(
     ["anlass wechsel","anlass","kassenwechsel","grund"],
     ["Kuendigung"],
     ["ablauf der bindungsfrist","bindungsfrist"],
     "Anlass Kassenwechsel"
-  ));
+  );
+  results.push(anlassRes);
 
   // Arbeitgeber (bei Jobcenter: Jobcenter-Name+Anschrift)
   results.push(fill(["arbeitgeber name","name arbeitgeber","name des arbeitgebers","arbeitgeber"], ag.name, "Arbeitgeber Name"));
-  var agStrasseKombi = [ag.strasse, ag.hausnummer].filter(Boolean).join(" ").trim();
-  results.push(fill(["arbeitgeber strasse","arbeitgeber straße","strasse arbeitgeber","arbeitgeber anschrift"], agStrasseKombi, "Arbeitgeber Straße und Hausnummer"));
+  var agCombined = ag.strasseHausnummer || "";
+  var agAddrRes = fillByName("ng.form0.arbeitgeber.strasse", agCombined, "Arbeitgeber Straße und Hausnummer");
+  if (!agAddrRes) agAddrRes = fill(["arbeitgeber strasse","arbeitgeber straße","strasse arbeitgeber","arbeitgeber anschrift"], agCombined, "Arbeitgeber Straße und Hausnummer");
+  results.push(agAddrRes);
   results.push(fill(["arbeitgeber plz","plz arbeitgeber"], ag.plz, "Arbeitgeber PLZ"));
   results.push(fill(["arbeitgeber ort","ort arbeitgeber","stadt arbeitgeber"], ag.ort, "Arbeitgeber Ort"));
   // Arbeitsentgelt ist auf Novitas ein Dropdown mit festen Werten
@@ -268,16 +292,15 @@ const BOOKMARKLET_BODY = /* js */ `
   results.push(fill(["kontoinhaber"], bank.kontoinhaber, "Kontoinhaber"));
   results.push(fill(["iban"], bank.iban, "IBAN"));
 
-  // Vertriebspartner: "Ich bin Vertriebspartner" + Vermittler-ID
-  var vpRes = selectRadioByValueOrLabel(
-    ["send vertriebspartner","vertriebspartner"],
-    ["ja"],
-    ["ich bin vertriebspartner","vertriebspartner"],
-    "Vertriebspartner (Radio)"
-  );
+  // Vertriebspartner: "Ich bin Vertriebspartner" (ja) + Vermittler-ID
+  var vpRes = clickRadioByName("ng.form0.send.vertriebspartner", "ja", "Vertriebspartner (Radio)");
+  if (!vpRes) vpRes = selectRadioByValueOrLabel(["send vertriebspartner","vertriebspartner"], ["ja"], ["ich bin vertriebspartner","vertriebspartner"], "Vertriebspartner (Radio)");
   results.push(vpRes);
   if (data.vertriebspartner && data.vertriebspartner.vermittlerId){
-    results.push(fill(["send vermittler id","vermittler id","vermittlerid","vermittler nummer","vermittler nr"], data.vertriebspartner.vermittlerId, "Vermittler-ID"));
+    await wait(350);
+    var vmRes = fillByName("ng.form0.send.vermittler_id", data.vertriebspartner.vermittlerId, "Vermittler-ID");
+    if (!vmRes) vmRes = fill(["send vermittler id","vermittler id","vermittlerid","vermittler nummer","vermittler nr"], data.vertriebspartner.vermittlerId, "Vermittler-ID");
+    results.push(vmRes);
   }
 
   // Familienangehörige-Fragebogen (nur bei mode=familie)
