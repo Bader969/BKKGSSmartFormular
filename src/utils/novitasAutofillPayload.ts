@@ -10,30 +10,25 @@ export interface NovitasAutofillPayload {
     label: string;
     vorname: string;
     nachname: string;
-    geburtsname: string;
     geburtsdatum: string; // YYYY-MM-DD
     geburtsort: string;
-    geburtsland: string;
-    staatsangehoerigkeit: string;
     geschlecht: 'maennlich' | 'weiblich' | 'unbestimmt' | 'divers' | '';
     familienstand: string;
     kvNummer: string;
-    rentenversicherungsnummer: string;
     bisherigeKrankenkasse: string;
     status: NovitasStatus;
   };
-  adresse: { strasse: string; hausnummer: string; plz: string; ort: string };
+  adresse: { strasseHausnummer: string; plz: string; ort: string };
   telefon: string;
   email: string;
   arbeitgeber: {
     name: string;
-    strasse: string;
-    hausnummer: string;
+    strasseHausnummer: string;
     plz: string;
     ort: string;
     arbeitsentgeltMonatlich: string;
   };
-  bank: { kontoinhaber: string; iban: string; bic: string; kreditinstitut: string };
+  bank: { kontoinhaber: string; iban: string };
   daten: {
     beginn: string;        // YYYY-MM-DD (01. des Monats +3)
     zuletztVersichertBis: string; // YYYY-MM-DD (Tag davor)
@@ -85,14 +80,11 @@ export function buildNovitasAutofillPayload(
   let nachname = formData.mitgliedName;
   let geburtsdatum = formData.mitgliedGeburtsdatum;
   let geburtsort = formData.mitgliedGeburtsort;
-  let geburtsland = formData.mitgliedGeburtsland;
-  let staat = formData.viactivStaatsangehoerigkeit || 'deutsch';
   let geschlecht = geschlechtFromString(formData.viactivGeschlecht || formData.bigGeschlecht);
   let familienstand = formData.familienstand;
   let kvNummer = formData.mitgliedKvNummer;
   let bisherigeKrankenkasse = formData.mitgliedKrankenkasse;
   let beschaeftigung: FormData['viactivBeschaeftigung'] | FamilyMember['beschaeftigung'] = formData.viactivBeschaeftigung;
-  let rentenversicherungsnummer = formData.mitgliedRentenversicherungsnummer || '';
   // Sub-Person-spezifische AG/Bank/Arbeitsentgelt-Fallbacks
   let personAg: typeof formData.viactivArbeitgeber | undefined;
   let personArbeitsentgelt: string | undefined;
@@ -104,14 +96,11 @@ export function buildNovitasAutofillPayload(
     nachname = eh.name;
     geburtsdatum = eh.geburtsdatum;
     geburtsort = eh.geburtsort;
-    geburtsland = eh.geburtsland;
-    staat = eh.staatsangehoerigkeit || staat;
     geschlecht = geschlechtFromString(eh.geschlecht);
     familienstand = 'verheiratet';
     kvNummer = ''; // Ehegatte hat i.d.R. eigene KVNR nicht in Novitas-Feldern
     bisherigeKrankenkasse = eh.bisherigBestandBei || formData.mitgliedKrankenkasse;
     beschaeftigung = eh.beschaeftigung;
-    rentenversicherungsnummer = eh.rentenversicherungsnummer || '';
     personAg = eh.novitasArbeitgeber;
     personArbeitsentgelt = eh.novitasArbeitsentgelt;
     personBank = eh.novitasBank;
@@ -122,14 +111,11 @@ export function buildNovitasAutofillPayload(
       nachname = k.name;
       geburtsdatum = k.geburtsdatum;
       geburtsort = k.geburtsort;
-      geburtsland = k.geburtsland;
-      staat = k.staatsangehoerigkeit || staat;
       geschlecht = geschlechtFromString(k.geschlecht);
       familienstand = 'ledig';
       kvNummer = '';
       bisherigeKrankenkasse = k.bisherigBestandBei || formData.mitgliedKrankenkasse;
       beschaeftigung = k.beschaeftigung;
-      rentenversicherungsnummer = k.rentenversicherungsnummer || '';
       personAg = k.novitasArbeitgeber;
       personArbeitsentgelt = k.novitasArbeitsentgelt;
       personBank = k.novitasBank;
@@ -141,10 +127,10 @@ export function buildNovitasAutofillPayload(
   // Arbeitgeber: bei Sub-Person eigenen AG bevorzugen, sonst Hauptmitglied.
   const ag = personAg || formData.viactivArbeitgeber || { name: '', strasse: '', hausnummer: '', plz: '', ort: '', beschaeftigtSeit: '' };
   const arbeitsentgeltMonatlich = personArbeitsentgelt ?? formData.novitasArbeitsentgelt ?? '';
+  const combine = (s?: string, h?: string) => [s || '', h || ''].map(x => x.trim()).filter(Boolean).join(' ');
   let arbeitgeber = {
     name: ag.name || '',
-    strasse: ag.strasse || '',
-    hausnummer: ag.hausnummer || '',
+    strasseHausnummer: combine(ag.strasse, ag.hausnummer),
     plz: ag.plz || '',
     ort: ag.ort || '',
     arbeitsentgeltMonatlich,
@@ -152,8 +138,7 @@ export function buildNovitasAutofillPayload(
   if (status === 'Arbeitslose_r_Jobcenter') {
     arbeitgeber = {
       name: ag.name || 'Jobcenter',
-      strasse: ag.strasse || '',
-      hausnummer: ag.hausnummer || '',
+      strasseHausnummer: combine(ag.strasse, ag.hausnummer),
       plz: ag.plz || formData.mitgliedPlz || '',
       ort: ag.ort || formData.ort || '',
       arbeitsentgeltMonatlich,
@@ -161,8 +146,7 @@ export function buildNovitasAutofillPayload(
   } else if (status === 'Arbeitslose_r_AgenturArbeit') {
     arbeitgeber = {
       name: ag.name || 'Agentur für Arbeit',
-      strasse: ag.strasse || '',
-      hausnummer: ag.hausnummer || '',
+      strasseHausnummer: combine(ag.strasse, ag.hausnummer),
       plz: ag.plz || formData.mitgliedPlz || '',
       ort: ag.ort || formData.ort || '',
       arbeitsentgeltMonatlich,
@@ -173,8 +157,6 @@ export function buildNovitasAutofillPayload(
   const bank = {
     kontoinhaber: personBank?.kontoinhaber || formData.bigBank?.kontoinhaber || formData.rundumSicherPaket?.kontoinhaber || '',
     iban: personBank?.iban || formData.bigBank?.iban || formData.rundumSicherPaket?.iban || '',
-    bic: formData.bigBank?.bic || '',
-    kreditinstitut: formData.bigBank?.kreditinstitut || '',
   };
 
   return {
@@ -185,21 +167,16 @@ export function buildNovitasAutofillPayload(
       label: person.label,
       vorname: vorname || '',
       nachname: nachname || '',
-      geburtsname: nachname || '', // Vorgabe: Geburtsname = Nachname
       geburtsdatum: toIso(geburtsdatum || ''),
       geburtsort: geburtsort || '',
-      geburtsland: geburtsland || '',
-      staatsangehoerigkeit: staat || '',
       geschlecht,
       familienstand: familienstand || '',
       kvNummer: kvNummer || '',
-      rentenversicherungsnummer: rentenversicherungsnummer || '',
       bisherigeKrankenkasse: bisherigeKrankenkasse || '',
       status,
     },
     adresse: {
-      strasse: formData.mitgliedStrasse || '',
-      hausnummer: formData.mitgliedHausnummer || '',
+      strasseHausnummer: combine(formData.mitgliedStrasse, formData.mitgliedHausnummer),
       plz: formData.mitgliedPlz || '',
       ort: formData.ort || '',
     },
