@@ -1,33 +1,50 @@
 ## Ziel
-Novitas-Autofill-Bookmarklet und Payload so anpassen, dass nur wirklich relevante Felder gemeldet/befüllt werden und die drei bekannten Bugs (bisherige KK, Anlass, Vermittler-ID, kombinierte Straße+Hausnummer) verschwinden.
 
-## Änderungen (nur Novitas BKK)
+Bei Novitas BKK soll — analog zur bereits vorhandenen Split-Logik in `novitasSplit.ts` — der **Beschäftigungsstatus** direkt im UI wählbar sein, und wenn das Hauptmitglied „Arbeitslos (Jobcenter)" ist, dürfen **Ehegatte** und **Kinder älter als 15 Jahre** (Alter ≥ 16) **nicht** mehr in den Familienversicherungs-PDF-Antrag geschrieben werden — sie bekommen stattdessen jeweils einen eigenen Novitas-Online-Antrag via Autofill.
 
-### 1) `src/utils/novitasAutofillPayload.ts`
-- Entfernen aus dem Payload-Typ und Aufbau:
-  - `person.geburtsname`
-  - `person.geburtsland`
-  - `person.staatsangehoerigkeit`
-  - `person.rentenversicherungsnummer`
-  - `bank.bic`, `bank.kreditinstitut`
-- Adresse und Arbeitgeber-Adresse als **kombinierter String** ins Payload schreiben:
-  - Neues Feld `adresse.strasseHausnummer = "<strasse> <hausnummer>".trim()`
-  - Neues Feld `arbeitgeber.strasseHausnummer` analog
-  - `strasse` / `hausnummer` einzeln entfallen im Payload
-- Bank vereinfachen auf `{ kontoinhaber, iban }`
+## Aktueller Stand (verifiziert)
 
-### 2) `src/bookmarklets/novitasAutofillSource.ts`
-- Sämtliche `fill(...)`- bzw. `selectByValueOrText(...)`-Aufrufe zu den entfernten Feldern (Geburtsname, Staatsangehörigkeit, Geburtsland, Rentenversicherungsnummer, BIC, Kreditinstitut) **komplett entfernen** — damit erscheinen sie weder unter "Nicht gefunden" noch unter "Kein Wert vorhanden".
-- **Bisherige Krankenkasse** (`ng.form0.kv.zuletzt_krankenkasse`): Muster ergänzen um `"zuletzt krankenkasse"`, `"kv zuletzt krankenkasse"`, `"bei der krankenkasse"` und der Fallback-Label-Match auf "bei der krankenkasse" schärfen. Nach erfolgreichem `findField` das eindeutige `name="ng.form0.kv.zuletzt_krankenkasse"` bevorzugen (per direkter `document.querySelector('input[name="ng.form0.kv.zuletzt_krankenkasse"]')` vor der Generic-Suche versuchen).
-- **Anlass Kassenwechsel** (Radio `value="Kuendigung"`, `name="ng.form0.Anlass_Wechsel.anlass"`): direktes `document.querySelector('input[name="ng.form0.Anlass_Wechsel.anlass"][value="Kuendigung"]')` mit anschließendem `.click()` vor dem generischen `selectRadioByValueOrLabel` als Fast-Path einbauen.
-- **Vertriebspartner + Vermittler-ID** (`ng.form0.send.vertriebspartner` = "ja" → dann `ng.form0.send.vermittler_id`): Radio direkt per Selector klicken, kurzes `await new Promise(r=>setTimeout(r,300))` warten, damit das bedingt gerenderte Input erscheint, dann per Selector `input[name="ng.form0.send.vermittler_id"]` mit `011062257459` befüllen.
-- **Adresse Mitglied**: statt getrennt Straße/Hausnummer nur noch `adresse.strasseHausnummer` in das Feld schreiben, das per Selector `input[name="ng.form0.adresse.strasse"]` (Fast-Path) bzw. Muster `"strasse"` gefunden wird. Keinen separaten Hausnummer-Fill mehr.
-- **Adresse Arbeitgeber**: analog `arbeitgeber.strasseHausnummer` in ein Feld schreiben (Fast-Path + Muster `"arbeitgeber strasse"`), separaten AG-Hausnummer-Fill entfernen.
+- `splitNovitasPersons` (in `src/utils/novitasSplit.ts`) markiert Ehegatte + Kinder ≥ 16 bereits als `ownMembership: true`, wenn `deriveNovitasStatus(formData.viactivBeschaeftigung) === 'Arbeitslose_r_Jobcenter'`.
+- Für jede dieser Personen wird in `src/pages/Index.tsx` bereits ein eigener `NovitasEmployerBank`-Block gerendert und ein eigener Autofill-Payload gebaut (`novitasAutofillPayload.ts`).
+- **Aber:** Der Beschäftigungsstatus des Hauptmitglieds wird bei Novitas nirgends im UI abgefragt (das Feld `viactivBeschaeftigung` wird nur in `ViactivSection` gerendert, die nur bei Viactiv erscheint). Bei Novitas bleibt der Wert dadurch leer, `deriveNovitasStatus` liefert `''`, und die Split-Regel greift nie.
+- **Und:** `src/utils/novitasExport.ts` schreibt Ehegatte und alle Kinder unabhängig von `ownMembership` in die Familienversicherungs-PDF — Kinder ≥ 16 und der Ehegatte tauchen aktuell doppelt auf (im FV-PDF *und* im eigenen Online-Antrag).
 
-### 3) Keine Änderungen an der UI
-Die deutschen Formularfelder in unserer App bleiben unverändert (Straße/Hausnummer weiterhin getrennt eingegeben) — die Kombination passiert ausschließlich im Payload-Builder für Novitas.
+## Änderungen
+
+### 1) Neue UI-Sektion für Novitas: Beschäftigungsstatus Hauptmitglied
+`src/pages/Index.tsx` — im Novitas-Block (dort wo Modus/Bonus/`NovitasEmployerBank` gerendert werden) einen `FormField type="select"` einfügen:
+- Label: „Beschäftigungsstatus Hauptmitglied"
+- Optionen: `beschaeftigt` (Pflichtversicherter Arbeitnehmer), `ausbildung` (Auszubildender), `al_geld_2` (Arbeitslos – Jobcenter), `al_geld_1` (Arbeitslos – Agentur für Arbeit)
+- Bindet an das bestehende Feld `formData.viactivBeschaeftigung` (Feld wird also für Novitas wiederverwendet — keine neue Form-Property nötig).
+- Nur sichtbar wenn `selectedKrankenkasse === 'novitas'` **und** `novitasMode === 'familie'` (bei Einzelbeitritt kein Split-Effekt).
+
+### 2) Beschäftigungsstatus pro Kind ≥ 15 im Novitas-Familienmodus
+`src/components/ChildrenSection.tsx` — den bereits existierenden Beschäftigungs-Selector (aktuell nur für BIG) zusätzlich rendern, wenn `selectedKrankenkasse === 'novitas'`, `novitasMode === 'familie'`, Hauptmitglied ist Jobcenter (`viactivBeschaeftigung === 'al_geld_2'`) und Alter des Kindes ≥ 16. Darunter ein Hinweistext:
+- „Kind ≥ 16 bei Jobcenter-Hauptversichertem → eigene Mitgliedschaft, wird über den Novitas-Online-Antrag ausgefüllt (nicht in die Familienversicherung)."
+
+### 3) Ehegatte-Hinweis in `SpouseSection`
+Bei Novitas + `viactivBeschaeftigung === 'al_geld_2'` einen analogen Hinweis unter dem bestehenden Ehegatte-Beschäftigungsfeld anzeigen: „Eigene Mitgliedschaft (Jobcenter-Regel) — wird nicht in die Familienversicherungs-PDF aufgenommen."
+
+### 4) `novitasExport.ts` — eigene Mitgliedschaften aus FV-PDF ausschließen
+`src/utils/novitasExport.ts` in der Familienversicherungs-Erzeugung:
+- `splitNovitasPersons(formData)` aufrufen.
+- Setzen des Ehegatten-Blocks überspringen, wenn der Ehegatte in der Split-Liste `ownMembership: true` hat.
+- Kinderliste vor dem 3er-Chunking filtern: nur Kinder behalten, deren zugehöriger `NovitasPerson` **nicht** `ownMembership: true` ist. Bleiben 0 Kinder und Ehegatte ist ausgeschlossen, weiterhin genau 1 PDF (nur Hauptmitglied) erzeugen.
+
+### 5) Validierung / Toasts
+`src/pages/Index.tsx` Novitas-Validierung erweitern:
+- Wenn `novitasMode === 'familie'`: `viactivBeschaeftigung` ist Pflichtfeld.
+- Bereits vorhandene Pflichtprüfung für Arbeitgeber+Arbeitsentgelt+Bank läuft weiter pro `ownMembership`-Person (bereits durch das dynamische Rendering abgedeckt).
+
+## Technische Details
+
+- Kein neues Schema/Feld — `viactivBeschaeftigung` wird bereits von `deriveNovitasStatus` gelesen, deshalb kein Rename.
+- Alterslogik bleibt bei ≥ 16 (= „über 15 Jahre alt"), Quelle ist die bestehende `ageInYears`-Funktion in `novitasSplit.ts`.
+- Keine Änderungen an `novitasAutofillPayload.ts` oder am Bookmarklet nötig — die Person-Splitting-Logik dort greift automatisch, sobald der Status gesetzt ist.
+- Auditlog: `viactivBeschaeftigung` ist bereits Teil von `FormData` und wird beim Speichern mitgeschrieben — keine Zusatzarbeit nötig.
 
 ## Nicht Teil dieses Plans
-- Änderungen an anderen Kassen (BIG, VIACTIV, DAK, BKK GS)
-- Änderungen an Extraktion / KI-Mapping
-- Änderungen an E-Mail-/WhatsApp-Versand
+
+- Änderungen an anderen Kassen (BIG, VIACTIV, DAK, BKK GS).
+- Umbenennung `viactivBeschaeftigung` → generisches Feld (aus Konsistenzgründen und um Migrationen zu vermeiden bewusst weggelassen).
+- Änderungen am WhatsApp-/E-Mail-Versand.
