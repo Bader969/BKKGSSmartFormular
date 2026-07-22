@@ -140,7 +140,8 @@ const fillBasicFields = (
 const fillSpouseFields = (
   formData: FormData,
   helpers: ReturnType<typeof createPDFHelpers>,
-  dates: ReturnType<typeof calculateNovitasDates>
+  dates: ReturnType<typeof calculateNovitasDates>,
+  opts: { forceMitgliedschaft?: boolean } = {}
 ) => {
   const { setTextField, setRadioButton } = helpers;
   const ehegatte = formData.ehegatte;
@@ -189,12 +190,14 @@ const fillSpouseFields = (
     familienversicherung: 'GesetzlichFAMI',
     nicht_gesetzlich: 'NichtGesetzlich'
   };
-  if (ehegatte.bisherigArt && versArtMap[ehegatte.bisherigArt]) {
-    setRadioButton("fna_PartnerVersArt", versArtMap[ehegatte.bisherigArt]);
+  // Jobcenter-Regel: Ehegatte hat eigene Mitgliedschaft → Art immer "Mitgliedschaft"
+  const effectiveArt = opts.forceMitgliedschaft ? 'mitgliedschaft' : ehegatte.bisherigArt;
+  if (effectiveArt && versArtMap[effectiveArt]) {
+    setRadioButton("fna_PartnerVersArt", versArtMap[effectiveArt]);
   }
   
   // If family insurance: sync first/last name from main member
-  if (ehegatte.bisherigArt === 'familienversicherung') {
+  if (effectiveArt === 'familienversicherung') {
     setTextField("famv_vorname_bisher_kv_partner", formData.mitgliedVorname);
     setTextField("famv_name_bisher_kv_partner", formData.mitgliedName);
   }
