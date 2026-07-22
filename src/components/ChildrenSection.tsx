@@ -110,6 +110,40 @@ export const ChildrenSection: React.FC<ChildrenSectionProps> = ({ formData, upda
                 );
               })()}
 
+              {/* Novitas: Jobcenter-Regel für Kinder älter als 15 */}
+              {formData.selectedKrankenkasse === 'novitas'
+                && (formData.novitasMode ?? 'familie') === 'familie'
+                && formData.viactivBeschaeftigung === 'al_geld_2'
+                && (() => {
+                  const age = parseAge(kind.geburtsdatum);
+                  const ownMembership = age !== null && age >= 16;
+                  return (
+                    <div className="mt-3 p-3 rounded-lg border bg-card/50 space-y-2">
+                      {ownMembership && (
+                        <FormField
+                          type="select"
+                          id={`kind-${index}-novitas-beschaeftigung`}
+                          label="Beschäftigungsstatus (Kind älter als 15)"
+                          value={kind.beschaeftigung}
+                          onChange={(v) => updateKind(index, { beschaeftigung: v as FamilyMember['beschaeftigung'] })}
+                          options={[
+                            { value: 'beschaeftigt', label: 'Pflichtversicherter Arbeitnehmer' },
+                            { value: 'ausbildung', label: 'Auszubildender' },
+                            { value: 'al_geld_2', label: 'Arbeitslos – Jobcenter (AL-Geld II)' },
+                            { value: 'al_geld_1', label: 'Arbeitslos – Agentur für Arbeit (AL-Geld I)' },
+                          ]}
+                          placeholder="Bitte auswählen"
+                        />
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {ownMembership
+                          ? '✓ Kind älter als 15 bei Jobcenter-Hauptversichertem → eigene Mitgliedschaft, wird über den Novitas-Online-Antrag (Autofill) ausgefüllt und nicht in die Familienversicherungs-PDF eingetragen.'
+                          : 'Kind bis 15 Jahre → wird in der Familienversicherungs-PDF eingetragen.'}
+                      </p>
+                    </div>
+                  );
+                })()}
+
               {/* Eigener Plusbonus-Block sobald Kind eigene Mitgliedschaft hat */}
               {formData.selectedKrankenkasse === 'big_plusbonus'
                 && formData.bigFamilienversicherung

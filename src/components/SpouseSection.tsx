@@ -235,6 +235,17 @@ export const SpouseSection: React.FC<SpouseSectionProps> = ({ formData, updateFo
             </div>
           )}
 
+          {/* Novitas: Jobcenter-Hinweis für Ehegatten */}
+          {formData.selectedKrankenkasse === 'novitas'
+            && (formData.novitasMode ?? 'familie') === 'familie'
+            && formData.viactivBeschaeftigung === 'al_geld_2' && (
+            <div className="mt-4 pt-4 border-t border-secondary/20">
+              <p className="text-xs text-muted-foreground">
+                Jobcenter-Regel: Der Ehegatte erhält eine <b>eigene Mitgliedschaft</b> und wird <b>nicht</b> in die Familienversicherungs-PDF aufgenommen — Datenübermittlung über den Novitas-Online-Antrag (Autofill).
+              </p>
+            </div>
+          )}
+
           {/* BIG Variante B: Eigener Plusbonus-Block sobald eigene Mitgliedschaft aktiv */}
           {formData.selectedKrankenkasse === 'big_plusbonus'
             && formData.bigFamilienversicherung

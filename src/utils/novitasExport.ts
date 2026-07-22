@@ -2,6 +2,7 @@ import { PDFDocument, rgb } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
 import { getCountryName, getNationalityName } from "./countries";
 import { getAutoSignatures, ensureSignatureFontReady } from "./generateSignature";
+import { splitNovitasPersons } from "./novitasSplit";
 
 // Helper function to format date from YYYY-MM-DD to DD.MM.YYYY
 const formatInputDate = (dateStr: string): string => {
@@ -318,7 +319,8 @@ const addSignature = async (
 // Create single Novitas family insurance PDF
 const createNovitasFamilyPDF = async (
   formData: FormData,
-  childrenSubset: FamilyMember[]
+  childrenSubset: FamilyMember[],
+  opts: { skipSpouse?: boolean } = {}
 ): Promise<Uint8Array> => {
   // Load template
   const templateUrl = '/novitas-familienversicherung.pdf';
@@ -331,7 +333,9 @@ const createNovitasFamilyPDF = async (
   
   // Fill all fields
   fillBasicFields(formData, helpers, dates);
-  fillSpouseFields(formData, helpers, dates);
+  if (!opts.skipSpouse) {
+    fillSpouseFields(formData, helpers, dates);
+  }
   
   // Fill children (max 3 per PDF)
   childrenSubset.forEach((kind, index) => {
@@ -384,12 +388,22 @@ export const exportNovitasFamilienversicherung = async (formData: FormData): Pro
     return;
   }
 
-  const children = formData.kinder;
+  // Jobcenter-Regel: Ehegatte und Kinder ≥16 mit eigener Mitgliedschaft NICHT in die
+  // Familienversicherungs-PDF aufnehmen (die laufen als Novitas-Online-Antrag / Autofill).
+  const persons = splitNovitasPersons(formData);
+  const skipSpouse = persons.some(p => p.role === 'ehegatte' && p.ownMembership);
+  const childOwnMembershipIdx = new Set<number>();
+  persons.forEach(p => {
+    if (p.role === 'kind' && p.ownMembership && p.index != null) {
+      childOwnMembershipIdx.add(p.index - 1);
+    }
+  });
+  const children = formData.kinder.filter((_, i) => !childOwnMembershipIdx.has(i));
   const numberOfPDFs = Math.max(1, Math.ceil(children.length / 3));
 
   for (let pdfIndex = 0; pdfIndex < numberOfPDFs; pdfIndex++) {
     const childrenForThisPDF = children.slice(pdfIndex * 3, (pdfIndex + 1) * 3);
-    const pdfBytes = await createNovitasFamilyPDF(formData, childrenForThisPDF);
+    const pdfBytes = await createNovitasFamilyPDF(formData, childrenForThisPDF, { skipSpouse });
 
     const filename = numberOfPDFs > 1
       ? `Novitas_Familienversicherung_${sanitizedVorname}_${sanitizedName}_Teil${pdfIndex + 1}.pdf`
