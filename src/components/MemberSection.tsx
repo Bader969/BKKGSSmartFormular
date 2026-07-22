@@ -29,7 +29,8 @@ export const MemberSection: React.FC<MemberSectionProps> = ({ formData, updateFo
   // BIG direkt: Plusbonus alleine = abgespecktes Formular.
   // Sobald die Familienversicherung mitbeantragt wird, voller Datensatz wie bei BKK GS.
   const bigFull = formData.selectedKrankenkasse === 'big_plusbonus' && formData.bigFamilienversicherung;
-  const isBigMinimal = formData.selectedKrankenkasse === 'big_plusbonus' && !bigFull;
+  // BIG Variante A zeigt jetzt die vollständige MemberSection (nur Pflichtfeldlogik nutzt `bigFull`).
+  const isBigMinimal = false;
   const familienstandOptions = [
     { value: 'ledig', label: 'Ledig' },
     { value: 'verheiratet', label: 'Verheiratet' },
