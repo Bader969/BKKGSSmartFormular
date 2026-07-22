@@ -5,9 +5,12 @@
  * das Formular anhand eines JSON-Payloads aus der Zwischenablage.
  * Der Payload muss dem Typ `novitas-autofill/v1` entsprechen.
  */
+export const NOVITAS_BOOKMARKLET_VERSION = "2026-07-22-2";
+
 const BOOKMARKLET_BODY = /* js */ `
 (async function(){
   var LOG_PREFIX = "[Novitas-Autofill]";
+  var BOOKMARKLET_VERSION = "${NOVITAS_BOOKMARKLET_VERSION}";
   function log(){ try { console.log.apply(console, [LOG_PREFIX].concat([].slice.call(arguments))); } catch(_){} }
 
   function showOverlay(html){
@@ -34,7 +37,7 @@ const BOOKMARKLET_BODY = /* js */ `
   catch(e){ showOverlay("❌ <b>Zwischenablage nicht lesbar.</b><br>Bitte in deiner App den 'Novitas online ausfüllen'-Button erneut klicken."); return; }
   var data; try { data = JSON.parse(raw); } catch(_){ showOverlay("❌ Zwischenablage enthält kein gültiges JSON."); return; }
   if (!data || data.__type !== "novitas-autofill/v1"){ showOverlay("❌ Kein Novitas-Autofill-Payload in der Zwischenablage."); return; }
-  log("payload", data);
+  log("version", BOOKMARKLET_VERSION, "payload", data);
 
   function norm(s){ return (s||"").toString().toLowerCase().replace(/[^a-z0-9]+/g," ").trim(); }
   function hayHas(hay, pat){
@@ -191,6 +194,13 @@ const BOOKMARKLET_BODY = /* js */ `
     var ok = setNative(el, value);
     return { filled: ok, label: label };
   }
+  function fillByNames(nameSels, value, label){
+    for (var i=0; i<nameSels.length; i++){
+      var res = fillByName(nameSels[i], value, label);
+      if (res) return res;
+    }
+    return null;
+  }
   function clickRadioByName(nameSel, value, label){
     var el = document.querySelector('input[type="radio"][name="'+nameSel+'"][value="'+value+'"]');
     if (!el) return null;
@@ -239,7 +249,7 @@ const BOOKMARKLET_BODY = /* js */ `
 
   // Adresse — Novitas nutzt EIN Feld "Straße und Hausnummer"
   var addrCombined = addr.strasseHausnummer || "";
-  var addrRes = fillByName("ng.form0.adresse.strasse", addrCombined, "Straße und Hausnummer");
+  var addrRes = fillByNames(["ng.form0.personen_angabe.Strasse", "ng.form0.adresse.strasse"], addrCombined, "Straße und Hausnummer");
   if (!addrRes) addrRes = fill(["adresse strasse","strasse","straße"], addrCombined, "Straße und Hausnummer");
   results.push(addrRes);
   results.push(fill(["plz","postleitzahl"], addr.plz, "PLZ"));
@@ -272,7 +282,7 @@ const BOOKMARKLET_BODY = /* js */ `
   // Arbeitgeber (bei Jobcenter: Jobcenter-Name+Anschrift)
   results.push(fill(["arbeitgeber name","name arbeitgeber","name des arbeitgebers","arbeitgeber"], ag.name, "Arbeitgeber Name"));
   var agCombined = ag.strasseHausnummer || "";
-  var agAddrRes = fillByName("ng.form0.arbeitgeber.strasse", agCombined, "Arbeitgeber Straße und Hausnummer");
+  var agAddrRes = fillByNames(["ng.form0.ag.Strasse_Arbeitgeber", "ng.form0.arbeitgeber.strasse"], agCombined, "Arbeitgeber Straße und Hausnummer");
   if (!agAddrRes) agAddrRes = fill(["arbeitgeber strasse","arbeitgeber straße","strasse arbeitgeber","arbeitgeber anschrift"], agCombined, "Arbeitgeber Straße und Hausnummer");
   results.push(agAddrRes);
   results.push(fill(["arbeitgeber plz","plz arbeitgeber"], ag.plz, "Arbeitgeber PLZ"));
@@ -314,6 +324,7 @@ const BOOKMARKLET_BODY = /* js */ `
   var total = results.length;
 
   var html = "<b>✅ "+filled+" / "+total+" Felder befüllt</b>";
+  html += "<br><small>Bookmarklet-Version: " + BOOKMARKLET_VERSION + "</small>";
   html += "<br><small>Person: " + (p.label||"") + " · Modus: " + (data.mode||"") + "</small>";
   if (missing.length) html += "<br><br><b>Nicht gefunden:</b><br>" + missing.map(function(x){return "• "+x;}).join("<br>");
   if (skipped.length) html += "<br><br><span style='opacity:.7'><b>Kein Wert vorhanden:</b><br>" + skipped.map(function(x){return "• "+x;}).join("<br>") + "</span>";
