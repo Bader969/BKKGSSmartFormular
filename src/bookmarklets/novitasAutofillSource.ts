@@ -10,7 +10,7 @@ export const NOVITAS_BOOKMARKLET_VERSION = "2026-07-22-2";
 const BOOKMARKLET_BODY = /* js */ `
 (async function(){
   var LOG_PREFIX = "[Novitas-Autofill]";
-  var BOOKMARKLET_VERSION = "${NOVITAS_BOOKMARKLET_VERSION}";
+  var BOOKMARKLET_VERSION = "2026-07-22-2";
   function log(){ try { console.log.apply(console, [LOG_PREFIX].concat([].slice.call(arguments))); } catch(_){} }
 
   function showOverlay(html){
