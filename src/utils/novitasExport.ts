@@ -2,6 +2,7 @@ import { PDFDocument, rgb } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
 import { getCountryName, getNationalityName } from "./countries";
 import { getAutoSignatures, ensureSignatureFontReady } from "./generateSignature";
+import { splitNovitasPersons } from "./novitasSplit";
 
 // Helper function to format date from YYYY-MM-DD to DD.MM.YYYY
 const formatInputDate = (dateStr: string): string => {
