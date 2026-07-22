@@ -252,6 +252,34 @@ export default function Applications() {
               </SelectContent>
             </Select>
           </div>
+          <div className="w-full md:w-48">
+            <label className="text-xs text-muted-foreground">Vertriebspartner</label>
+            <Select value={vpFilter} onValueChange={setVpFilter}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle</SelectItem>
+                {vps.map((vp) => <SelectItem key={vp} value={vp}>{vp}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full md:w-40">
+            <label className="text-xs text-muted-foreground">Monat</label>
+            <Select value={monthFilter} onValueChange={(v) => { setMonthFilter(v); if (v !== "all") { setDateFrom(""); setDateTo(""); } }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle Monate</SelectItem>
+                {months.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full md:w-40">
+            <label className="text-xs text-muted-foreground">Von</label>
+            <Input type="date" value={dateFrom} disabled={monthFilter !== "all"} onChange={(e) => setDateFrom(e.target.value)} />
+          </div>
+          <div className="w-full md:w-40">
+            <label className="text-xs text-muted-foreground">Bis</label>
+            <Input type="date" value={dateTo} disabled={monthFilter !== "all"} onChange={(e) => setDateTo(e.target.value)} />
+          </div>
           <Button
             variant="outline"
             onClick={handleExportXlsx}
@@ -266,6 +294,7 @@ export default function Applications() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-16">Nr.</TableHead>
                 <TableHead>Typ</TableHead>
                 <TableHead>Krankenkasse</TableHead>
                 <TableHead>Status</TableHead>
@@ -283,10 +312,10 @@ export default function Applications() {
             </TableHeader>
             <TableBody>
               {loading && (
-                <TableRow><TableCell colSpan={13} className="text-center text-muted-foreground py-8">Lädt…</TableCell></TableRow>
+                <TableRow><TableCell colSpan={14} className="text-center text-muted-foreground py-8">Lädt…</TableCell></TableRow>
               )}
               {!loading && grouped.length === 0 && (
-                <TableRow><TableCell colSpan={13} className="text-center text-muted-foreground py-8">
+                <TableRow><TableCell colSpan={14} className="text-center text-muted-foreground py-8">
                   <FileText className="inline h-4 w-4 mr-1" /> Noch keine Anträge gespeichert.
                 </TableCell></TableRow>
               )}
@@ -297,6 +326,7 @@ export default function Applications() {
                   : "Hauptantrag";
                 return (
                 <TableRow key={r.id} className={`cursor-pointer ${isSub ? "bg-muted/30" : ""}`} onClick={() => setSelected(r)}>
+                  <TableCell className="text-muted-foreground text-xs font-mono">{numberMap.get(r.id) ?? ""}</TableCell>
                   <TableCell>
                     <Badge variant={isSub ? "outline" : "secondary"} className="text-xs">{typLabel}</Badge>
                     {!isSub && r.source === "whatsapp" && (
