@@ -123,27 +123,27 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b border-border/60 glass-bar">
-        <div className="max-w-6xl mx-auto px-4 lg:px-6 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-gradient-hero text-primary-foreground flex items-center justify-center shadow-card">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 min-h-16 py-2 flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="h-9 w-9 shrink-0 rounded-xl bg-gradient-hero text-primary-foreground flex items-center justify-center shadow-card">
               <ShieldCheck className="h-5 w-5" />
             </div>
-            <div>
-              <div className="font-display text-lg font-semibold leading-tight">Admin</div>
-              <div className="text-xs text-muted-foreground">Nutzerverwaltung & Allow-List</div>
+            <div className="min-w-0">
+              <div className="font-display text-base sm:text-lg font-semibold leading-tight truncate">Admin</div>
+              <div className="text-xs text-muted-foreground truncate">Nutzerverwaltung & Allow-List</div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm"><Link to="/antraege"><ArrowLeft className="h-4 w-4 mr-1" /> Anträge</Link></Button>
+          <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-end">
+            <Button asChild variant="ghost" size="sm" className="min-h-11 sm:min-h-9"><Link to="/antraege"><ArrowLeft className="h-4 w-4 sm:mr-1" /> <span className="hidden sm:inline">Anträge</span></Link></Button>
             <ThemeToggle />
-            <Button variant="ghost" size="sm" onClick={() => supabase.auth.signOut()}>Abmelden</Button>
+            <Button variant="ghost" size="sm" onClick={() => supabase.auth.signOut()} className="min-h-11 sm:min-h-9">Abmelden</Button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 lg:px-6 py-8 space-y-6">
+      <main className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
         <Tabs defaultValue="users" className="space-y-4">
-          <TabsList>
+          <TabsList className="w-full sm:w-auto">
             <TabsTrigger value="users">Nutzer</TabsTrigger>
             <TabsTrigger value="allowlist">Allow-List</TabsTrigger>
           </TabsList>
@@ -167,8 +167,8 @@ export default function Admin() {
               </Dialog>
             </div>
 
-            <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden">
-              <Table>
+            <div className="rounded-2xl border border-border bg-card shadow-card overflow-x-auto">
+              <Table className="min-w-[720px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>E-Mail</TableHead>
@@ -208,13 +208,13 @@ export default function Admin() {
           </TabsContent>
 
           <TabsContent value="allowlist" className="space-y-4">
-            <div className="rounded-2xl border border-border bg-card p-4 shadow-card flex gap-2 items-end">
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-card flex flex-col sm:flex-row gap-2 sm:items-end">
               <div className="flex-1 space-y-1"><Label>E-Mail freigeben</Label><Input type="email" value={newAllowed.email} onChange={(e) => setNewAllowed({ ...newAllowed, email: e.target.value })} /></div>
               <div className="flex-1 space-y-1"><Label>Notiz (optional)</Label><Input value={newAllowed.note} onChange={(e) => setNewAllowed({ ...newAllowed, note: e.target.value })} /></div>
-              <Button onClick={handleAddAllowed}><Plus className="h-4 w-4 mr-1" /> Hinzufügen</Button>
+              <Button onClick={handleAddAllowed} className="min-h-11 w-full sm:w-auto"><Plus className="h-4 w-4 mr-1" /> Hinzufügen</Button>
             </div>
-            <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden">
-              <Table>
+            <div className="rounded-2xl border border-border bg-card shadow-card overflow-x-auto">
+              <Table className="min-w-[600px]">
                 <TableHeader>
                   <TableRow><TableHead>E-Mail</TableHead><TableHead>Notiz</TableHead><TableHead>Hinzugefügt</TableHead><TableHead className="text-right">Entfernen</TableHead></TableRow>
                 </TableHeader>
