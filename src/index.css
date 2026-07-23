@@ -194,3 +194,23 @@
     border-color: hsl(var(--accent));
   }
 }
+
+/* Touch-target minimums on coarse pointers (mobile/tablet): guarantee 44x44
+   for interactive controls without touching component logic. */
+@media (pointer: coarse) {
+  button,
+  [role="button"],
+  a.btn,
+  [data-slot="trigger"],
+  input[type="button"],
+  input[type="submit"] {
+    min-height: 44px;
+  }
+  button[aria-label],
+  button:has(> svg:only-child) {
+    min-width: 44px;
+  }
+}
+
+/* Prevent horizontal page scroll from long unbroken strings on small screens. */
+html, body { overflow-x: hidden; }
