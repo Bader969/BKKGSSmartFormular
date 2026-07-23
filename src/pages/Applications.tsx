@@ -189,7 +189,7 @@ export default function Applications() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b border-border/60 glass-bar">
-        <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 min-h-16 py-2 flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+        <div className="max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 min-h-16 md:h-16 py-2 md:py-0 flex flex-wrap md:flex-nowrap items-center justify-between gap-2 sm:gap-4">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="h-9 w-9 shrink-0 rounded-xl bg-gradient-hero text-primary-foreground flex items-center justify-center shadow-card">
               <ShieldCheck className="h-5 w-5" />
@@ -214,9 +214,9 @@ export default function Applications() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-          <div className="sm:col-span-2 lg:col-span-4">
+      <main className="max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+          <div className="sm:col-span-2 lg:col-span-6">
             <label className="text-xs text-muted-foreground">Suche</label>
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Krankenkasse, VP, Bearbeiter, Name, Vorname, Antragsform…" />
           </div>
@@ -280,7 +280,7 @@ export default function Applications() {
             <label className="text-xs text-muted-foreground">Bis</label>
             <Input type="date" value={dateTo} disabled={monthFilter !== "all"} onChange={(e) => setDateTo(e.target.value)} />
           </div>
-          <div className="w-full sm:col-span-2 lg:col-span-4 flex justify-end">
+          <div className="w-full sm:col-span-2 lg:col-span-6 flex justify-end">
             <Button
               variant="outline"
               onClick={handleExportXlsx}
@@ -293,7 +293,7 @@ export default function Applications() {
         </div>
 
         <div className="rounded-2xl border border-border bg-card shadow-card overflow-x-auto">
-          <Table className="min-w-[900px]">
+          <Table className="min-w-[1100px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-16">Nr.</TableHead>
