@@ -677,7 +677,7 @@ const Index = () => {
     <div className="min-h-screen bg-background text-foreground">
       {/* Sticky glass top bar */}
       <header className="sticky top-0 z-40 border-b border-border/60 glass-bar">
-        <div className="max-w-6xl mx-auto px-4 lg:px-6 h-16 flex items-center justify-between gap-4">
+        <div className="max-w-[1400px] mx-auto px-4 lg:px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="h-9 w-9 rounded-xl bg-gradient-hero text-primary-foreground flex items-center justify-center shadow-card shrink-0">
               <ShieldCheck className="h-5 w-5" />
@@ -726,7 +726,7 @@ const Index = () => {
 
       {/* Hero / context strip */}
       <div className="bg-gradient-surface border-b border-border/60">
-        <div className="max-w-6xl mx-auto px-4 lg:px-6 py-6 md:py-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="max-w-[1400px] mx-auto px-4 lg:px-6 py-6 md:py-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-2 text-xs font-medium text-accent bg-accent/10 px-2.5 py-1 rounded-full mb-3">
               <Sparkles className="h-3.5 w-3.5" /> Smart-Antrag
@@ -743,7 +743,7 @@ const Index = () => {
       </div>
 
       {/* Main Form */}
-      <main className="max-w-6xl mx-auto px-4 lg:px-6 py-8 grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-8">
+      <main className="max-w-[1400px] mx-auto px-4 lg:px-6 py-8 grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)] gap-8">
         {/* Side TOC (desktop only) */}
         <aside className="hidden lg:block">
           <nav className="sticky top-24 space-y-1 text-sm">
@@ -1215,7 +1215,7 @@ const Index = () => {
       
       {/* Footer */}
       <footer className="border-t border-border/60 py-6 px-4 mt-8">
-        <div className="max-w-6xl mx-auto text-center text-xs text-muted-foreground">
+        <div className="max-w-[1400px] mx-auto text-center text-xs text-muted-foreground">
           Smart-Formular · Unterstützt das Ausfüllen von Krankenkassen-Anträgen.
         </div>
       </footer>

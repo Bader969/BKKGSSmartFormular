@@ -123,7 +123,7 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b border-border/60 glass-bar">
-        <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 min-h-16 py-2 flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+        <div className="max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 min-h-16 md:h-16 py-2 md:py-0 flex flex-wrap md:flex-nowrap items-center justify-between gap-2 sm:gap-4">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="h-9 w-9 shrink-0 rounded-xl bg-gradient-hero text-primary-foreground flex items-center justify-center shadow-card">
               <ShieldCheck className="h-5 w-5" />
@@ -141,7 +141,7 @@ export default function Admin() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
+      <main className="max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
         <Tabs defaultValue="users" className="space-y-4">
           <TabsList className="w-full sm:w-auto">
             <TabsTrigger value="users">Nutzer</TabsTrigger>
