@@ -189,38 +189,38 @@ export default function Applications() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b border-border/60 glass-bar">
-        <div className="max-w-6xl mx-auto px-4 lg:px-6 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="h-9 w-9 rounded-xl bg-gradient-hero text-primary-foreground flex items-center justify-center shadow-card">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 min-h-16 py-2 flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="h-9 w-9 shrink-0 rounded-xl bg-gradient-hero text-primary-foreground flex items-center justify-center shadow-card">
               <ShieldCheck className="h-5 w-5" />
             </div>
-            <div>
-              <div className="font-display text-lg font-semibold leading-tight">Meine Anträge</div>
-              <div className="text-xs text-muted-foreground">{isAdmin ? "Admin-Ansicht (alle Bearbeiter)" : "Nur Ihre Anträge"}</div>
+            <div className="min-w-0">
+              <div className="font-display text-base sm:text-lg font-semibold leading-tight truncate">Meine Anträge</div>
+              <div className="text-xs text-muted-foreground truncate">{isAdmin ? "Admin-Ansicht (alle Bearbeiter)" : "Nur Ihre Anträge"}</div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm">
-              <Link to="/"><ArrowLeft className="h-4 w-4 mr-1" /> Formular</Link>
+          <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-end">
+            <Button asChild variant="ghost" size="sm" className="min-h-11 sm:min-h-9">
+              <Link to="/"><ArrowLeft className="h-4 w-4 sm:mr-1" /> <span className="hidden sm:inline">Formular</span></Link>
             </Button>
             {isAdmin && (
-              <Button asChild variant="ghost" size="sm">
+              <Button asChild variant="ghost" size="sm" className="min-h-11 sm:min-h-9">
                 <Link to="/admin">Admin</Link>
               </Button>
             )}
             <ThemeToggle />
-            <Button variant="ghost" size="sm" onClick={() => supabase.auth.signOut()}>Abmelden</Button>
+            <Button variant="ghost" size="sm" onClick={() => supabase.auth.signOut()} className="min-h-11 sm:min-h-9">Abmelden</Button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 lg:px-6 py-8 space-y-6">
-        <div className="flex flex-col md:flex-row gap-3 md:items-end">
-          <div className="flex-1">
+      <main className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+          <div className="sm:col-span-2 lg:col-span-4">
             <label className="text-xs text-muted-foreground">Suche</label>
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Krankenkasse, VP, Bearbeiter, Name, Vorname, Antragsform…" />
           </div>
-          <div className="w-full md:w-48">
+          <div className="w-full">
             <label className="text-xs text-muted-foreground">Krankenkasse</label>
             <Select value={kkFilter} onValueChange={setKkFilter}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -230,7 +230,7 @@ export default function Applications() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-full md:w-40">
+          <div className="w-full">
             <label className="text-xs text-muted-foreground">Status</label>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -241,7 +241,7 @@ export default function Applications() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-full md:w-40">
+          <div className="w-full">
             <label className="text-xs text-muted-foreground">Herkunft</label>
             <Select value={sourceFilter} onValueChange={setSourceFilter}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -252,7 +252,7 @@ export default function Applications() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-full md:w-48">
+          <div className="w-full">
             <label className="text-xs text-muted-foreground">Vertriebspartner</label>
             <Select value={vpFilter} onValueChange={setVpFilter}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -262,7 +262,7 @@ export default function Applications() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-full md:w-40">
+          <div className="w-full">
             <label className="text-xs text-muted-foreground">Monat</label>
             <Select value={monthFilter} onValueChange={(v) => { setMonthFilter(v); if (v !== "all") { setDateFrom(""); setDateTo(""); } }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -272,26 +272,28 @@ export default function Applications() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-full md:w-40">
+          <div className="w-full">
             <label className="text-xs text-muted-foreground">Von</label>
             <Input type="date" value={dateFrom} disabled={monthFilter !== "all"} onChange={(e) => setDateFrom(e.target.value)} />
           </div>
-          <div className="w-full md:w-40">
+          <div className="w-full">
             <label className="text-xs text-muted-foreground">Bis</label>
             <Input type="date" value={dateTo} disabled={monthFilter !== "all"} onChange={(e) => setDateTo(e.target.value)} />
           </div>
-          <Button
-            variant="outline"
-            onClick={handleExportXlsx}
-            disabled={!filtered.length}
-            className="gap-2"
-          >
-            <FileSpreadsheet className="h-4 w-4" /> Als Excel exportieren
-          </Button>
+          <div className="w-full sm:col-span-2 lg:col-span-4 flex justify-end">
+            <Button
+              variant="outline"
+              onClick={handleExportXlsx}
+              disabled={!filtered.length}
+              className="gap-2 w-full sm:w-auto min-h-11"
+            >
+              <FileSpreadsheet className="h-4 w-4" /> Als Excel exportieren
+            </Button>
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card shadow-card overflow-hidden">
-          <Table>
+        <div className="rounded-2xl border border-border bg-card shadow-card overflow-x-auto">
+          <Table className="min-w-[900px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-16">Nr.</TableHead>
