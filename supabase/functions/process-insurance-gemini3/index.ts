@@ -565,6 +565,23 @@ serve(async (req) => {
       );
     }
 
+    // Guard against OOM: cap total base64 payload size (rough decode ~ *0.75).
+    // Edge worker memory is limited; 7-8 images + 3 PDFs as base64 easily exceed it.
+    const MAX_TOTAL_BASE64_BYTES = 18 * 1024 * 1024; // ~13.5 MB decoded
+    let totalBase64 = 0;
+    if (Array.isArray(images)) {
+      for (const f of images) {
+        totalBase64 += typeof f?.base64 === 'string' ? f.base64.length : 0;
+      }
+    }
+    if (totalBase64 > MAX_TOTAL_BASE64_BYTES) {
+      return new Response(
+        JSON.stringify({ error: 'Zu viele/zu große Dokumente auf einmal. Bitte in kleineren Blöcken (max. ~4-5 Dateien) hochladen.' }),
+        { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const isLargePayload = totalBase64 > 6 * 1024 * 1024;
+
     // Get schema and prompt based on selected Krankenkasse
     const { schema: jsonSchema, prompt: kassePrompt } = getSchemaForKrankenkasse(
       selectedKrankenkasse || '', 
@@ -631,6 +648,7 @@ Wichtig:
             url: `data:${img.mimeType};base64,${img.base64}`
           }
         });
+        img.base64 = ''; // free reference for GC
       }
       
       // Add PDFs - Gemini 2.5 Pro supports PDF input
@@ -641,6 +659,7 @@ Wichtig:
             url: `data:${pdf.mimeType};base64,${pdf.base64}`
           }
         });
+        pdf.base64 = ''; // free reference for GC
       }
 
       messages = [
@@ -666,18 +685,28 @@ Wichtig:
       ];
     }
 
+    // Drop original arrays so base64 payload can be garbage collected before fetch.
+    if (Array.isArray(images)) images.length = 0;
+    imageFiles.length = 0;
+    pdfFiles.length = 0;
+    if (body && typeof body === 'object') (body as any).images = undefined;
+
+    const requestBody = JSON.stringify({
+      // Switch to flash for large payloads to reduce provider-side memory pressure & latency.
+      model: hasVisualContent && !fastOcr && !isLargePayload ? 'google/gemini-2.5-pro' : 'google/gemini-2.5-flash',
+      messages,
+      max_tokens: 8192,
+    });
+    // Free messages before fetch — the body string now holds the payload.
+    messages = [];
+
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        // WhatsApp intake uses fast OCR to avoid backend timeouts on multi-image blocks.
-        model: hasVisualContent && !fastOcr ? 'google/gemini-2.5-pro' : 'google/gemini-2.5-flash',
-        messages,
-        max_tokens: 8192,
-      }),
+      body: requestBody,
     });
 
     if (!response.ok) {
