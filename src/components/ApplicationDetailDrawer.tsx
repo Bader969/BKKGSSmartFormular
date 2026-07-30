@@ -121,7 +121,9 @@ export function ApplicationDetailDrawer({
     (async () => {
       try {
         const { payload } = await decrypt(application.id);
-        if (!cancelled) setNovitasPersons(splitNovitasPersons(payload));
+        // Nur Personen mit eigener Mitgliedschaft anzeigen – Familienversicherte
+        // haben keinen eigenen Online-Antrag.
+        if (!cancelled) setNovitasPersons(splitNovitasPersons(payload).filter((p) => p.ownMembership));
       } catch { /* ignore */ }
     })();
     return () => { cancelled = true; };

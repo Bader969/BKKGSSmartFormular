@@ -160,6 +160,24 @@ export default function Applications() {
     return map;
   }, [grouped]);
 
+  // Gesamtzahl der Mitgliedschaften im aktuellen Filter:
+  // Hauptantrag + jede Person mit eigener Mitgliedschaft (Sub-Einträge).
+  const totals = useMemo(() => {
+    let haupt = 0;
+    let eigene = 0;
+    for (const r of grouped) {
+      if (r.parent_application_id) eigene += 1;
+      else haupt += 1;
+    }
+    return { haupt, eigene, gesamt: haupt + eigene };
+  }, [grouped]);
+
+  const zeitraumLabel = monthFilter !== "all"
+    ? `Monat ${monthFilter}`
+    : dateFrom || dateTo
+      ? `Zeitraum ${dateFrom ? new Date(dateFrom).toLocaleDateString("de-DE") : "…"} – ${dateTo ? new Date(dateTo).toLocaleDateString("de-DE") : "…"}`
+      : "Alle Zeiträume";
+
   const handleExportXlsx = () => {
     const data = grouped.map((r) => ({
       "Nr.": numberMap.get(r.id) ?? "",
@@ -289,6 +307,23 @@ export default function Applications() {
             >
               <FileSpreadsheet className="h-4 w-4" /> Als Excel exportieren
             </Button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card shadow-card p-4 flex flex-wrap items-center gap-4 sm:gap-8">
+          <div>
+            <div className="text-xs text-muted-foreground">Gesamt Mitgliedschaften</div>
+            <div className="font-display text-3xl font-semibold leading-tight">{totals.gesamt}</div>
+            <div className="text-xs text-muted-foreground">{zeitraumLabel}</div>
+          </div>
+          <div className="h-10 w-px bg-border hidden sm:block" />
+          <div>
+            <div className="text-xs text-muted-foreground">Hauptanträge</div>
+            <div className="text-xl font-semibold">{totals.haupt}</div>
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground">Eigene Mitgliedschaften (Familie)</div>
+            <div className="text-xl font-semibold">{totals.eigene}</div>
           </div>
         </div>
 
