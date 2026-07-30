@@ -364,7 +364,25 @@ const buildPdf = async (
 };
 
 // ---------- Public export ----------
+/**
+ * Ein Familienversicherungs-Antrag wird nur benötigt, wenn tatsächlich jemand
+ * familienversichert werden muss: mindestens ein Kind ohne eigene Mitgliedschaft
+ * (z. B. Kinder unter 15) oder ein Ehegatte ohne eigene Mitgliedschaft.
+ * Sonst (z. B. arbeitslos → Ehegatte + Kinder ≥15 alle mit eigener Mitgliedschaft)
+ * werden ausschließlich Plusbonus-Anträge erzeugt.
+ */
+export const bigNeedsFamversPdf = (formData: FormData): boolean => {
+  if (!formData.bigFamilienversicherung) return false;
+  const hasFamiInsuredChild = (formData.kinder || []).some(
+    k => !k.eigeneMitgliedschaft && (k.name || k.vorname)
+  );
+  if (hasFamiInsuredChild) return true;
+  const sp = formData.ehegatte;
+  return !!(sp && (sp.name || sp.vorname) && !sp.eigeneMitgliedschaft);
+};
+
 export const exportBigFamilienversicherung = async (formData: FormData): Promise<void> => {
+  if (!bigNeedsFamversPdf(formData)) return;
   // Kinder mit eigener Mitgliedschaft erscheinen NICHT im FamVers-PDF
   // (sie bekommen einen separaten Plusbonus-Antrag). Ehegatte bleibt
   // immer im FamVers-PDF eingetragen — unabhängig von eigener Mitgliedschaft.
