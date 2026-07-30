@@ -139,7 +139,7 @@ function buildWaTextLines(
 async function runAllExports(formData: FormData): Promise<void> {
   const kk = formData.selectedKrankenkasse;
   if (kk === 'big_plusbonus') {
-    if (formData.bigFamilienversicherung) {
+    if (bigNeedsFamversPdf(formData)) {
       await exportBigFamilienversicherung(formData);
     }
     await exportBigPlusbonus(formData);
