@@ -20,7 +20,7 @@ import {
 import { createCombinedPdf } from '@/utils/pdfUtils';
 import type { FileForPdf } from '@/utils/pdfUtils';
 import { exportBigPlusbonus } from '@/utils/bigPlusbonusExport';
-import { exportBigFamilienversicherung } from '@/utils/bigFamversExport';
+import { exportBigFamilienversicherung, bigNeedsFamversPdf } from '@/utils/bigFamversExport';
 import { exportViactivBeitrittserklaerung } from '@/utils/viactivExport';
 import { exportViactivFamilienversicherung } from '@/utils/viactivFamilyExport';
 import { exportViactivBonusPDFs } from '@/utils/viactivBonusExport';
