@@ -20,7 +20,7 @@ import {
 import { createCombinedPdf } from '@/utils/pdfUtils';
 import type { FileForPdf } from '@/utils/pdfUtils';
 import { exportBigPlusbonus } from '@/utils/bigPlusbonusExport';
-import { exportBigFamilienversicherung } from '@/utils/bigFamversExport';
+import { exportBigFamilienversicherung, bigNeedsFamversPdf } from '@/utils/bigFamversExport';
 import { exportViactivBeitrittserklaerung } from '@/utils/viactivExport';
 import { exportViactivFamilienversicherung } from '@/utils/viactivFamilyExport';
 import { exportViactivBonusPDFs } from '@/utils/viactivBonusExport';
@@ -139,7 +139,7 @@ function buildWaTextLines(
 async function runAllExports(formData: FormData): Promise<void> {
   const kk = formData.selectedKrankenkasse;
   if (kk === 'big_plusbonus') {
-    if (formData.bigFamilienversicherung) {
+    if (bigNeedsFamversPdf(formData)) {
       await exportBigFamilienversicherung(formData);
     }
     await exportBigPlusbonus(formData);

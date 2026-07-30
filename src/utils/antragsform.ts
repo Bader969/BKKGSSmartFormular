@@ -1,9 +1,10 @@
 import type { FormData } from '@/types/form';
+import { bigNeedsFamversPdf } from '@/utils/bigFamversExport';
 
 export function deriveAntragsform(formData: FormData): string {
   switch (formData.selectedKrankenkasse) {
     case 'big_plusbonus':
-      return formData.bigFamilienversicherung
+      return bigNeedsFamversPdf(formData)
         ? 'Plusbonus + Familienvers.'
         : 'Plusbonus';
     case 'viactiv': {

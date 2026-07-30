@@ -60,3 +60,8 @@ type: feature
   - Ehegatte → x=44, y=227, w=252, h=12 (links unten)
   - Kind ≥15 (ältestes) → x=313, y=226, w=252, h=14
 - Multi-PDF: >3 Kinder → mehrere PDFs (`Teil 1`, `Teil 2`, …) analog Novitas.
+
+## Kein Familienantrag ohne Familienversicherte
+- `bigNeedsFamversPdf(formData)` (in `src/utils/bigFamversExport.ts`) entscheidet, ob überhaupt ein FamVers-PDF erzeugt wird: nur wenn mindestens ein Kind ohne eigene Mitgliedschaft (z. B. <15) ODER ein Ehegatte ohne eigene Mitgliedschaft vorhanden ist.
+- Beispiel arbeitslos (SGB II): Ehegatte + Kinder ≥15 haben alle eigene Mitgliedschaft → nur Plusbonus-Anträge, KEIN Familienversicherungs-Antrag.
+- Gilt für Export (`Index.tsx`), E-Mail-Versand (`SendEmailDialog.tsx`) und Antragsform/Betreff (`antragsform.ts`).

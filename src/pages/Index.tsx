@@ -21,7 +21,7 @@ import { exportViactivBonusPDFs } from '@/utils/viactivBonusExport';
 import { exportNovitasFamilienversicherung } from '@/utils/novitasExport';
 import { exportDAKFamilienversicherung } from '@/utils/dakExport';
 import { exportBigPlusbonus } from '@/utils/bigPlusbonusExport';
-import { exportBigFamilienversicherung } from '@/utils/bigFamversExport';
+import { exportBigFamilienversicherung, bigNeedsFamversPdf } from '@/utils/bigFamversExport';
 import { toast } from 'sonner';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -589,11 +589,12 @@ const Index = () => {
           ).length;
         }
         const plusbonusParts = mitgliedChunks + ownMembershipPersons;
-        if (formData.bigFamilienversicherung) {
+        if (bigNeedsFamversPdf(formData)) {
           toast.info('BIG Familienversicherung + Plusbonus PDFs werden erstellt...');
           await exportBigFamilienversicherung(formData);
           await exportBigPlusbonus(formData);
-          const famversParts = Math.max(1, Math.ceil(Math.max(1, formData.kinder.length) / 3));
+          const famiChildren = (formData.kinder || []).filter(k => !k.eigeneMitgliedschaft && (k.name || k.vorname));
+          const famversParts = Math.max(1, Math.ceil(Math.max(1, famiChildren.length) / 3));
           pdfCount = famversParts + plusbonusParts;
           toast.success('BIG PDFs erfolgreich exportiert!');
         } else {
