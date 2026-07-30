@@ -84,7 +84,57 @@ type PersonDesired = {
   applicant_name: string;
 };
 
-function collectPersonsWithOwnMembership(payload: Record<string, unknown>): PersonDesired[] {
+function ageInYearsFromString(g: unknown): number | null {
+  if (typeof g !== "string" || !g) return null;
+  let d: Date | null = null;
+  if (g.includes(".")) {
+    const [dd, mm, yy] = g.split(".").map(Number);
+    if (dd && mm && yy) d = new Date(yy, mm - 1, dd);
+  } else if (g.includes("-")) {
+    const [yy, mm, dd] = g.split("-").map(Number);
+    if (dd && mm && yy) d = new Date(yy, mm - 1, dd);
+  }
+  if (!d || Number.isNaN(d.getTime())) return null;
+  const ref = new Date();
+  let a = ref.getFullYear() - d.getFullYear();
+  const mDiff = ref.getMonth() - d.getMonth();
+  if (mDiff < 0 || (mDiff === 0 && ref.getDate() < d.getDate())) a -= 1;
+  return a;
+}
+
+/**
+ * Novitas: eigene Mitgliedschaft nur, wenn Hauptmitglied Jobcenter (al_geld_2)
+ * → Ehegatte + Kinder ≥ 16. Familienversicherte zählen nicht als Mitgliedschaft.
+ */
+function collectNovitasPersonsWithOwnMembership(payload: Record<string, unknown>): PersonDesired[] {
+  const out: PersonDesired[] = [];
+  if ((payload.novitasMode ?? "familie") !== "familie") return out;
+  const mainIsJobcenter = payload.viactivBeschaeftigung === "al_geld_2";
+  if (!mainIsJobcenter) return out;
+
+  const eh = payload.ehegatte as Record<string, unknown> | undefined;
+  if (eh) {
+    const vor = typeof eh.vorname === "string" ? eh.vorname.trim() : "";
+    const nam = typeof eh.name === "string" ? eh.name.trim() : "";
+    if (vor || nam) {
+      out.push({ person_role: "ehegatte", person_index: null, applicant_vorname: vor.slice(0, 120), applicant_name: nam.slice(0, 120) });
+    }
+  }
+  const kinder = Array.isArray(payload.kinder) ? (payload.kinder as Array<Record<string, unknown>>) : [];
+  kinder.forEach((k, i) => {
+    if (!k) return;
+    const vor = typeof k.vorname === "string" ? k.vorname.trim() : "";
+    const nam = typeof k.name === "string" ? k.name.trim() : "";
+    if (!vor && !nam) return;
+    const age = ageInYearsFromString(k.geburtsdatum);
+    if (age == null || age < 16) return;
+    out.push({ person_role: "kind", person_index: i + 1, applicant_vorname: vor.slice(0, 120), applicant_name: nam.slice(0, 120) });
+  });
+  return out;
+}
+
+function collectPersonsWithOwnMembership(payload: Record<string, unknown>, krankenkasse?: string): PersonDesired[] {
+  if (krankenkasse === "novitas") return collectNovitasPersonsWithOwnMembership(payload);
   const out: PersonDesired[] = [];
   const eh = payload.ehegatte as Record<string, unknown> | undefined;
   if (eh && eh.eigeneMitgliedschaft === true) {
@@ -131,7 +181,7 @@ async function syncSubEntries(args: {
 }): Promise<void> {
   const { admin, parentId, userId, krankenkasse, vertriebspartner, antragsform, ctHex, ivHex, hash, payload } = args;
 
-  const desired = collectPersonsWithOwnMembership(payload);
+  const desired = collectPersonsWithOwnMembership(payload, krankenkasse);
   const { data: existing } = await admin
     .from("applications")
     .select("id, person_role, person_index")
