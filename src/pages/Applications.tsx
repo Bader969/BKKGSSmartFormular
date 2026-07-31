@@ -44,7 +44,7 @@ export default function Applications() {
 
   const bearbeiterOf = (userId: string) => displayNames[userId] || emails[userId] || userId.slice(0, 8);
 
-  const filtered = useMemo(() => rows.filter((r) => {
+  const matchesFilters = (r: ApplicationRow) => {
     if (kkFilter !== "all" && r.krankenkasse !== kkFilter) return false;
     // Status filter applies only to parent entries; sub-entries follow parent.
     if (statusFilter !== "all" && !r.parent_application_id && r.status !== statusFilter) return false;
@@ -80,7 +80,21 @@ export default function Applications() {
       if (!haystacks.some((h) => h.toLowerCase().includes(s))) return false;
     }
     return true;
-  }), [rows, kkFilter, statusFilter, sourceFilter, vpFilter, monthFilter, dateFrom, dateTo, search, emails, displayNames]);
+  };
+
+  const filtered = useMemo(() => {
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    // Sub-Einträge folgen immer ihrem Hauptantrag: sie werden nur angezeigt,
+    // wenn der Hauptantrag selbst den Filtern (inkl. Zeitraum) entspricht.
+    return rows.filter((r) => {
+      if (r.parent_application_id) {
+        const parent = byId.get(r.parent_application_id);
+        return parent ? matchesFilters(parent) : false;
+      }
+      return matchesFilters(r);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, kkFilter, statusFilter, sourceFilter, vpFilter, monthFilter, dateFrom, dateTo, search, emails, displayNames]);
 
   // Group sub-entries under their parent, preserving the existing top-level sort order.
   const grouped = useMemo(() => {
