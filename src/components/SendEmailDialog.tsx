@@ -125,13 +125,14 @@ function buildWaTextLines(
   person: { vorname: string; name: string },
   kk: string,
   vertriebspartner: string,
+  opts?: { bonus400?: boolean },
 ): string[] {
   const lines: string[] = [];
   const fullName = `${(person.vorname || '').trim()} ${(person.name || '').trim()}`.trim();
   if (fullName) lines.push(fullName);
   lines.push(todayDdMmYyyy());
   const kkLabel = WA_KK_LABEL[kk] || kk;
-  if (kkLabel) lines.push(kkLabel);
+  if (kkLabel) lines.push(opts?.bonus400 ? `${kkLabel} 400€` : kkLabel);
   if (vertriebspartner && vertriebspartner.trim()) lines.push(vertriebspartner.trim());
   return lines;
 }
