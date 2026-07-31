@@ -627,13 +627,11 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
       } else if (isNovitas) {
         summary = active.find((a) => {
           const fn = a.filename.toLowerCase();
-          // Nur das Beitrittsformular/den Antrag senden — NIEMALS die Familienversicherung.
-          if (fn.includes('familienversicherung')) return false;
-          return (
-            fn.startsWith('novitas-bkk') ||
-            fn.startsWith('novitas_beitritt') ||
-            fn.startsWith('novitasbkk_beitritt')
-          );
+          // NUR die echte, manuell angehängte Datei "novitas-bkk forms.pdf" senden.
+          // Niemals automatisch erzeugte Familienversicherungs-PDFs umbenennen.
+          if (a.kind === 'auto') return false;
+          if (fn.includes('familienvers')) return false;
+          return fn.includes('novitas-bkk') && fn.endsWith('.pdf');
         });
         waFilenameOverride = 'novitas-bkk forms.pdf';
       } else {
