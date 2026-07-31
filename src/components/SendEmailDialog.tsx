@@ -627,9 +627,15 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
       } else if (isNovitas) {
         summary = active.find((a) => {
           const fn = a.filename.toLowerCase();
-          return fn.startsWith('novitas_familienversicherung') || fn.startsWith('novitas_beitritt');
+          // Nur das Beitrittsformular/den Antrag senden — NIEMALS die Familienversicherung.
+          if (fn.includes('familienversicherung')) return false;
+          return (
+            fn.startsWith('novitas-bkk') ||
+            fn.startsWith('novitas_beitritt') ||
+            fn.startsWith('novitasbkk_beitritt')
+          );
         });
-        waFilenameOverride = 'NovitasBKK_Beitritt.pdf';
+        waFilenameOverride = 'novitas-bkk forms.pdf';
       } else {
         summary = active.find((a) => a.filename.toLowerCase().startsWith('zusammenfassung_mitgliedsantrag'));
       }
@@ -638,7 +644,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           isViactiv
             ? `"${g.label}": keine Beitrittserklärung (BE) gefunden — WhatsApp übersprungen.`
             : isNovitas
-              ? `"${g.label}": keine Novitas-Antragsdatei angehängt — WhatsApp übersprungen.`
+                ? `"${g.label}": kein Novitas-Beitrittsformular ("novitas-bkk forms.pdf") angehängt — WhatsApp übersprungen.`
               : `"${g.label}": keine „Zusammenfassung_Mitgliedsantrag" angehängt — WhatsApp übersprungen.`,
         );
       } else {
@@ -648,6 +654,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
             g.person,
             formData.selectedKrankenkasse,
             formData.vertriebspartner || '',
+            { bonus400: isNovitas && !!formData.novitasBonus400 },
           );
           const { data: waData, error: waErr } = await supabase.functions.invoke('send-whatsapp-summary', {
             body: {
