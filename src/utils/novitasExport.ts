@@ -387,9 +387,9 @@ export const exportNovitasFamilienversicherung = async (formData: FormData): Pro
   const isEinzeln = formData.novitasMode === 'einzeln';
 
   if (isEinzeln) {
-    // Einzelbeitritt — nur Hauptmitglied, kein Kinder-Chunking
-    const pdfBytes = await createNovitasFamilyPDF(formData, []);
-    downloadPDF(pdfBytes, `Novitas_Beitritt_${sanitizedVorname}_${sanitizedName}.pdf`);
+    // Einzelbeitritt — es wird KEIN Familienversicherungs-Antrag erstellt.
+    // Der Beitritt läuft ausschließlich über den Novitas-Online-Antrag
+    // ("novitas-bkk forms.pdf", manuell angehängt).
     return;
   }
 

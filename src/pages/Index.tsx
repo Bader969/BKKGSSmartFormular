@@ -634,11 +634,16 @@ const Index = () => {
       }
       // Novitas BKK Export
       else if (formData.selectedKrankenkasse === 'novitas') {
+        if ((formData.novitasMode ?? 'familie') === 'einzeln') {
+          toast.info('Einzelbeitritt: Es wird kein Familienversicherungs-Antrag erstellt — bitte den Online-Antrag ("novitas-bkk forms.pdf") verwenden.');
+          pdfCount = 0;
+        } else {
         const numberOfPDFs = Math.max(1, Math.ceil(formData.kinder.length / 3));
         toast.info(`Es werden ${numberOfPDFs} Novitas Familienversicherungs-PDF(s) erstellt...`);
         await exportNovitasFamilienversicherung(formData);
         pdfCount = numberOfPDFs;
         toast.success('Novitas BKK Familienversicherung erfolgreich exportiert!');
+        }
       }
       // DAK Export
       else if (formData.selectedKrankenkasse === 'dak') {
@@ -810,7 +815,9 @@ const Index = () => {
                 : formData.selectedKrankenkasse === 'dak' 
                 ? 'Es wird die DAK Familienversicherung erstellt.'
                 : formData.selectedKrankenkasse === 'novitas' 
-                  ? 'Es wird die Novitas BKK Familienversicherung erstellt.'
+                  ? ((formData.novitasMode ?? 'familie') === 'einzeln'
+                      ? 'Einzelbeitritt: Es wird kein Familienversicherungs-Antrag erstellt.'
+                      : 'Es wird die Novitas BKK Familienversicherung erstellt.')
                   : formData.selectedKrankenkasse === 'viactiv' 
                     ? 'Es wird die VIACTIV Beitrittserklärung erstellt.'
                     : 'Es werden BKK GS Familienversicherung und Rundum-Sicher-Paket erstellt.'}
