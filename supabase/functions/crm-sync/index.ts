@@ -8,6 +8,8 @@ const ENC_SECRET = Deno.env.get("APPLICATIONS_ENCRYPTION_KEY")!;
 const CRM_IMPORT_SECRET = Deno.env.get("CRM_IMPORT_SECRET") ?? "";
 const CRM_IMPORT_URL = Deno.env.get("CRM_IMPORT_URL") ??
   "https://acvuxtmkzhjzecrfvhfp.supabase.co/functions/v1/gkv-import";
+const CRM_SUPABASE_URL = Deno.env.get("CRM_SUPABASE_URL") ?? "";
+const CRM_SERVICE_ROLE_KEY = Deno.env.get("CRM_SERVICE_ROLE_KEY") ?? "";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
