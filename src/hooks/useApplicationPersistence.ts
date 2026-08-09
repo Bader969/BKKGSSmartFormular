@@ -54,6 +54,7 @@ export function useApplicationPersistence() {
       source: string | null;
       emailed_at: string | null;
       whatsapp_sent_at: string | null;
+      crm_synced_at: string | null;
     }>;
     isAdmin: boolean;
     userEmails: Record<string, string>;

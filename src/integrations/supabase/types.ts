@@ -142,6 +142,7 @@ export type Database = {
           applicant_name: string | null
           applicant_vorname: string | null
           created_at: string
+          crm_synced_at: string | null
           exported_at: string | null
           id: string
           intake_meta: Json
@@ -165,6 +166,7 @@ export type Database = {
           applicant_name?: string | null
           applicant_vorname?: string | null
           created_at?: string
+          crm_synced_at?: string | null
           exported_at?: string | null
           id?: string
           intake_meta?: Json
@@ -188,6 +190,7 @@ export type Database = {
           applicant_name?: string | null
           applicant_vorname?: string | null
           created_at?: string
+          crm_synced_at?: string | null
           exported_at?: string | null
           id?: string
           intake_meta?: Json
@@ -210,6 +213,47 @@ export type Database = {
           {
             foreignKeyName: "applications_parent_application_id_fkey"
             columns: ["parent_application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_sync_log: {
+        Row: {
+          actor_id: string | null
+          application_id: string | null
+          created_at: string
+          entries: number
+          error: string | null
+          id: string
+          response: Json
+          status: string
+        }
+        Insert: {
+          actor_id?: string | null
+          application_id?: string | null
+          created_at?: string
+          entries?: number
+          error?: string | null
+          id?: string
+          response?: Json
+          status: string
+        }
+        Update: {
+          actor_id?: string | null
+          application_id?: string | null
+          created_at?: string
+          entries?: number
+          error?: string | null
+          id?: string
+          response?: Json
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_sync_log_application_id_fkey"
+            columns: ["application_id"]
             isOneToOne: false
             referencedRelation: "applications"
             referencedColumns: ["id"]
