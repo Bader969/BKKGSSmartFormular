@@ -205,6 +205,7 @@ export default function Applications() {
       PDFs: r.parent_application_id ? "" : r.pdf_count,
       "E-Mail gesendet": r.emailed_at ? new Date(r.emailed_at).toLocaleString("de-DE") : "",
       "WhatsApp gesendet": r.whatsapp_sent_at ? new Date(r.whatsapp_sent_at).toLocaleString("de-DE") : "",
+      "CRM übertragen": r.crm_synced_at ? new Date(r.crm_synced_at).toLocaleString("de-DE") : "",
       Aktualisiert: new Date(r.updated_at).toLocaleString("de-DE"),
       Erstellt: new Date(r.created_at).toLocaleString("de-DE"),
       VP: r.vertriebspartner ?? "",
@@ -218,6 +219,35 @@ export default function Applications() {
     XLSX.utils.book_append_sheet(wb, ws, "Anträge");
     const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
     XLSX.writeFile(wb, `antraege_${ts}.xlsx`);
+  };
+
+  // --- CRM (Vermittlersuite): Übertragung der gefilterten Hauptanträge ---
+  const crmCandidates = useMemo(
+    () => grouped.filter((r) => !r.parent_application_id && isCrmEligibleVp(r.vertriebspartner)),
+    [grouped],
+  );
+  const crmOpen = crmCandidates.filter((r) => !r.crm_synced_at);
+
+  const handleCrmSync = async () => {
+    if (!crmOpen.length) return;
+    setCrmBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("crm-sync", {
+        body: { action: "push", application_ids: crmOpen.map((r) => r.id) },
+      });
+      if (error) throw error;
+      const res = data as { entries?: number; results?: Array<{ status?: string }> };
+      const skipped = (res.results ?? []).filter((x) => x.status !== "prepared").length;
+      toast.success(
+        `${res.entries ?? 0} Mitgliedschaften ins CRM übertragen${skipped ? ` · ${skipped} übersprungen` : ""}.`,
+      );
+      reload();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`CRM-Übertragung fehlgeschlagen: ${msg}`);
+    } finally {
+      setCrmBusy(false);
+    }
   };
 
   return (
@@ -314,7 +344,17 @@ export default function Applications() {
             <label className="text-xs text-muted-foreground">Bis</label>
             <Input type="date" value={dateTo} disabled={monthFilter !== "all"} onChange={(e) => setDateTo(e.target.value)} />
           </div>
-          <div className="w-full sm:col-span-2 lg:col-span-6 flex justify-end">
+          <div className="w-full sm:col-span-2 lg:col-span-6 flex flex-wrap justify-end gap-2">
+            <Button
+              variant="default"
+              onClick={handleCrmSync}
+              disabled={crmBusy || !crmOpen.length}
+              className="gap-2 w-full sm:w-auto min-h-11"
+              title="Überträgt alle gefilterten Hauptanträge zulässiger VP inkl. Familienmitglieder an die Vermittlersuite"
+            >
+              <Building2 className="h-4 w-4" />
+              {crmBusy ? "Übertrage…" : `An CRM übertragen (${crmOpen.length})`}
+            </Button>
             <Button
               variant="outline"
               onClick={handleExportXlsx}
@@ -354,6 +394,7 @@ export default function Applications() {
                 <TableHead>PDFs</TableHead>
                 <TableHead>E-Mail</TableHead>
                 <TableHead>WhatsApp</TableHead>
+                <TableHead>CRM</TableHead>
                 <TableHead>Aktualisiert</TableHead>
                 <TableHead>Erstellt</TableHead>
                 <TableHead>VP</TableHead>
@@ -365,10 +406,10 @@ export default function Applications() {
             </TableHeader>
             <TableBody>
               {loading && (
-                <TableRow><TableCell colSpan={14} className="text-center text-muted-foreground py-8">Lädt…</TableCell></TableRow>
+                <TableRow><TableCell colSpan={15} className="text-center text-muted-foreground py-8">Lädt…</TableCell></TableRow>
               )}
               {!loading && grouped.length === 0 && (
-                <TableRow><TableCell colSpan={14} className="text-center text-muted-foreground py-8">
+                <TableRow><TableCell colSpan={15} className="text-center text-muted-foreground py-8">
                   <FileText className="inline h-4 w-4 mr-1" /> Noch keine Anträge gespeichert.
                 </TableCell></TableRow>
               )}
