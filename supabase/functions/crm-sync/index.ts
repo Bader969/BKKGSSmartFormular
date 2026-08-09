@@ -398,10 +398,28 @@ type DirectResult = {
   contract_id?: string;
 };
 
-async function writeEntriesDirect(batch: CrmEntry[]): Promise<DirectResult[]> {
-  const crm = createClient(CRM_SUPABASE_URL, CRM_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-  const out: DirectResult[] = [];
+const famRow = (contractId: string, m: Record<string, unknown>) => ({
+  contract_id: contractId,
+  relation: m.relation,
+  first_name: s(m.first_name) || "-",
+  last_name: s(m.last_name) || "-",
+  birthdate: m.birthdate ?? null,
+  versicherungsnummer: m.versicherungsnummer ?? null,
+  geschlecht: m.geschlecht ?? null,
+  verwandtschaft: KV_VERWANDTSCHAFT.includes(String(m.verwandtschaft ?? "").toLowerCase())
+    ? String(m.verwandtschaft).toLowerCase() : null,
+  geburtsname: m.geburtsname ?? null,
+  geburtsort: m.geburtsort ?? null,
+  geburtsland: m.geburtsland ?? null,
+  staatsangehoerigkeit: m.staatsangehoerigkeit ?? null,
+  bisherig_kasse: m.bisherig_kasse ?? null,
+  bisherig_ende: m.bisherig_ende ?? null,
+  bisherig_art: KV_BISHERIG_ART.includes(String(m.bisherig_art ?? "").toLowerCase())
+    ? String(m.bisherig_art).toLowerCase() : null,
+  abweichende_anschrift: m.abweichende_anschrift ?? null,
+});
 
+async function writeEntriesDirect(batch: CrmEntry[]): Promise<DirectResult[]> {
   const crm = createClient(CRM_SUPABASE_URL, CRM_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
   const out: DirectResult[] = [];
 
