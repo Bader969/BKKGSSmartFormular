@@ -551,7 +551,7 @@ Deno.serve(async (req) => {
     const isAdmin = !!roleRow;
 
     const body = (await req.json().catch(() => ({}))) as {
-      action?: "preview" | "push" | "export-sql";
+      action?: "preview" | "push" | "export-sql" | "direct-push";
       application_ids?: string[];
       dry_run?: boolean;
     };
@@ -606,6 +606,53 @@ Deno.serve(async (req) => {
 
     if (action === "export-sql") {
       return json(200, { ok: true, mode: "export-sql", entries: batch.length, results, sql: buildSqlScript(batch) });
+    }
+
+    if (action === "direct-push") {
+      if (!CRM_SUPABASE_URL || !CRM_SERVICE_ROLE_KEY) {
+        return json(400, { error: "crm_credentials_missing", message: "CRM_SUPABASE_URL / CRM_SERVICE_ROLE_KEY fehlen." });
+      }
+      if (!batch.length) return json(200, { ok: true, entries: 0, results });
+
+      const written = await writeEntriesDirect(batch);
+      const created = written.filter((w) => w.status === "created").length;
+      const skipped = written.filter((w) => w.status === "skipped").length;
+      const failed = written.filter((w) => w.status === "error");
+      const now = new Date().toISOString();
+
+      for (const app of apps ?? []) {
+        if (!appEntryCount.has(app.id)) continue;
+        const appRefs = written.filter((w) => w.external_ref.startsWith(`${app.id}:`));
+        const appFailed = appRefs.filter((w) => w.status === "error");
+        if (!appFailed.length) {
+          await admin.from("applications").update({ crm_synced_at: now }).eq("id", app.id);
+          await admin.from("application_events").insert({
+            application_id: app.id,
+            user_id: user.id,
+            event_type: "crm_synced",
+            meta: { entries: appRefs.length, mode: "direct" },
+          });
+        }
+        await admin.from("crm_sync_log").insert({
+          application_id: app.id,
+          actor_id: user.id,
+          status: appFailed.length ? "error" : "ok",
+          entries: appRefs.length,
+          response: { mode: "direct", details: appRefs },
+          error: appFailed.length ? appFailed.map((f) => f.reason).join("; ").slice(0, 500) : null,
+        });
+      }
+
+      return json(200, {
+        ok: !failed.length,
+        mode: "direct-push",
+        entries: batch.length,
+        created,
+        skipped,
+        failed: failed.length,
+        errors: failed.slice(0, 20),
+        results,
+      });
     }
 
     if (!CRM_IMPORT_SECRET) {
