@@ -379,6 +379,155 @@ function buildSqlScript(batch: CrmEntry[]): string {
 }
 
 Deno.serve(async (req) => {
+// ------------------------------------------------- Direktschreiben ins CRM
+type DirectResult = {
+  external_ref: string;
+  status: "created" | "skipped" | "error";
+  reason?: string;
+  customer_id?: string;
+  contract_id?: string;
+};
+
+async function writeEntriesDirect(batch: CrmEntry[]): Promise<DirectResult[]> {
+  const crm = createClient(CRM_SUPABASE_URL, CRM_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  const advisorCache = new Map<string, string | null>();
+  const out: DirectResult[] = [];
+
+  const findAdvisor = async (name: string | null): Promise<string | null> => {
+    if (!name) return null;
+    if (advisorCache.has(name)) return advisorCache.get(name)!;
+    const { data } = await crm.from("profiles").select("id").eq("full_name", name).limit(1).maybeSingle();
+    const id = (data as { id?: string } | null)?.id ?? null;
+    advisorCache.set(name, id);
+    return id;
+  };
+
+  for (const e of batch) {
+    const ref = String(e.external_ref);
+    const cust = (e.customer ?? {}) as Record<string, unknown>;
+    const contract = (e.contract ?? {}) as Record<string, unknown>;
+    const kv = (contract.kv_details ?? {}) as Record<string, unknown>;
+    const fam = Array.isArray(e.family_members) ? (e.family_members as Array<Record<string, unknown>>) : [];
+
+    try {
+      const advisorId = await findAdvisor((e.advisor_name ?? null) as string | null);
+      if (!advisorId) {
+        out.push({ external_ref: ref, status: "error", reason: `advisor_not_found:${e.advisor_name}` });
+        continue;
+      }
+
+      // Idempotenz: bereits importierter Vertrag?
+      const { data: existing } = await crm
+        .from("contracts").select("id").eq("details->>external_ref", ref).limit(1).maybeSingle();
+      if (existing) {
+        out.push({ external_ref: ref, status: "skipped", reason: "already_imported", contract_id: (existing as { id: string }).id });
+        continue;
+      }
+
+      // Kunde suchen (Name + Geburtsdatum)
+      let customerId: string | null = null;
+      let q = crm.from("customers").select("id")
+        .ilike("first_name", String(cust.first_name ?? ""))
+        .ilike("last_name", String(cust.last_name ?? ""));
+      q = cust.birthdate ? q.eq("birthdate", cust.birthdate as string) : q.is("birthdate", null);
+      const { data: foundCust } = await q.limit(1).maybeSingle();
+      customerId = (foundCust as { id?: string } | null)?.id ?? null;
+
+      if (!customerId) {
+        const { data: insCust, error: custErr } = await crm.from("customers").insert({
+          salutation: cust.salutation ?? null,
+          first_name: cust.first_name ?? null,
+          last_name: cust.last_name ?? null,
+          birthdate: cust.birthdate ?? null,
+          phone: cust.phone ?? null,
+          email: cust.email ?? null,
+          street: cust.street ?? null,
+          zip: cust.zip ?? null,
+          city: cust.city ?? null,
+          lead_source: e.lead_source ?? null,
+          lead_source_detail: e.lead_source_detail ?? null,
+          assigned_to: advisorId,
+          recorded_by: advisorId,
+          advisor_id: advisorId,
+          created_by: advisorId,
+        }).select("id").single();
+        if (custErr) throw new Error(`customer_insert:${custErr.message}`);
+        customerId = (insCust as { id: string }).id;
+      }
+
+      const details = {
+        external_ref: ref,
+        source: e.source,
+        application_id: e.application_id,
+        role: e.role,
+        own_membership: e.own_membership ?? e.role === "hauptmitglied",
+        related_to_external_ref: e.related_to_external_ref ?? null,
+        vp_code: e.vp_code ?? null,
+        advisor_name: e.advisor_name ?? null,
+      };
+
+      const { data: insContract, error: contractErr } = await crm.from("contracts").insert({
+        customer_id: customerId,
+        type: "gkv",
+        status: contract.status ?? "in_pruefung",
+        provider: contract.provider ?? null,
+        start_date: contract.start_date ?? null,
+        details,
+        created_by: advisorId,
+        created_at: e.created_at ?? null,
+      }).select("id").single();
+      if (contractErr) throw new Error(`contract_insert:${contractErr.message}`);
+      const contractId = (insContract as { id: string }).id;
+
+      const { error: kvErr } = await crm.from("contract_kv_details").insert({
+        contract_id: contractId,
+        geschlecht: kv.geschlecht ?? null,
+        familienstand: KV_FAMILIENSTAND.includes(String(kv.familienstand ?? "").toLowerCase())
+          ? String(kv.familienstand).toLowerCase() : null,
+        geburtsort: kv.geburtsort ?? null,
+        geburtsland: kv.geburtsland ?? null,
+        staatsangehoerigkeit: kv.staatsangehoerigkeit ?? null,
+        kv_nummer: kv.kv_nummer ?? null,
+        vorherige_kasse: kv.vorherige_kasse ?? null,
+        vorherige_kasse_ende: kv.vorherige_kasse_ende ?? null,
+      });
+      if (kvErr) throw new Error(`kv_insert:${kvErr.message}`);
+
+      if (fam.length) {
+        const rows = fam.map((m) => ({
+          contract_id: contractId,
+          relation: m.relation,
+          first_name: m.first_name ?? null,
+          last_name: m.last_name ?? null,
+          birthdate: m.birthdate ?? null,
+          versicherungsnummer: m.versicherungsnummer ?? null,
+          geschlecht: m.geschlecht ?? null,
+          verwandtschaft: KV_VERWANDTSCHAFT.includes(String(m.verwandtschaft ?? "").toLowerCase())
+            ? String(m.verwandtschaft).toLowerCase() : null,
+          geburtsname: m.geburtsname ?? null,
+          geburtsort: m.geburtsort ?? null,
+          geburtsland: m.geburtsland ?? null,
+          staatsangehoerigkeit: m.staatsangehoerigkeit ?? null,
+          bisherig_kasse: m.bisherig_kasse ?? null,
+          bisherig_ende: m.bisherig_ende ?? null,
+          bisherig_art: KV_BISHERIG_ART.includes(String(m.bisherig_art ?? "").toLowerCase())
+            ? String(m.bisherig_art).toLowerCase() : null,
+          abweichende_anschrift: m.abweichende_anschrift ?? null,
+        }));
+        const { error: famErr } = await crm.from("contract_family_members").insert(rows);
+        if (famErr) throw new Error(`family_insert:${famErr.message}`);
+      }
+
+      out.push({ external_ref: ref, status: "created", customer_id: customerId, contract_id: contractId });
+    } catch (err) {
+      out.push({ external_ref: ref, status: "error", reason: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  return out;
+}
+
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const json = (status: number, body: unknown) =>
