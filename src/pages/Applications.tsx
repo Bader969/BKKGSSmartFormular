@@ -456,8 +456,20 @@ export default function Applications() {
                       <span className="text-muted-foreground text-xs">—</span>
                     )}
                   </TableCell>
+                  <TableCell>
+                    {isSub ? (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    ) : r.crm_synced_at ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-green-700 dark:text-green-400" title={`Übertragen: ${new Date(r.crm_synced_at).toLocaleString("de-DE")}`}>
+                        <Check className="h-3 w-3" /> <Building2 className="h-3 w-3" />
+                      </span>
+                    ) : isCrmEligibleVp(r.vertriebspartner) ? (
+                      <span className="text-muted-foreground text-xs" title="Noch nicht übertragen">offen</span>
+                    ) : (
+                      <span className="text-muted-foreground text-xs" title="VP nicht für CRM freigegeben">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{new Date(r.updated_at).toLocaleString("de-DE")}</TableCell>
-                  {null}
                   <TableCell className="text-muted-foreground">{new Date(r.created_at).toLocaleString("de-DE")}</TableCell>
                   <TableCell>{r.vertriebspartner || <span className="text-muted-foreground">—</span>}</TableCell>
                   <TableCell className="text-muted-foreground text-xs">{bearbeiterOf(r.user_id)}</TableCell>
