@@ -398,6 +398,27 @@ type DirectResult = {
   contract_id?: string;
 };
 
+const famRow = (contractId: string, m: Record<string, unknown>) => ({
+  contract_id: contractId,
+  relation: m.relation,
+  first_name: s(m.first_name) || "-",
+  last_name: s(m.last_name) || "-",
+  birthdate: m.birthdate ?? null,
+  versicherungsnummer: m.versicherungsnummer ?? null,
+  geschlecht: m.geschlecht ?? null,
+  verwandtschaft: KV_VERWANDTSCHAFT.includes(String(m.verwandtschaft ?? "").toLowerCase())
+    ? String(m.verwandtschaft).toLowerCase() : null,
+  geburtsname: m.geburtsname ?? null,
+  geburtsort: m.geburtsort ?? null,
+  geburtsland: m.geburtsland ?? null,
+  staatsangehoerigkeit: m.staatsangehoerigkeit ?? null,
+  bisherig_kasse: m.bisherig_kasse ?? null,
+  bisherig_ende: m.bisherig_ende ?? null,
+  bisherig_art: KV_BISHERIG_ART.includes(String(m.bisherig_art ?? "").toLowerCase())
+    ? String(m.bisherig_art).toLowerCase() : null,
+  abweichende_anschrift: m.abweichende_anschrift ?? null,
+});
+
 async function writeEntriesDirect(batch: CrmEntry[]): Promise<DirectResult[]> {
   const crm = createClient(CRM_SUPABASE_URL, CRM_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
   const out: DirectResult[] = [];
@@ -508,26 +529,9 @@ async function writeEntriesDirect(batch: CrmEntry[]): Promise<DirectResult[]> {
       if (kvErr) throw new Error(`kv_insert:${kvErr.message}`);
 
       if (fam.length) {
-        const rows = fam.filter((m) => s(m.first_name) || s(m.last_name)).map((m) => ({
-          contract_id: contractId,
-          relation: m.relation,
-          first_name: s(m.first_name) || "-",
-          last_name: s(m.last_name) || "-",
-          birthdate: m.birthdate ?? null,
-          versicherungsnummer: m.versicherungsnummer ?? null,
-          geschlecht: m.geschlecht ?? null,
-          verwandtschaft: KV_VERWANDTSCHAFT.includes(String(m.verwandtschaft ?? "").toLowerCase())
-            ? String(m.verwandtschaft).toLowerCase() : null,
-          geburtsname: m.geburtsname ?? null,
-          geburtsort: m.geburtsort ?? null,
-          geburtsland: m.geburtsland ?? null,
-          staatsangehoerigkeit: m.staatsangehoerigkeit ?? null,
-          bisherig_kasse: m.bisherig_kasse ?? null,
-          bisherig_ende: m.bisherig_ende ?? null,
-          bisherig_art: KV_BISHERIG_ART.includes(String(m.bisherig_art ?? "").toLowerCase())
-            ? String(m.bisherig_art).toLowerCase() : null,
-          abweichende_anschrift: m.abweichende_anschrift ?? null,
-        }));
+        const rows = fam
+          .filter((m) => s(m.first_name) || s(m.last_name))
+          .map((m) => famRow(contractId, m));
         if (rows.length) {
           const { error: famErr } = await crm.from("contract_family_members").insert(rows);
           if (famErr) throw new Error(`family_insert:${famErr.message}`);
@@ -540,6 +544,68 @@ async function writeEntriesDirect(batch: CrmEntry[]): Promise<DirectResult[]> {
     }
   }
 
+  return out;
+}
+
+// -------- Familienmitglieder im CRM prüfen / nachtragen (Hauptvertrag) --------
+type FamAudit = {
+  external_ref: string;
+  status: "ok" | "missing_contract" | "inserted" | "incomplete" | "error";
+  expected: number;
+  found: number;
+  inserted?: number;
+  reason?: string;
+};
+
+async function auditFamilyMembers(batch: CrmEntry[], repair: boolean): Promise<FamAudit[]> {
+  const crm = createClient(CRM_SUPABASE_URL, CRM_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  const out: FamAudit[] = [];
+  const key = (f: unknown, l: unknown, b: unknown) =>
+    `${String(f ?? "").trim().toLowerCase()}|${String(l ?? "").trim().toLowerCase()}|${b ?? ""}`;
+
+  for (const e of batch) {
+    if (e.role !== "hauptmitglied") continue;
+    const ref = String(e.external_ref);
+    const fam = (Array.isArray(e.family_members) ? (e.family_members as Array<Record<string, unknown>>) : [])
+      .filter((m) => s(m.first_name) || s(m.last_name));
+    try {
+      const { data: contract, error: cErr } = await crm
+        .from("contracts").select("id").eq("details->>external_ref", ref).limit(1).maybeSingle();
+      if (cErr) throw new Error(cErr.message);
+      if (!contract) {
+        out.push({ external_ref: ref, status: "missing_contract", expected: fam.length, found: 0 });
+        continue;
+      }
+      const contractId = (contract as { id: string }).id;
+      const { data: rows, error: rErr } = await crm
+        .from("contract_family_members")
+        .select("first_name, last_name, birthdate").eq("contract_id", contractId);
+      if (rErr) throw new Error(rErr.message);
+      const have = new Set((rows ?? []).map((r: Record<string, unknown>) => key(r.first_name, r.last_name, r.birthdate)));
+      const missing = fam.filter((m) => !have.has(key(m.first_name, m.last_name, m.birthdate)));
+
+      if (!missing.length) {
+        out.push({ external_ref: ref, status: "ok", expected: fam.length, found: (rows ?? []).length });
+        continue;
+      }
+      if (!repair) {
+        out.push({ external_ref: ref, status: "incomplete", expected: fam.length, found: (rows ?? []).length });
+        continue;
+      }
+      const { error: iErr } = await crm
+        .from("contract_family_members").insert(missing.map((m) => famRow(contractId, m)));
+      if (iErr) throw new Error(`family_insert:${iErr.message}`);
+      out.push({
+        external_ref: ref, status: "inserted", expected: fam.length,
+        found: (rows ?? []).length, inserted: missing.length,
+      });
+    } catch (err) {
+      out.push({
+        external_ref: ref, status: "error", expected: fam.length, found: 0,
+        reason: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
   return out;
 }
 
@@ -567,7 +633,7 @@ Deno.serve(async (req) => {
     const isAdmin = !!roleRow;
 
     const body = (await req.json().catch(() => ({}))) as {
-      action?: "preview" | "push" | "export-sql" | "direct-push";
+      action?: "preview" | "push" | "export-sql" | "direct-push" | "audit-family" | "repair-family";
       application_ids?: string[];
       dry_run?: boolean;
     };
@@ -575,13 +641,14 @@ Deno.serve(async (req) => {
     const ids = Array.isArray(body.application_ids)
       ? body.application_ids.filter((x) => typeof x === "string").slice(0, 500)
       : [];
-    if (!ids.length) return json(400, { error: "no_applications" });
+    const isFamilyAction = action === "audit-family" || action === "repair-family";
+    if (!ids.length && !isFamilyAction) return json(400, { error: "no_applications" });
 
     let q = admin
       .from("applications")
       .select("id, user_id, krankenkasse, created_at, vertriebspartner, parent_application_id, payload_encrypted, payload_iv, crm_synced_at")
-      .in("id", ids)
       .is("parent_application_id", null);
+    if (ids.length) q = q.in("id", ids);
     if (!isAdmin) q = q.eq("user_id", user.id);
     const { data: apps, error: appsErr } = await q;
     if (appsErr) return json(500, { error: "db_read_failed" });
@@ -622,6 +689,27 @@ Deno.serve(async (req) => {
 
     if (action === "export-sql") {
       return json(200, { ok: true, mode: "export-sql", entries: batch.length, results, sql: buildSqlScript(batch) });
+    }
+
+    if (action === "audit-family" || action === "repair-family") {
+      if (!CRM_SUPABASE_URL || !CRM_SERVICE_ROLE_KEY) {
+        return json(400, { error: "crm_credentials_missing", message: "CRM_SUPABASE_URL / CRM_SERVICE_ROLE_KEY fehlen." });
+      }
+      const audit = await auditFamilyMembers(batch, action === "repair-family");
+      const summary = {
+        checked: audit.length,
+        ok: audit.filter((a) => a.status === "ok").length,
+        incomplete: audit.filter((a) => a.status === "incomplete").length,
+        inserted: audit.reduce((n, a) => n + (a.inserted ?? 0), 0),
+        missing_contract: audit.filter((a) => a.status === "missing_contract").length,
+        errors: audit.filter((a) => a.status === "error"),
+      };
+      return json(200, {
+        ok: !summary.errors.length,
+        mode: action,
+        ...summary,
+        details: audit.filter((a) => a.status !== "ok").slice(0, 50),
+      });
     }
 
     if (action === "direct-push") {

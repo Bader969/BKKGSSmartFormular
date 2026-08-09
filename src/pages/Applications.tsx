@@ -259,6 +259,32 @@ export default function Applications() {
     }
   };
 
+  // Familienmitglieder im CRM prüfen und ggf. am Hauptvertrag nachtragen
+  const handleCrmFamilyRepair = async () => {
+    if (!crmCandidates.length) return;
+    setCrmBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("crm-sync", {
+        body: { action: "repair-family", application_ids: crmCandidates.map((r) => r.id) },
+      });
+      if (error) throw error;
+      const res = data as {
+        checked?: number; ok?: number; incomplete?: number; inserted?: number;
+        missing_contract?: number; errors?: Array<{ reason?: string }>;
+      };
+      toast.success(
+        `${res.checked ?? 0} Hauptverträge geprüft · ${res.inserted ?? 0} Familienmitglieder nachgetragen` +
+          (res.missing_contract ? ` · ${res.missing_contract} ohne CRM-Vertrag` : "") +
+          (res.errors?.length ? ` · ${res.errors.length} Fehler` : ""),
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Familien-Prüfung fehlgeschlagen: ${msg}`);
+    } finally {
+      setCrmBusy(false);
+    }
+  };
+
   // SQL-Export: alle gefilterten, zulässigen Hauptanträge inkl. eigener Mitgliedschaften
   const handleCrmSqlExport = async () => {
     if (!crmCandidates.length) return;
@@ -399,6 +425,15 @@ export default function Applications() {
               title="Erzeugt ein SQL-Skript (Kunden, GKV-Verträge, KV-Details, Familienmitglieder) zum Einspielen in der Vermittlersuite"
             >
               <Building2 className="h-4 w-4" /> CRM-SQL exportieren ({crmCandidates.length} Hauptanträge)
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleCrmFamilyRepair}
+              disabled={crmBusy || !crmCandidates.length}
+              className="gap-2 w-full sm:w-auto min-h-11"
+              title="Prüft im CRM, ob unter jedem Hauptvertrag alle Familienmitglieder (Ehegatte + Kinder) hinterlegt sind, und trägt Fehlende nach"
+            >
+              <Building2 className="h-4 w-4" /> Familienmitglieder prüfen/nachtragen
             </Button>
             <Button
               variant="outline"
