@@ -259,6 +259,32 @@ export default function Applications() {
     }
   };
 
+  // Familienmitglieder im CRM prüfen und ggf. am Hauptvertrag nachtragen
+  const handleCrmFamilyRepair = async () => {
+    if (!crmCandidates.length) return;
+    setCrmBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("crm-sync", {
+        body: { action: "repair-family", application_ids: crmCandidates.map((r) => r.id) },
+      });
+      if (error) throw error;
+      const res = data as {
+        checked?: number; ok?: number; incomplete?: number; inserted?: number;
+        missing_contract?: number; errors?: Array<{ reason?: string }>;
+      };
+      toast.success(
+        `${res.checked ?? 0} Hauptverträge geprüft · ${res.inserted ?? 0} Familienmitglieder nachgetragen` +
+          (res.missing_contract ? ` · ${res.missing_contract} ohne CRM-Vertrag` : "") +
+          (res.errors?.length ? ` · ${res.errors.length} Fehler` : ""),
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Familien-Prüfung fehlgeschlagen: ${msg}`);
+    } finally {
+      setCrmBusy(false);
+    }
+  };
+
   // SQL-Export: alle gefilterten, zulässigen Hauptanträge inkl. eigener Mitgliedschaften
   const handleCrmSqlExport = async () => {
     if (!crmCandidates.length) return;
