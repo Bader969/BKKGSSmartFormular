@@ -8,7 +8,11 @@ const ENC_SECRET = Deno.env.get("APPLICATIONS_ENCRYPTION_KEY")!;
 const CRM_IMPORT_SECRET = Deno.env.get("CRM_IMPORT_SECRET") ?? "";
 const CRM_IMPORT_URL = Deno.env.get("CRM_IMPORT_URL") ??
   "https://acvuxtmkzhjzecrfvhfp.supabase.co/functions/v1/gkv-import";
-const CRM_SUPABASE_URL = Deno.env.get("CRM_SUPABASE_URL") ?? "";
+/** Secret kann inkl. "/rest/v1/" hinterlegt sein – für createClient muss die Basis-URL rein. */
+const CRM_SUPABASE_URL = (Deno.env.get("CRM_SUPABASE_URL") ?? "")
+  .trim()
+  .replace(/\/+$/, "")
+  .replace(/\/rest\/v1$/, "");
 const CRM_SERVICE_ROLE_KEY = Deno.env.get("CRM_SERVICE_ROLE_KEY") ?? "";
 
 const enc = new TextEncoder();
@@ -50,7 +54,13 @@ const VP_ADVISOR: Record<string, string> = {
   "HZ Blitzvox": "Hamza",
   "JA Blitzvox": "Jamil",
 };
-const advisorForVp = (vp?: string | null) => (vp && VP_ADVISOR[vp.trim()]) || null;
+const NORM_VP_ADVISOR: Record<string, string> = Object.fromEntries(
+  Object.entries(VP_ADVISOR).map(([k, v]) => [k.trim().toLowerCase().replace(/\s+/g, " "), v]),
+);
+const advisorForVp = (vp?: string | null): string | null => {
+  if (!vp) return null;
+  return NORM_VP_ADVISOR[vp.trim().toLowerCase().replace(/\s+/g, " ")] ?? null;
+};
 
 const KK_LABEL: Record<string, string> = {
   bkk_gs: "BKK GILDEMEISTER SEIDENSTICKER",
