@@ -378,7 +378,6 @@ function buildSqlScript(batch: CrmEntry[]): string {
   return [header, ...batch.map(entryToSql)].join("\n\n");
 }
 
-Deno.serve(async (req) => {
 // ------------------------------------------------- Direktschreiben ins CRM
 type DirectResult = {
   external_ref: string;
