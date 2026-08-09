@@ -196,7 +196,6 @@ export default function Applications() {
 
   const handleExportXlsx = () => {
     const data = grouped.map((r) => ({
-    const data = grouped.map((r) => ({
       "Nr.": numberMap.get(r.id) ?? "",
       Typ: r.parent_application_id
         ? r.person_role === "ehegatte" ? "Ehegatte" : `Kind ${r.person_index ?? ""}`.trim()
