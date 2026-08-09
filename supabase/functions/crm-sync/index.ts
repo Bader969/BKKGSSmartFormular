@@ -633,7 +633,7 @@ Deno.serve(async (req) => {
     const isAdmin = !!roleRow;
 
     const body = (await req.json().catch(() => ({}))) as {
-      action?: "preview" | "push" | "export-sql" | "direct-push";
+      action?: "preview" | "push" | "export-sql" | "direct-push" | "audit-family" | "repair-family";
       application_ids?: string[];
       dry_run?: boolean;
     };
@@ -688,6 +688,27 @@ Deno.serve(async (req) => {
 
     if (action === "export-sql") {
       return json(200, { ok: true, mode: "export-sql", entries: batch.length, results, sql: buildSqlScript(batch) });
+    }
+
+    if (action === "audit-family" || action === "repair-family") {
+      if (!CRM_SUPABASE_URL || !CRM_SERVICE_ROLE_KEY) {
+        return json(400, { error: "crm_credentials_missing", message: "CRM_SUPABASE_URL / CRM_SERVICE_ROLE_KEY fehlen." });
+      }
+      const audit = await auditFamilyMembers(batch, action === "repair-family");
+      const summary = {
+        checked: audit.length,
+        ok: audit.filter((a) => a.status === "ok").length,
+        incomplete: audit.filter((a) => a.status === "incomplete").length,
+        inserted: audit.reduce((n, a) => n + (a.inserted ?? 0), 0),
+        missing_contract: audit.filter((a) => a.status === "missing_contract").length,
+        errors: audit.filter((a) => a.status === "error"),
+      };
+      return json(200, {
+        ok: !summary.errors.length,
+        mode: action,
+        ...summary,
+        details: audit.filter((a) => a.status !== "ok").slice(0, 50),
+      });
     }
 
     if (action === "direct-push") {
