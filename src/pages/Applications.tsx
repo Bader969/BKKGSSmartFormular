@@ -428,6 +428,15 @@ export default function Applications() {
             </Button>
             <Button
               variant="outline"
+              onClick={handleCrmFamilyRepair}
+              disabled={crmBusy || !crmCandidates.length}
+              className="gap-2 w-full sm:w-auto min-h-11"
+              title="Prüft im CRM, ob unter jedem Hauptvertrag alle Familienmitglieder (Ehegatte + Kinder) hinterlegt sind, und trägt Fehlende nach"
+            >
+              <Building2 className="h-4 w-4" /> Familienmitglieder prüfen/nachtragen
+            </Button>
+            <Button
+              variant="outline"
               onClick={handleExportXlsx}
               disabled={!filtered.length}
               className="gap-2 w-full sm:w-auto min-h-11"
