@@ -400,7 +400,7 @@ Deno.serve(async (req) => {
     const isAdmin = !!roleRow;
 
     const body = (await req.json().catch(() => ({}))) as {
-      action?: "preview" | "push";
+      action?: "preview" | "push" | "export-sql";
       application_ids?: string[];
       dry_run?: boolean;
     };
@@ -451,6 +451,10 @@ Deno.serve(async (req) => {
 
     if (action === "preview" || body.dry_run) {
       return json(200, { ok: true, mode: "preview", entries: batch.length, results, payload_sample: batch.slice(0, 2) });
+    }
+
+    if (action === "export-sql") {
+      return json(200, { ok: true, mode: "export-sql", entries: batch.length, results, sql: buildSqlScript(batch) });
     }
 
     if (!CRM_IMPORT_SECRET) {
