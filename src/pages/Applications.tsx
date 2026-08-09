@@ -233,14 +233,23 @@ export default function Applications() {
     setCrmBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke("crm-sync", {
-        body: { action: "push", application_ids: crmOpen.map((r) => r.id) },
+        body: { action: "direct-push", application_ids: crmOpen.map((r) => r.id) },
       });
       if (error) throw error;
-      const res = data as { entries?: number; results?: Array<{ status?: string }> };
-      const skipped = (res.results ?? []).filter((x) => x.status !== "prepared").length;
-      toast.success(
-        `${res.entries ?? 0} Mitgliedschaften ins CRM übertragen${skipped ? ` · ${skipped} übersprungen` : ""}.`,
-      );
+      const res = data as {
+        created?: number; skipped?: number; failed?: number;
+        errors?: Array<{ external_ref?: string; reason?: string }>;
+      };
+      if (res.failed) {
+        toast.error(
+          `${res.created ?? 0} übertragen, ${res.failed} fehlgeschlagen: ${(res.errors ?? [])
+            .map((x) => x.reason).filter(Boolean).slice(0, 2).join(" · ")}`,
+        );
+      } else {
+        toast.success(
+          `${res.created ?? 0} Mitgliedschaften ins CRM geschrieben${res.skipped ? ` · ${res.skipped} bereits vorhanden` : ""}.`,
+        );
+      }
       reload();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
