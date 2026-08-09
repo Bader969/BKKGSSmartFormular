@@ -90,6 +90,38 @@ const nn = (v: string | null) => (v && v.length ? v : null);
 
 type CrmEntry = Record<string, unknown>;
 
+// -------------------------------------------------- eigene Mitgliedschaft
+function ageInYears(v: unknown): number | null {
+  const iso = toIsoDate(v);
+  if (!iso) return null;
+  const d = new Date(iso);
+  const ref = new Date();
+  let a = ref.getFullYear() - d.getFullYear();
+  const mDiff = ref.getMonth() - d.getMonth();
+  if (mDiff < 0 || (mDiff === 0 && ref.getDate() < d.getDate())) a -= 1;
+  return a;
+}
+
+/**
+ * Nur Personen mit eigener Mitgliedschaft werden als eigener Kunde + GKV-Vertrag
+ * übertragen. Novitas: Ehegatte + Kinder ≥ 16, wenn Hauptmitglied Jobcenter.
+ */
+function hasOwnMembership(
+  payload: Record<string, unknown>,
+  krankenkasse: string,
+  m: Record<string, unknown>,
+  relation: "ehegatte" | "kind",
+): boolean {
+  if (krankenkasse === "novitas") {
+    if ((payload.novitasMode ?? "familie") !== "familie") return false;
+    if (payload.viactivBeschaeftigung !== "al_geld_2") return false;
+    if (relation === "ehegatte") return true;
+    const age = ageInYears(m.geburtsdatum);
+    return age != null && age >= 16;
+  }
+  return m.eigeneMitgliedschaft === true;
+}
+
 function buildEntries(app: {
   id: string;
   krankenkasse: string;
