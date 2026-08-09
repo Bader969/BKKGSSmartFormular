@@ -547,6 +547,68 @@ async function writeEntriesDirect(batch: CrmEntry[]): Promise<DirectResult[]> {
   return out;
 }
 
+// -------- Familienmitglieder im CRM prüfen / nachtragen (Hauptvertrag) --------
+type FamAudit = {
+  external_ref: string;
+  status: "ok" | "missing_contract" | "inserted" | "incomplete" | "error";
+  expected: number;
+  found: number;
+  inserted?: number;
+  reason?: string;
+};
+
+async function auditFamilyMembers(batch: CrmEntry[], repair: boolean): Promise<FamAudit[]> {
+  const crm = createClient(CRM_SUPABASE_URL, CRM_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  const out: FamAudit[] = [];
+  const key = (f: unknown, l: unknown, b: unknown) =>
+    `${String(f ?? "").trim().toLowerCase()}|${String(l ?? "").trim().toLowerCase()}|${b ?? ""}`;
+
+  for (const e of batch) {
+    if (e.role !== "hauptmitglied") continue;
+    const ref = String(e.external_ref);
+    const fam = (Array.isArray(e.family_members) ? (e.family_members as Array<Record<string, unknown>>) : [])
+      .filter((m) => s(m.first_name) || s(m.last_name));
+    try {
+      const { data: contract, error: cErr } = await crm
+        .from("contracts").select("id").eq("details->>external_ref", ref).limit(1).maybeSingle();
+      if (cErr) throw new Error(cErr.message);
+      if (!contract) {
+        out.push({ external_ref: ref, status: "missing_contract", expected: fam.length, found: 0 });
+        continue;
+      }
+      const contractId = (contract as { id: string }).id;
+      const { data: rows, error: rErr } = await crm
+        .from("contract_family_members")
+        .select("first_name, last_name, birthdate").eq("contract_id", contractId);
+      if (rErr) throw new Error(rErr.message);
+      const have = new Set((rows ?? []).map((r: Record<string, unknown>) => key(r.first_name, r.last_name, r.birthdate)));
+      const missing = fam.filter((m) => !have.has(key(m.first_name, m.last_name, m.birthdate)));
+
+      if (!missing.length) {
+        out.push({ external_ref: ref, status: "ok", expected: fam.length, found: (rows ?? []).length });
+        continue;
+      }
+      if (!repair) {
+        out.push({ external_ref: ref, status: "incomplete", expected: fam.length, found: (rows ?? []).length });
+        continue;
+      }
+      const { error: iErr } = await crm
+        .from("contract_family_members").insert(missing.map((m) => famRow(contractId, m)));
+      if (iErr) throw new Error(`family_insert:${iErr.message}`);
+      out.push({
+        external_ref: ref, status: "inserted", expected: fam.length,
+        found: (rows ?? []).length, inserted: missing.length,
+      });
+    } catch (err) {
+      out.push({
+        external_ref: ref, status: "error", expected: fam.length, found: 0,
+        reason: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  return out;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
