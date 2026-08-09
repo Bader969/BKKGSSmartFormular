@@ -508,26 +508,9 @@ async function writeEntriesDirect(batch: CrmEntry[]): Promise<DirectResult[]> {
       if (kvErr) throw new Error(`kv_insert:${kvErr.message}`);
 
       if (fam.length) {
-        const rows = fam.filter((m) => s(m.first_name) || s(m.last_name)).map((m) => ({
-          contract_id: contractId,
-          relation: m.relation,
-          first_name: s(m.first_name) || "-",
-          last_name: s(m.last_name) || "-",
-          birthdate: m.birthdate ?? null,
-          versicherungsnummer: m.versicherungsnummer ?? null,
-          geschlecht: m.geschlecht ?? null,
-          verwandtschaft: KV_VERWANDTSCHAFT.includes(String(m.verwandtschaft ?? "").toLowerCase())
-            ? String(m.verwandtschaft).toLowerCase() : null,
-          geburtsname: m.geburtsname ?? null,
-          geburtsort: m.geburtsort ?? null,
-          geburtsland: m.geburtsland ?? null,
-          staatsangehoerigkeit: m.staatsangehoerigkeit ?? null,
-          bisherig_kasse: m.bisherig_kasse ?? null,
-          bisherig_ende: m.bisherig_ende ?? null,
-          bisherig_art: KV_BISHERIG_ART.includes(String(m.bisherig_art ?? "").toLowerCase())
-            ? String(m.bisherig_art).toLowerCase() : null,
-          abweichende_anschrift: m.abweichende_anschrift ?? null,
-        }));
+        const rows = fam
+          .filter((m) => s(m.first_name) || s(m.last_name))
+          .map((m) => famRow(contractId, m));
         if (rows.length) {
           const { error: famErr } = await crm.from("contract_family_members").insert(rows);
           if (famErr) throw new Error(`family_insert:${famErr.message}`);
