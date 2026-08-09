@@ -8,7 +8,11 @@ const ENC_SECRET = Deno.env.get("APPLICATIONS_ENCRYPTION_KEY")!;
 const CRM_IMPORT_SECRET = Deno.env.get("CRM_IMPORT_SECRET") ?? "";
 const CRM_IMPORT_URL = Deno.env.get("CRM_IMPORT_URL") ??
   "https://acvuxtmkzhjzecrfvhfp.supabase.co/functions/v1/gkv-import";
-const CRM_SUPABASE_URL = Deno.env.get("CRM_SUPABASE_URL") ?? "";
+/** Secret kann inkl. "/rest/v1/" hinterlegt sein – für createClient muss die Basis-URL rein. */
+const CRM_SUPABASE_URL = (Deno.env.get("CRM_SUPABASE_URL") ?? "")
+  .trim()
+  .replace(/\/+$/, "")
+  .replace(/\/rest\/v1$/, "");
 const CRM_SERVICE_ROLE_KEY = Deno.env.get("CRM_SERVICE_ROLE_KEY") ?? "";
 
 const enc = new TextEncoder();
@@ -50,7 +54,13 @@ const VP_ADVISOR: Record<string, string> = {
   "HZ Blitzvox": "Hamza",
   "JA Blitzvox": "Jamil",
 };
-const advisorForVp = (vp?: string | null) => (vp && VP_ADVISOR[vp.trim()]) || null;
+const NORM_VP_ADVISOR: Record<string, string> = Object.fromEntries(
+  Object.entries(VP_ADVISOR).map(([k, v]) => [k.trim().toLowerCase().replace(/\s+/g, " "), v]),
+);
+const advisorForVp = (vp?: string | null): string | null => {
+  if (!vp) return null;
+  return NORM_VP_ADVISOR[vp.trim().toLowerCase().replace(/\s+/g, " ")] ?? null;
+};
 
 const KK_LABEL: Record<string, string> = {
   bkk_gs: "BKK GILDEMEISTER SEIDENSTICKER",
@@ -326,7 +336,8 @@ function entryToSql(e: CrmEntry): string {
 DO $do$
 DECLARE v_adv uuid; v_cust uuid; v_contract uuid;
 BEGIN
-  SELECT id INTO v_adv FROM public.profiles WHERE full_name = ${q(e.advisor_name)} LIMIT 1;
+  SELECT id INTO v_adv FROM public.profiles
+   WHERE lower(btrim(full_name)) = lower(btrim(${q(e.advisor_name)})) LIMIT 1;
   IF v_adv IS NULL THEN
     RAISE NOTICE 'Berater nicht gefunden: % (%)', ${q(e.advisor_name)}, ${q(ref)};
     RETURN;
@@ -343,10 +354,10 @@ BEGIN
 
   IF v_cust IS NULL THEN
     INSERT INTO public.customers
-      (salutation, first_name, last_name, birthdate, phone, email, street, zip, city,
+      (salutation, first_name, last_name, birthdate, phone, email, street, zip, city, status,
        lead_source, lead_source_detail, assigned_to, recorded_by, advisor_id, created_by)
     VALUES (${q(cust.salutation)}, ${q(cust.first_name)}, ${q(cust.last_name)}, ${qDate(cust.birthdate)},
-       ${q(cust.phone)}, ${q(cust.email)}, ${q(cust.street)}, ${q(cust.zip)}, ${q(cust.city)},
+       ${q(cust.phone)}, ${q(cust.email)}, ${q(cust.street)}, ${q(cust.zip)}, ${q(cust.city)}, 'kunde'::public.customer_status,
        ${q(e.lead_source)}, ${q(e.lead_source_detail)}, v_adv, v_adv, v_adv, v_adv)
     RETURNING id INTO v_cust;
   END IF;
@@ -389,17 +400,20 @@ type DirectResult = {
 
 async function writeEntriesDirect(batch: CrmEntry[]): Promise<DirectResult[]> {
   const crm = createClient(CRM_SUPABASE_URL, CRM_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-  const advisorCache = new Map<string, string | null>();
   const out: DirectResult[] = [];
 
-  const findAdvisor = async (name: string | null): Promise<string | null> => {
-    if (!name) return null;
-    if (advisorCache.has(name)) return advisorCache.get(name)!;
-    const { data } = await crm.from("profiles").select("id").eq("full_name", name).limit(1).maybeSingle();
-    const id = (data as { id?: string } | null)?.id ?? null;
-    advisorCache.set(name, id);
-    return id;
-  };
+  // Berater einmalig laden – full_name im CRM kann Leerzeichen/Groß-Kleinschreibung abweichen
+  const norm = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ");
+  const advisorMap = new Map<string, string>();
+  {
+    const { data: profs, error: profErr } = await crm.from("profiles").select("id, full_name");
+    if (profErr) throw new Error(`profiles_read:${profErr.message}`);
+    for (const p of (profs ?? []) as Array<{ id: string; full_name: string | null }>) {
+      if (p.full_name) advisorMap.set(norm(p.full_name), p.id);
+    }
+  }
+  const findAdvisor = (name: string | null): string | null =>
+    name ? advisorMap.get(norm(name)) ?? null : null;
 
   for (const e of batch) {
     const ref = String(e.external_ref);
@@ -409,7 +423,7 @@ async function writeEntriesDirect(batch: CrmEntry[]): Promise<DirectResult[]> {
     const fam = Array.isArray(e.family_members) ? (e.family_members as Array<Record<string, unknown>>) : [];
 
     try {
-      const advisorId = await findAdvisor((e.advisor_name ?? null) as string | null);
+      const advisorId = findAdvisor((e.advisor_name ?? null) as string | null);
       if (!advisorId) {
         out.push({ external_ref: ref, status: "error", reason: `advisor_not_found:${e.advisor_name}` });
         continue;
@@ -443,6 +457,7 @@ async function writeEntriesDirect(batch: CrmEntry[]): Promise<DirectResult[]> {
           street: cust.street ?? null,
           zip: cust.zip ?? null,
           city: cust.city ?? null,
+          status: "kunde",
           lead_source: e.lead_source ?? null,
           lead_source_detail: e.lead_source_detail ?? null,
           assigned_to: advisorId,
@@ -493,11 +508,11 @@ async function writeEntriesDirect(batch: CrmEntry[]): Promise<DirectResult[]> {
       if (kvErr) throw new Error(`kv_insert:${kvErr.message}`);
 
       if (fam.length) {
-        const rows = fam.map((m) => ({
+        const rows = fam.filter((m) => s(m.first_name) || s(m.last_name)).map((m) => ({
           contract_id: contractId,
           relation: m.relation,
-          first_name: m.first_name ?? null,
-          last_name: m.last_name ?? null,
+          first_name: s(m.first_name) || "-",
+          last_name: s(m.last_name) || "-",
           birthdate: m.birthdate ?? null,
           versicherungsnummer: m.versicherungsnummer ?? null,
           geschlecht: m.geschlecht ?? null,
@@ -513,8 +528,10 @@ async function writeEntriesDirect(batch: CrmEntry[]): Promise<DirectResult[]> {
             ? String(m.bisherig_art).toLowerCase() : null,
           abweichende_anschrift: m.abweichende_anschrift ?? null,
         }));
-        const { error: famErr } = await crm.from("contract_family_members").insert(rows);
-        if (famErr) throw new Error(`family_insert:${famErr.message}`);
+        if (rows.length) {
+          const { error: famErr } = await crm.from("contract_family_members").insert(rows);
+          if (famErr) throw new Error(`family_insert:${famErr.message}`);
+        }
       }
 
       out.push({ external_ref: ref, status: "created", customer_id: customerId, contract_id: contractId });
@@ -556,7 +573,7 @@ Deno.serve(async (req) => {
     };
     const action = body.action ?? "preview";
     const ids = Array.isArray(body.application_ids)
-      ? body.application_ids.filter((x) => typeof x === "string").slice(0, 200)
+      ? body.application_ids.filter((x) => typeof x === "string").slice(0, 500)
       : [];
     if (!ids.length) return json(400, { error: "no_applications" });
 
