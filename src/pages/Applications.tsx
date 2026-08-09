@@ -250,6 +250,33 @@ export default function Applications() {
     }
   };
 
+  // SQL-Export: alle gefilterten, zulässigen Hauptanträge inkl. eigener Mitgliedschaften
+  const handleCrmSqlExport = async () => {
+    if (!crmCandidates.length) return;
+    setCrmBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("crm-sync", {
+        body: { action: "export-sql", application_ids: crmCandidates.map((r) => r.id) },
+      });
+      if (error) throw error;
+      const res = data as { sql?: string; entries?: number };
+      if (!res.sql) throw new Error("Kein SQL erhalten");
+      const blob = new Blob([res.sql], { type: "application/sql" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `crm_import_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.sql`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`${res.entries ?? 0} Mitgliedschaften als SQL exportiert.`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`SQL-Export fehlgeschlagen: ${msg}`);
+    } finally {
+      setCrmBusy(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b border-border/60 glass-bar">
@@ -354,6 +381,15 @@ export default function Applications() {
             >
               <Building2 className="h-4 w-4" />
               {crmBusy ? "Übertrage…" : `An CRM übertragen (${crmOpen.length})`}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleCrmSqlExport}
+              disabled={crmBusy || !crmCandidates.length}
+              className="gap-2 w-full sm:w-auto min-h-11"
+              title="Erzeugt ein SQL-Skript (Kunden, GKV-Verträge, KV-Details, Familienmitglieder) zum Einspielen in der Vermittlersuite"
+            >
+              <Building2 className="h-4 w-4" /> CRM-SQL exportieren ({crmCandidates.length})
             </Button>
             <Button
               variant="outline"

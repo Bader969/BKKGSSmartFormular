@@ -90,6 +90,38 @@ const nn = (v: string | null) => (v && v.length ? v : null);
 
 type CrmEntry = Record<string, unknown>;
 
+// -------------------------------------------------- eigene Mitgliedschaft
+function ageInYears(v: unknown): number | null {
+  const iso = toIsoDate(v);
+  if (!iso) return null;
+  const d = new Date(iso);
+  const ref = new Date();
+  let a = ref.getFullYear() - d.getFullYear();
+  const mDiff = ref.getMonth() - d.getMonth();
+  if (mDiff < 0 || (mDiff === 0 && ref.getDate() < d.getDate())) a -= 1;
+  return a;
+}
+
+/**
+ * Nur Personen mit eigener Mitgliedschaft werden als eigener Kunde + GKV-Vertrag
+ * übertragen. Novitas: Ehegatte + Kinder ≥ 16, wenn Hauptmitglied Jobcenter.
+ */
+function hasOwnMembership(
+  payload: Record<string, unknown>,
+  krankenkasse: string,
+  m: Record<string, unknown>,
+  relation: "ehegatte" | "kind",
+): boolean {
+  if (krankenkasse === "novitas") {
+    if ((payload.novitasMode ?? "familie") !== "familie") return false;
+    if (payload.viactivBeschaeftigung !== "al_geld_2") return false;
+    if (relation === "ehegatte") return true;
+    const age = ageInYears(m.geburtsdatum);
+    return age != null && age >= 16;
+  }
+  return m.eigeneMitgliedschaft === true;
+}
+
 function buildEntries(app: {
   id: string;
   krankenkasse: string;
@@ -227,14 +259,121 @@ function buildEntries(app: {
   };
 
   if (ehegatte && (s(ehegatte.vorname) || s(ehegatte.name))) {
-    entries.push(personEntry(ehegatte, "ehegatte", null));
+    if (hasOwnMembership(payload, app.krankenkasse, ehegatte, "ehegatte")) {
+      entries.push(personEntry(ehegatte, "ehegatte", null));
+    }
   }
   kinder.forEach((k, i) => {
     if (!k || (!s(k.vorname) && !s(k.name))) return;
+    if (!hasOwnMembership(payload, app.krankenkasse, k, "kind")) return;
     entries.push(personEntry(k, "kind", i + 1));
   });
 
   return entries;
+}
+
+// ---------------------------------------------------------------- SQL export
+const KV_FAMILIENSTAND = ["ledig", "verheiratet", "getrennt", "geschieden", "verwitwet"];
+const KV_VERWANDTSCHAFT = ["leiblich", "stief", "enkel", "pflege"];
+const KV_BISHERIG_ART = ["mitgliedschaft", "familienversicherung", "nicht_gesetzlich"];
+
+const q = (v: unknown): string => {
+  if (v === null || v === undefined || v === "") return "NULL";
+  return `'${String(v).replace(/'/g, "''")}'`;
+};
+const qEnum = (v: unknown, allowed: string[], type: string): string => {
+  const val = typeof v === "string" ? v.toLowerCase() : "";
+  return allowed.includes(val) ? `${q(val)}::public.${type}` : "NULL";
+};
+const qDate = (v: unknown): string => (v ? `${q(v)}::date` : "NULL");
+
+function entryToSql(e: CrmEntry): string {
+  const cust = (e.customer ?? {}) as Record<string, unknown>;
+  const contract = (e.contract ?? {}) as Record<string, unknown>;
+  const kv = (contract.kv_details ?? {}) as Record<string, unknown>;
+  const fam = Array.isArray(e.family_members) ? (e.family_members as Array<Record<string, unknown>>) : [];
+  const ref = String(e.external_ref);
+  const details = {
+    external_ref: ref,
+    source: e.source,
+    application_id: e.application_id,
+    role: e.role,
+    own_membership: e.own_membership ?? (e.role === "hauptmitglied"),
+    related_to_external_ref: e.related_to_external_ref ?? null,
+    vp_code: e.vp_code ?? null,
+    advisor_name: e.advisor_name ?? null,
+  };
+
+  const famSql = fam
+    .map(
+      (m) => `  INSERT INTO public.contract_family_members
+    (contract_id, relation, first_name, last_name, birthdate, versicherungsnummer,
+     geschlecht, verwandtschaft, geburtsname, geburtsort, geburtsland,
+     staatsangehoerigkeit, bisherig_kasse, bisherig_ende, bisherig_art, abweichende_anschrift)
+  VALUES (v_contract, ${q(m.relation)}::public.family_relation, ${q(m.first_name)}, ${q(m.last_name)},
+     ${qDate(m.birthdate)}, ${q(m.versicherungsnummer)},
+     ${qEnum(m.geschlecht, ["m", "w", "d"], "kv_geschlecht")},
+     ${qEnum(m.verwandtschaft, KV_VERWANDTSCHAFT, "kv_verwandtschaft")},
+     ${q(m.geburtsname)}, ${q(m.geburtsort)}, ${q(m.geburtsland)}, ${q(m.staatsangehoerigkeit)},
+     ${q(m.bisherig_kasse)}, ${qDate(m.bisherig_ende)},
+     ${qEnum(m.bisherig_art, KV_BISHERIG_ART, "kv_bisherig_art")}, ${q(m.abweichende_anschrift)});`,
+    )
+    .join("\n");
+
+  return `-- ${ref} · ${cust.first_name ?? ""} ${cust.last_name ?? ""} (${e.role})
+DO $do$
+DECLARE v_adv uuid; v_cust uuid; v_contract uuid;
+BEGIN
+  SELECT id INTO v_adv FROM public.profiles WHERE full_name = ${q(e.advisor_name)} LIMIT 1;
+  IF v_adv IS NULL THEN
+    RAISE NOTICE 'Berater nicht gefunden: % (%)', ${q(e.advisor_name)}, ${q(ref)};
+    RETURN;
+  END IF;
+
+  SELECT id INTO v_contract FROM public.contracts WHERE details->>'external_ref' = ${q(ref)} LIMIT 1;
+  IF v_contract IS NOT NULL THEN RETURN; END IF;  -- bereits importiert
+
+  SELECT id INTO v_cust FROM public.customers
+   WHERE lower(first_name) = lower(${q(cust.first_name)})
+     AND lower(last_name) = lower(${q(cust.last_name)})
+     AND birthdate IS NOT DISTINCT FROM ${qDate(cust.birthdate)}
+   LIMIT 1;
+
+  IF v_cust IS NULL THEN
+    INSERT INTO public.customers
+      (salutation, first_name, last_name, birthdate, phone, email, street, zip, city,
+       lead_source, lead_source_detail, assigned_to, recorded_by, advisor_id, created_by)
+    VALUES (${q(cust.salutation)}, ${q(cust.first_name)}, ${q(cust.last_name)}, ${qDate(cust.birthdate)},
+       ${q(cust.phone)}, ${q(cust.email)}, ${q(cust.street)}, ${q(cust.zip)}, ${q(cust.city)},
+       ${q(e.lead_source)}, ${q(e.lead_source_detail)}, v_adv, v_adv, v_adv, v_adv)
+    RETURNING id INTO v_cust;
+  END IF;
+
+  INSERT INTO public.contracts
+    (customer_id, type, status, provider, start_date, details, created_by, created_at)
+  VALUES (v_cust, 'gkv'::public.contract_type, ${q(contract.status)}::public.contract_status,
+     ${q(contract.provider)}, ${qDate(contract.start_date)},
+     ${q(JSON.stringify(details))}::jsonb, v_adv, ${q(e.created_at)}::timestamptz)
+  RETURNING id INTO v_contract;
+
+  INSERT INTO public.contract_kv_details
+    (contract_id, geschlecht, familienstand, geburtsort, geburtsland,
+     staatsangehoerigkeit, kv_nummer, vorherige_kasse, vorherige_kasse_ende)
+  VALUES (v_contract, ${qEnum(kv.geschlecht, ["m", "w", "d"], "kv_geschlecht")},
+     ${qEnum(kv.familienstand, KV_FAMILIENSTAND, "kv_familienstand")},
+     ${q(kv.geburtsort)}, ${q(kv.geburtsland)}, ${q(kv.staatsangehoerigkeit)}, ${q(kv.kv_nummer)},
+     ${q(kv.vorherige_kasse)}, ${qDate(kv.vorherige_kasse_ende)});
+${famSql}
+END $do$;`;
+}
+
+function buildSqlScript(batch: CrmEntry[]): string {
+  const header = `-- GKV-Antragsportal → Vermittler Suite (CRM)
+-- Generiert: ${new Date().toISOString()}
+-- Einträge (Mitgliedschaften): ${batch.length}
+-- Idempotent: Verträge mit gleicher details->>'external_ref' werden übersprungen.
+`;
+  return [header, ...batch.map(entryToSql)].join("\n\n");
 }
 
 Deno.serve(async (req) => {
@@ -261,7 +400,7 @@ Deno.serve(async (req) => {
     const isAdmin = !!roleRow;
 
     const body = (await req.json().catch(() => ({}))) as {
-      action?: "preview" | "push";
+      action?: "preview" | "push" | "export-sql";
       application_ids?: string[];
       dry_run?: boolean;
     };
@@ -312,6 +451,10 @@ Deno.serve(async (req) => {
 
     if (action === "preview" || body.dry_run) {
       return json(200, { ok: true, mode: "preview", entries: batch.length, results, payload_sample: batch.slice(0, 2) });
+    }
+
+    if (action === "export-sql") {
+      return json(200, { ok: true, mode: "export-sql", entries: batch.length, results, sql: buildSqlScript(batch) });
     }
 
     if (!CRM_IMPORT_SECRET) {
