@@ -402,6 +402,9 @@ async function writeEntriesDirect(batch: CrmEntry[]): Promise<DirectResult[]> {
   const crm = createClient(CRM_SUPABASE_URL, CRM_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
   const out: DirectResult[] = [];
 
+  const crm = createClient(CRM_SUPABASE_URL, CRM_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  const out: DirectResult[] = [];
+
   // Berater einmalig laden – full_name im CRM kann Leerzeichen/Groß-Kleinschreibung abweichen
   const norm = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ");
   const advisorMap = new Map<string, string>();
