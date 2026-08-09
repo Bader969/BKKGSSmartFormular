@@ -233,14 +233,23 @@ export default function Applications() {
     setCrmBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke("crm-sync", {
-        body: { action: "push", application_ids: crmOpen.map((r) => r.id) },
+        body: { action: "direct-push", application_ids: crmOpen.map((r) => r.id) },
       });
       if (error) throw error;
-      const res = data as { entries?: number; results?: Array<{ status?: string }> };
-      const skipped = (res.results ?? []).filter((x) => x.status !== "prepared").length;
-      toast.success(
-        `${res.entries ?? 0} Mitgliedschaften ins CRM übertragen${skipped ? ` · ${skipped} übersprungen` : ""}.`,
-      );
+      const res = data as {
+        created?: number; skipped?: number; failed?: number;
+        errors?: Array<{ external_ref?: string; reason?: string }>;
+      };
+      if (res.failed) {
+        toast.error(
+          `${res.created ?? 0} übertragen, ${res.failed} fehlgeschlagen: ${(res.errors ?? [])
+            .map((x) => x.reason).filter(Boolean).slice(0, 2).join(" · ")}`,
+        );
+      } else {
+        toast.success(
+          `${res.created ?? 0} Mitgliedschaften ins CRM geschrieben${res.skipped ? ` · ${res.skipped} bereits vorhanden` : ""}.`,
+        );
+      }
       reload();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -377,10 +386,10 @@ export default function Applications() {
               onClick={handleCrmSync}
               disabled={crmBusy || !crmOpen.length}
               className="gap-2 w-full sm:w-auto min-h-11"
-              title="Überträgt alle gefilterten Hauptanträge zulässiger VP inkl. Familienmitglieder an die Vermittlersuite"
+              title="Schreibt alle noch nicht übertragenen Hauptanträge zulässiger VP (inkl. eigener Mitgliedschaften der Familie) direkt in die CRM-Datenbank"
             >
               <Building2 className="h-4 w-4" />
-              {crmBusy ? "Übertrage…" : `An CRM übertragen (${crmOpen.length})`}
+              {crmBusy ? "Übertrage…" : `An CRM übertragen (${crmOpen.length} Hauptanträge)`}
             </Button>
             <Button
               variant="outline"
@@ -389,7 +398,7 @@ export default function Applications() {
               className="gap-2 w-full sm:w-auto min-h-11"
               title="Erzeugt ein SQL-Skript (Kunden, GKV-Verträge, KV-Details, Familienmitglieder) zum Einspielen in der Vermittlersuite"
             >
-              <Building2 className="h-4 w-4" /> CRM-SQL exportieren ({crmCandidates.length})
+              <Building2 className="h-4 w-4" /> CRM-SQL exportieren ({crmCandidates.length} Hauptanträge)
             </Button>
             <Button
               variant="outline"
