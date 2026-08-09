@@ -336,7 +336,8 @@ function entryToSql(e: CrmEntry): string {
 DO $do$
 DECLARE v_adv uuid; v_cust uuid; v_contract uuid;
 BEGIN
-  SELECT id INTO v_adv FROM public.profiles WHERE full_name = ${q(e.advisor_name)} LIMIT 1;
+  SELECT id INTO v_adv FROM public.profiles
+   WHERE lower(btrim(full_name)) = lower(btrim(${q(e.advisor_name)})) LIMIT 1;
   IF v_adv IS NULL THEN
     RAISE NOTICE 'Berater nicht gefunden: % (%)', ${q(e.advisor_name)}, ${q(ref)};
     RETURN;
@@ -353,10 +354,10 @@ BEGIN
 
   IF v_cust IS NULL THEN
     INSERT INTO public.customers
-      (salutation, first_name, last_name, birthdate, phone, email, street, zip, city,
+      (salutation, first_name, last_name, birthdate, phone, email, street, zip, city, status,
        lead_source, lead_source_detail, assigned_to, recorded_by, advisor_id, created_by)
     VALUES (${q(cust.salutation)}, ${q(cust.first_name)}, ${q(cust.last_name)}, ${qDate(cust.birthdate)},
-       ${q(cust.phone)}, ${q(cust.email)}, ${q(cust.street)}, ${q(cust.zip)}, ${q(cust.city)},
+       ${q(cust.phone)}, ${q(cust.email)}, ${q(cust.street)}, ${q(cust.zip)}, ${q(cust.city)}, 'kunde'::public.customer_status,
        ${q(e.lead_source)}, ${q(e.lead_source_detail)}, v_adv, v_adv, v_adv, v_adv)
     RETURNING id INTO v_cust;
   END IF;
@@ -572,7 +573,7 @@ Deno.serve(async (req) => {
     };
     const action = body.action ?? "preview";
     const ids = Array.isArray(body.application_ids)
-      ? body.application_ids.filter((x) => typeof x === "string").slice(0, 200)
+      ? body.application_ids.filter((x) => typeof x === "string").slice(0, 500)
       : [];
     if (!ids.length) return json(400, { error: "no_applications" });
 
