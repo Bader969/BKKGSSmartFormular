@@ -641,13 +641,14 @@ Deno.serve(async (req) => {
     const ids = Array.isArray(body.application_ids)
       ? body.application_ids.filter((x) => typeof x === "string").slice(0, 500)
       : [];
-    if (!ids.length) return json(400, { error: "no_applications" });
+    const isFamilyAction = action === "audit-family" || action === "repair-family";
+    if (!ids.length && !isFamilyAction) return json(400, { error: "no_applications" });
 
     let q = admin
       .from("applications")
       .select("id, user_id, krankenkasse, created_at, vertriebspartner, parent_application_id, payload_encrypted, payload_iv, crm_synced_at")
-      .in("id", ids)
       .is("parent_application_id", null);
+    if (ids.length) q = q.in("id", ids);
     if (!isAdmin) q = q.eq("user_id", user.id);
     const { data: apps, error: appsErr } = await q;
     if (appsErr) return json(500, { error: "db_read_failed" });
