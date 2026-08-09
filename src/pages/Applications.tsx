@@ -457,6 +457,7 @@ export default function Applications() {
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{new Date(r.updated_at).toLocaleString("de-DE")}</TableCell>
+                  {null}
                   <TableCell className="text-muted-foreground">{new Date(r.created_at).toLocaleString("de-DE")}</TableCell>
                   <TableCell>{r.vertriebspartner || <span className="text-muted-foreground">—</span>}</TableCell>
                   <TableCell className="text-muted-foreground text-xs">{bearbeiterOf(r.user_id)}</TableCell>
