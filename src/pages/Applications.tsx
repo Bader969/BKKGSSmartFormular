@@ -5,12 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShieldCheck, FileText, ArrowLeft, FileSpreadsheet, Mail, MessageCircle, Check } from "lucide-react";
+import { ShieldCheck, FileText, ArrowLeft, FileSpreadsheet, Mail, MessageCircle, Check, Building2 } from "lucide-react";
 import { useApplicationPersistence } from "@/hooks/useApplicationPersistence";
 import { ApplicationDetailDrawer, type ApplicationRow } from "@/components/ApplicationDetailDrawer";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
+import { isCrmEligibleVp } from "@/utils/crmVp";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
@@ -30,6 +31,7 @@ export default function Applications() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [selected, setSelected] = useState<ApplicationRow | null>(null);
+  const [crmBusy, setCrmBusy] = useState(false);
 
   const reload = () => {
     setLoading(true);
