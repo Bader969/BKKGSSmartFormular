@@ -386,10 +386,10 @@ export default function Applications() {
               onClick={handleCrmSync}
               disabled={crmBusy || !crmOpen.length}
               className="gap-2 w-full sm:w-auto min-h-11"
-              title="Überträgt alle gefilterten Hauptanträge zulässiger VP inkl. Familienmitglieder an die Vermittlersuite"
+              title="Schreibt alle noch nicht übertragenen Hauptanträge zulässiger VP (inkl. eigener Mitgliedschaften der Familie) direkt in die CRM-Datenbank"
             >
               <Building2 className="h-4 w-4" />
-              {crmBusy ? "Übertrage…" : `An CRM übertragen (${crmOpen.length})`}
+              {crmBusy ? "Übertrage…" : `An CRM übertragen (${crmOpen.length} Hauptanträge)`}
             </Button>
             <Button
               variant="outline"
@@ -398,7 +398,7 @@ export default function Applications() {
               className="gap-2 w-full sm:w-auto min-h-11"
               title="Erzeugt ein SQL-Skript (Kunden, GKV-Verträge, KV-Details, Familienmitglieder) zum Einspielen in der Vermittlersuite"
             >
-              <Building2 className="h-4 w-4" /> CRM-SQL exportieren ({crmCandidates.length})
+              <Building2 className="h-4 w-4" /> CRM-SQL exportieren ({crmCandidates.length} Hauptanträge)
             </Button>
             <Button
               variant="outline"
