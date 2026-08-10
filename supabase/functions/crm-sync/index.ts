@@ -95,6 +95,20 @@ function mapGeschlecht(v: unknown): "m" | "w" | "d" | null {
 const salutationFor = (g: "m" | "w" | "d" | null) =>
   g === "w" ? "Frau" : g === "m" ? "Herr" : g === "d" ? "Divers" : null;
 
+/**
+ * Geschlecht des Hauptmitglieds – je Krankenkasse liegt es in einem anderen Feld
+ * (VIACTIV/Novitas: viactivGeschlecht, BIG: bigGeschlecht).
+ */
+function mainGeschlechtOf(payload: Record<string, unknown>): "m" | "w" | "d" | null {
+  return (
+    mapGeschlecht(payload.viactivGeschlecht) ??
+    mapGeschlecht(payload.bigGeschlecht) ??
+    mapGeschlecht(payload.novitasGeschlecht) ??
+    mapGeschlecht(payload.geschlecht) ??
+    mapGeschlecht((payload as { mitglied?: Record<string, unknown> }).mitglied?.geschlecht)
+  );
+}
+
 const streetOf = (strasse: unknown, hausnummer: unknown) =>
   [s(strasse), s(hausnummer)].filter(Boolean).join(" ") || null;
 
@@ -150,7 +164,7 @@ function buildEntries(app: {
   const mainCity = nn(s(payload.ort));
   const phone = nn(s(payload.telefon));
   const email = nn(s(payload.email));
-  const mainGeschlecht = mapGeschlecht(payload.viactivGeschlecht);
+  const mainGeschlecht = mainGeschlechtOf(payload);
   const staat = nn(s(payload.viactivStaatsangehoerigkeit));
 
   const common = {
@@ -224,7 +238,7 @@ function buildEntries(app: {
         staatsangehoerigkeit: staat,
         kv_nummer: nn(s(payload.mitgliedKvNummer)) ?? nn(s(payload.mitgliedVersichertennummer)),
         vorherige_kasse: previousKasse,
-        vorherige_kasse_ende: null,
+        vorherige_kasse_ende: toIsoDate(payload.bisherigEndeteAm),
       },
     },
     family_members: familyMembers,
@@ -398,6 +412,77 @@ type DirectResult = {
   contract_id?: string;
 };
 
+type CrmClient = ReturnType<typeof createClient>;
+
+const isEmptyVal = (v: unknown) => v === null || v === undefined || (typeof v === "string" && v.trim() === "");
+
+/** Patcht nur Felder, die im CRM leer sind. Bei ungültiger Anrede (Enum) ohne salutation erneut. */
+async function patchEmptyFields(
+  crm: CrmClient,
+  table: string,
+  matchColumn: string,
+  matchValue: string,
+  wanted: Record<string, unknown>,
+): Promise<string[]> {
+  const cols = Object.keys(wanted);
+  const { data: row, error } = await crm.from(table).select(cols.join(", ")).eq(matchColumn, matchValue).limit(1).maybeSingle();
+  if (error) throw new Error(`${table}_read:${error.message}`);
+  if (!row) return [];
+  const patch: Record<string, unknown> = {};
+  for (const c of cols) {
+    const next = wanted[c];
+    if (isEmptyVal(next)) continue;
+    if (!isEmptyVal((row as Record<string, unknown>)[c])) continue;
+    patch[c] = next;
+  }
+  const changed = Object.keys(patch);
+  if (!changed.length) return [];
+  const { error: uErr } = await crm.from(table).update(patch).eq(matchColumn, matchValue);
+  if (uErr) {
+    if ("salutation" in patch) {
+      const { salutation: _drop, ...rest } = patch;
+      if (Object.keys(rest).length) {
+        const { error: retryErr } = await crm.from(table).update(rest).eq(matchColumn, matchValue);
+        if (retryErr) throw new Error(`${table}_update:${retryErr.message}`);
+        return Object.keys(rest);
+      }
+      return [];
+    }
+    throw new Error(`${table}_update:${uErr.message}`);
+  }
+  return changed;
+}
+
+const customerFields = (cust: Record<string, unknown>) => ({
+  salutation: cust.salutation ?? null,
+  birthdate: cust.birthdate ?? null,
+  phone: cust.phone ?? null,
+  email: cust.email ?? null,
+  street: cust.street ?? null,
+  zip: cust.zip ?? null,
+  city: cust.city ?? null,
+});
+
+const kvFields = (kv: Record<string, unknown>) => ({
+  geschlecht: kv.geschlecht ?? null,
+  familienstand: KV_FAMILIENSTAND.includes(String(kv.familienstand ?? "").toLowerCase())
+    ? String(kv.familienstand).toLowerCase() : null,
+  geburtsort: kv.geburtsort ?? null,
+  geburtsland: kv.geburtsland ?? null,
+  staatsangehoerigkeit: kv.staatsangehoerigkeit ?? null,
+  kv_nummer: kv.kv_nummer ?? null,
+  vorherige_kasse: kv.vorherige_kasse ?? null,
+  vorherige_kasse_ende: kv.vorherige_kasse_ende ?? null,
+});
+
+async function fillEmptyCustomerFields(crm: CrmClient, customerId: string, cust: Record<string, unknown>) {
+  try {
+    return await patchEmptyFields(crm, "customers", "id", customerId, customerFields(cust));
+  } catch (_e) {
+    return [];
+  }
+}
+
 const famRow = (contractId: string, m: Record<string, unknown>) => ({
   contract_id: contractId,
   relation: m.relation,
@@ -466,6 +551,11 @@ async function writeEntriesDirect(batch: CrmEntry[]): Promise<DirectResult[]> {
       q = cust.birthdate ? q.eq("birthdate", cust.birthdate as string) : q.is("birthdate", null);
       const { data: foundCust } = await q.limit(1).maybeSingle();
       customerId = (foundCust as { id?: string } | null)?.id ?? null;
+
+      // Bestandskunde: nur leere Felder nachtragen (nie überschreiben)
+      if (customerId) {
+        await fillEmptyCustomerFields(crm, customerId, cust);
+      }
 
       if (!customerId) {
         const { data: insCust, error: custErr } = await crm.from("customers").insert({
@@ -609,6 +699,92 @@ async function auditFamilyMembers(batch: CrmEntry[], repair: boolean): Promise<F
   return out;
 }
 
+// ---- Kundendaten (Anrede & Co.) im CRM prüfen / leere Felder nachtragen ----
+type CustAudit = {
+  external_ref: string;
+  status: "ok" | "missing_contract" | "updated" | "incomplete" | "error";
+  fields?: string[];
+  reason?: string;
+};
+
+async function auditCustomers(batch: CrmEntry[], repair: boolean): Promise<CustAudit[]> {
+  const crm = createClient(CRM_SUPABASE_URL, CRM_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  const out: CustAudit[] = [];
+  const key = (f: unknown, l: unknown, b: unknown) =>
+    `${String(f ?? "").trim().toLowerCase()}|${String(l ?? "").trim().toLowerCase()}|${b ?? ""}`;
+
+  for (const e of batch) {
+    const ref = String(e.external_ref);
+    const cust = (e.customer ?? {}) as Record<string, unknown>;
+    const contract = (e.contract ?? {}) as Record<string, unknown>;
+    const kv = (contract.kv_details ?? {}) as Record<string, unknown>;
+    const fam = (Array.isArray(e.family_members) ? (e.family_members as Array<Record<string, unknown>>) : [])
+      .filter((m) => s(m.first_name) || s(m.last_name));
+
+    try {
+      const { data: row, error: cErr } = await crm
+        .from("contracts").select("id, customer_id").eq("details->>external_ref", ref).limit(1).maybeSingle();
+      if (cErr) throw new Error(cErr.message);
+      if (!row) {
+        out.push({ external_ref: ref, status: "missing_contract" });
+        continue;
+      }
+      const { id: contractId, customer_id: customerId } = row as { id: string; customer_id: string };
+
+      const wantedCust = customerFields(cust);
+      const wantedKv = kvFields(kv);
+
+      if (!repair) {
+        const missing: string[] = [];
+        const probe = async (table: string, col: string, val: string, wanted: Record<string, unknown>, prefix: string) => {
+          const cols = Object.keys(wanted);
+          const { data: cur } = await crm.from(table).select(cols.join(", ")).eq(col, val).limit(1).maybeSingle();
+          if (!cur) return;
+          for (const c of cols) {
+            if (isEmptyVal(wanted[c])) continue;
+            if (isEmptyVal((cur as Record<string, unknown>)[c])) missing.push(`${prefix}${c}`);
+          }
+        };
+        await probe("customers", "id", customerId, wantedCust, "customer.");
+        await probe("contract_kv_details", "contract_id", contractId, wantedKv, "kv.");
+        out.push(missing.length
+          ? { external_ref: ref, status: "incomplete", fields: missing }
+          : { external_ref: ref, status: "ok" });
+        continue;
+      }
+
+      const changed: string[] = [];
+      changed.push(...(await patchEmptyFields(crm, "customers", "id", customerId, wantedCust)).map((c) => `customer.${c}`));
+      changed.push(...(await patchEmptyFields(crm, "contract_kv_details", "contract_id", contractId, wantedKv)).map((c) => `kv.${c}`));
+
+      // Angehörige: leere Felder in vorhandenen Zeilen nachtragen
+      if (fam.length) {
+        const { data: rows } = await crm
+          .from("contract_family_members")
+          .select("id, first_name, last_name, birthdate").eq("contract_id", contractId);
+        const byKey = new Map<string, string>();
+        for (const r of (rows ?? []) as Array<Record<string, unknown>>) {
+          byKey.set(key(r.first_name, r.last_name, r.birthdate), String(r.id));
+        }
+        for (const m of fam) {
+          const id = byKey.get(key(m.first_name, m.last_name, m.birthdate));
+          if (!id) continue;
+          const { contract_id: _skip, ...wanted } = famRow(contractId, m);
+          const upd = await patchEmptyFields(crm, "contract_family_members", "id", id, wanted);
+          changed.push(...upd.map((c) => `family.${c}`));
+        }
+      }
+
+      out.push(changed.length
+        ? { external_ref: ref, status: "updated", fields: changed }
+        : { external_ref: ref, status: "ok" });
+    } catch (err) {
+      out.push({ external_ref: ref, status: "error", reason: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  return out;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -633,7 +809,8 @@ Deno.serve(async (req) => {
     const isAdmin = !!roleRow;
 
     const body = (await req.json().catch(() => ({}))) as {
-      action?: "preview" | "push" | "export-sql" | "direct-push" | "audit-family" | "repair-family";
+      action?: "preview" | "push" | "export-sql" | "direct-push" | "audit-family" | "repair-family"
+        | "audit-customers" | "repair-customers";
       application_ids?: string[];
       dry_run?: boolean;
     };
@@ -641,8 +818,9 @@ Deno.serve(async (req) => {
     const ids = Array.isArray(body.application_ids)
       ? body.application_ids.filter((x) => typeof x === "string").slice(0, 500)
       : [];
-    const isFamilyAction = action === "audit-family" || action === "repair-family";
-    if (!ids.length && !isFamilyAction) return json(400, { error: "no_applications" });
+    const isCrmMaintenance = action === "audit-family" || action === "repair-family" ||
+      action === "audit-customers" || action === "repair-customers";
+    if (!ids.length && !isCrmMaintenance) return json(400, { error: "no_applications" });
 
     let q = admin
       .from("applications")
@@ -702,6 +880,34 @@ Deno.serve(async (req) => {
         incomplete: audit.filter((a) => a.status === "incomplete").length,
         inserted: audit.reduce((n, a) => n + (a.inserted ?? 0), 0),
         missing_contract: audit.filter((a) => a.status === "missing_contract").length,
+        errors: audit.filter((a) => a.status === "error"),
+      };
+      return json(200, {
+        ok: !summary.errors.length,
+        mode: action,
+        ...summary,
+        details: audit.filter((a) => a.status !== "ok").slice(0, 50),
+      });
+    }
+
+    if (action === "audit-customers" || action === "repair-customers") {
+      if (!CRM_SUPABASE_URL || !CRM_SERVICE_ROLE_KEY) {
+        return json(400, { error: "crm_credentials_missing", message: "CRM_SUPABASE_URL / CRM_SERVICE_ROLE_KEY fehlen." });
+      }
+      const audit = await auditCustomers(batch, action === "repair-customers");
+      const updated = audit.filter((a) => a.status === "updated");
+      const fieldCounts: Record<string, number> = {};
+      for (const a of [...updated, ...audit.filter((x) => x.status === "incomplete")]) {
+        for (const f of a.fields ?? []) fieldCounts[f] = (fieldCounts[f] ?? 0) + 1;
+      }
+      const summary = {
+        checked: audit.length,
+        ok: audit.filter((a) => a.status === "ok").length,
+        updated: updated.length,
+        incomplete: audit.filter((a) => a.status === "incomplete").length,
+        missing_contract: audit.filter((a) => a.status === "missing_contract").length,
+        salutation_filled: fieldCounts["customer.salutation"] ?? 0,
+        fields: fieldCounts,
         errors: audit.filter((a) => a.status === "error"),
       };
       return json(200, {

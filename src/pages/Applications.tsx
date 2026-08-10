@@ -286,6 +286,32 @@ export default function Applications() {
   };
 
   // SQL-Export: alle gefilterten, zulässigen Hauptanträge inkl. eigener Mitgliedschaften
+  // Kundendaten (Anrede, Kontakt, KV-Details) im CRM prüfen und leere Felder nachtragen
+  const handleCrmCustomerRepair = async () => {
+    if (!crmCandidates.length) return;
+    setCrmBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("crm-sync", {
+        body: { action: "repair-customers", application_ids: crmCandidates.map((r) => r.id) },
+      });
+      if (error) throw error;
+      const res = data as {
+        checked?: number; updated?: number; salutation_filled?: number;
+        missing_contract?: number; errors?: Array<{ reason?: string }>;
+      };
+      toast.success(
+        `${res.checked ?? 0} Datensätze geprüft · ${res.updated ?? 0} ergänzt · ${res.salutation_filled ?? 0} Anreden gesetzt` +
+          (res.missing_contract ? ` · ${res.missing_contract} ohne CRM-Vertrag` : "") +
+          (res.errors?.length ? ` · ${res.errors.length} Fehler` : ""),
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Kundendaten-Prüfung fehlgeschlagen: ${msg}`);
+    } finally {
+      setCrmBusy(false);
+    }
+  };
+
   const handleCrmSqlExport = async () => {
     if (!crmCandidates.length) return;
     setCrmBusy(true);
@@ -434,6 +460,15 @@ export default function Applications() {
               title="Prüft im CRM, ob unter jedem Hauptvertrag alle Familienmitglieder (Ehegatte + Kinder) hinterlegt sind, und trägt Fehlende nach"
             >
               <Building2 className="h-4 w-4" /> Familienmitglieder prüfen/nachtragen
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleCrmCustomerRepair}
+              disabled={crmBusy || !crmCandidates.length}
+              className="gap-2 w-full sm:w-auto min-h-11"
+              title="Prüft im CRM Anrede, Kontaktdaten und KV-Details aller übertragenen Mitgliedschaften und trägt leere Felder nach"
+            >
+              <Building2 className="h-4 w-4" /> Kundendaten prüfen/nachtragen
             </Button>
             <Button
               variant="outline"
