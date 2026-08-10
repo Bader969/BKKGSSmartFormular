@@ -481,6 +481,11 @@ async function writeEntriesDirect(batch: CrmEntry[]): Promise<DirectResult[]> {
       const { data: foundCust } = await q.limit(1).maybeSingle();
       customerId = (foundCust as { id?: string } | null)?.id ?? null;
 
+      // Bestandskunde: nur leere Felder nachtragen (nie überschreiben)
+      if (customerId) {
+        await fillEmptyCustomerFields(crm, customerId, cust);
+      }
+
       if (!customerId) {
         const { data: insCust, error: custErr } = await crm.from("customers").insert({
           salutation: cust.salutation ?? null,
