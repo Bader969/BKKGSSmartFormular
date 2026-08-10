@@ -95,6 +95,20 @@ function mapGeschlecht(v: unknown): "m" | "w" | "d" | null {
 const salutationFor = (g: "m" | "w" | "d" | null) =>
   g === "w" ? "Frau" : g === "m" ? "Herr" : g === "d" ? "Divers" : null;
 
+/**
+ * Geschlecht des Hauptmitglieds – je Krankenkasse liegt es in einem anderen Feld
+ * (VIACTIV/Novitas: viactivGeschlecht, BIG: bigGeschlecht).
+ */
+function mainGeschlechtOf(payload: Record<string, unknown>): "m" | "w" | "d" | null {
+  return (
+    mapGeschlecht(payload.viactivGeschlecht) ??
+    mapGeschlecht(payload.bigGeschlecht) ??
+    mapGeschlecht(payload.novitasGeschlecht) ??
+    mapGeschlecht(payload.geschlecht) ??
+    mapGeschlecht((payload as { mitglied?: Record<string, unknown> }).mitglied?.geschlecht)
+  );
+}
+
 const streetOf = (strasse: unknown, hausnummer: unknown) =>
   [s(strasse), s(hausnummer)].filter(Boolean).join(" ") || null;
 
