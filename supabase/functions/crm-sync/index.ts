@@ -412,6 +412,77 @@ type DirectResult = {
   contract_id?: string;
 };
 
+type CrmClient = ReturnType<typeof createClient>;
+
+const isEmptyVal = (v: unknown) => v === null || v === undefined || (typeof v === "string" && v.trim() === "");
+
+/** Patcht nur Felder, die im CRM leer sind. Bei ungültiger Anrede (Enum) ohne salutation erneut. */
+async function patchEmptyFields(
+  crm: CrmClient,
+  table: string,
+  matchColumn: string,
+  matchValue: string,
+  wanted: Record<string, unknown>,
+): Promise<string[]> {
+  const cols = Object.keys(wanted);
+  const { data: row, error } = await crm.from(table).select(cols.join(", ")).eq(matchColumn, matchValue).limit(1).maybeSingle();
+  if (error) throw new Error(`${table}_read:${error.message}`);
+  if (!row) return [];
+  const patch: Record<string, unknown> = {};
+  for (const c of cols) {
+    const next = wanted[c];
+    if (isEmptyVal(next)) continue;
+    if (!isEmptyVal((row as Record<string, unknown>)[c])) continue;
+    patch[c] = next;
+  }
+  const changed = Object.keys(patch);
+  if (!changed.length) return [];
+  const { error: uErr } = await crm.from(table).update(patch).eq(matchColumn, matchValue);
+  if (uErr) {
+    if ("salutation" in patch) {
+      const { salutation: _drop, ...rest } = patch;
+      if (Object.keys(rest).length) {
+        const { error: retryErr } = await crm.from(table).update(rest).eq(matchColumn, matchValue);
+        if (retryErr) throw new Error(`${table}_update:${retryErr.message}`);
+        return Object.keys(rest);
+      }
+      return [];
+    }
+    throw new Error(`${table}_update:${uErr.message}`);
+  }
+  return changed;
+}
+
+const customerFields = (cust: Record<string, unknown>) => ({
+  salutation: cust.salutation ?? null,
+  birthdate: cust.birthdate ?? null,
+  phone: cust.phone ?? null,
+  email: cust.email ?? null,
+  street: cust.street ?? null,
+  zip: cust.zip ?? null,
+  city: cust.city ?? null,
+});
+
+const kvFields = (kv: Record<string, unknown>) => ({
+  geschlecht: kv.geschlecht ?? null,
+  familienstand: KV_FAMILIENSTAND.includes(String(kv.familienstand ?? "").toLowerCase())
+    ? String(kv.familienstand).toLowerCase() : null,
+  geburtsort: kv.geburtsort ?? null,
+  geburtsland: kv.geburtsland ?? null,
+  staatsangehoerigkeit: kv.staatsangehoerigkeit ?? null,
+  kv_nummer: kv.kv_nummer ?? null,
+  vorherige_kasse: kv.vorherige_kasse ?? null,
+  vorherige_kasse_ende: kv.vorherige_kasse_ende ?? null,
+});
+
+async function fillEmptyCustomerFields(crm: CrmClient, customerId: string, cust: Record<string, unknown>) {
+  try {
+    return await patchEmptyFields(crm, "customers", "id", customerId, customerFields(cust));
+  } catch (_e) {
+    return [];
+  }
+}
+
 const famRow = (contractId: string, m: Record<string, unknown>) => ({
   contract_id: contractId,
   relation: m.relation,
