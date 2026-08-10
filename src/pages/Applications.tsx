@@ -286,6 +286,32 @@ export default function Applications() {
   };
 
   // SQL-Export: alle gefilterten, zulässigen Hauptanträge inkl. eigener Mitgliedschaften
+  // Kundendaten (Anrede, Kontakt, KV-Details) im CRM prüfen und leere Felder nachtragen
+  const handleCrmCustomerRepair = async () => {
+    if (!crmCandidates.length) return;
+    setCrmBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("crm-sync", {
+        body: { action: "repair-customers", application_ids: crmCandidates.map((r) => r.id) },
+      });
+      if (error) throw error;
+      const res = data as {
+        checked?: number; updated?: number; salutation_filled?: number;
+        missing_contract?: number; errors?: Array<{ reason?: string }>;
+      };
+      toast.success(
+        `${res.checked ?? 0} Datensätze geprüft · ${res.updated ?? 0} ergänzt · ${res.salutation_filled ?? 0} Anreden gesetzt` +
+          (res.missing_contract ? ` · ${res.missing_contract} ohne CRM-Vertrag` : "") +
+          (res.errors?.length ? ` · ${res.errors.length} Fehler` : ""),
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Kundendaten-Prüfung fehlgeschlagen: ${msg}`);
+    } finally {
+      setCrmBusy(false);
+    }
+  };
+
   const handleCrmSqlExport = async () => {
     if (!crmCandidates.length) return;
     setCrmBusy(true);
