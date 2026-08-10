@@ -463,6 +463,15 @@ export default function Applications() {
             </Button>
             <Button
               variant="outline"
+              onClick={handleCrmCustomerRepair}
+              disabled={crmBusy || !crmCandidates.length}
+              className="gap-2 w-full sm:w-auto min-h-11"
+              title="Prüft im CRM Anrede, Kontaktdaten und KV-Details aller übertragenen Mitgliedschaften und trägt leere Felder nach"
+            >
+              <Building2 className="h-4 w-4" /> Kundendaten prüfen/nachtragen
+            </Button>
+            <Button
+              variant="outline"
               onClick={handleExportXlsx}
               disabled={!filtered.length}
               className="gap-2 w-full sm:w-auto min-h-11"
