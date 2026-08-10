@@ -164,7 +164,7 @@ function buildEntries(app: {
   const mainCity = nn(s(payload.ort));
   const phone = nn(s(payload.telefon));
   const email = nn(s(payload.email));
-  const mainGeschlecht = mapGeschlecht(payload.viactivGeschlecht);
+  const mainGeschlecht = mainGeschlechtOf(payload);
   const staat = nn(s(payload.viactivStaatsangehoerigkeit));
 
   const common = {
@@ -238,7 +238,7 @@ function buildEntries(app: {
         staatsangehoerigkeit: staat,
         kv_nummer: nn(s(payload.mitgliedKvNummer)) ?? nn(s(payload.mitgliedVersichertennummer)),
         vorherige_kasse: previousKasse,
-        vorherige_kasse_ende: null,
+        vorherige_kasse_ende: toIsoDate(payload.bisherigEndeteAm),
       },
     },
     family_members: familyMembers,
