@@ -809,7 +809,8 @@ Deno.serve(async (req) => {
     const isAdmin = !!roleRow;
 
     const body = (await req.json().catch(() => ({}))) as {
-      action?: "preview" | "push" | "export-sql" | "direct-push" | "audit-family" | "repair-family";
+      action?: "preview" | "push" | "export-sql" | "direct-push" | "audit-family" | "repair-family"
+        | "audit-customers" | "repair-customers";
       application_ids?: string[];
       dry_run?: boolean;
     };
@@ -817,8 +818,9 @@ Deno.serve(async (req) => {
     const ids = Array.isArray(body.application_ids)
       ? body.application_ids.filter((x) => typeof x === "string").slice(0, 500)
       : [];
-    const isFamilyAction = action === "audit-family" || action === "repair-family";
-    if (!ids.length && !isFamilyAction) return json(400, { error: "no_applications" });
+    const isCrmMaintenance = action === "audit-family" || action === "repair-family" ||
+      action === "audit-customers" || action === "repair-customers";
+    if (!ids.length && !isCrmMaintenance) return json(400, { error: "no_applications" });
 
     let q = admin
       .from("applications")
@@ -878,6 +880,34 @@ Deno.serve(async (req) => {
         incomplete: audit.filter((a) => a.status === "incomplete").length,
         inserted: audit.reduce((n, a) => n + (a.inserted ?? 0), 0),
         missing_contract: audit.filter((a) => a.status === "missing_contract").length,
+        errors: audit.filter((a) => a.status === "error"),
+      };
+      return json(200, {
+        ok: !summary.errors.length,
+        mode: action,
+        ...summary,
+        details: audit.filter((a) => a.status !== "ok").slice(0, 50),
+      });
+    }
+
+    if (action === "audit-customers" || action === "repair-customers") {
+      if (!CRM_SUPABASE_URL || !CRM_SERVICE_ROLE_KEY) {
+        return json(400, { error: "crm_credentials_missing", message: "CRM_SUPABASE_URL / CRM_SERVICE_ROLE_KEY fehlen." });
+      }
+      const audit = await auditCustomers(batch, action === "repair-customers");
+      const updated = audit.filter((a) => a.status === "updated");
+      const fieldCounts: Record<string, number> = {};
+      for (const a of [...updated, ...audit.filter((x) => x.status === "incomplete")]) {
+        for (const f of a.fields ?? []) fieldCounts[f] = (fieldCounts[f] ?? 0) + 1;
+      }
+      const summary = {
+        checked: audit.length,
+        ok: audit.filter((a) => a.status === "ok").length,
+        updated: updated.length,
+        incomplete: audit.filter((a) => a.status === "incomplete").length,
+        missing_contract: audit.filter((a) => a.status === "missing_contract").length,
+        salutation_filled: fieldCounts["customer.salutation"] ?? 0,
+        fields: fieldCounts,
         errors: audit.filter((a) => a.status === "error"),
       };
       return json(200, {
