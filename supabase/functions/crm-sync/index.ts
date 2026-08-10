@@ -699,6 +699,92 @@ async function auditFamilyMembers(batch: CrmEntry[], repair: boolean): Promise<F
   return out;
 }
 
+// ---- Kundendaten (Anrede & Co.) im CRM prüfen / leere Felder nachtragen ----
+type CustAudit = {
+  external_ref: string;
+  status: "ok" | "missing_contract" | "updated" | "incomplete" | "error";
+  fields?: string[];
+  reason?: string;
+};
+
+async function auditCustomers(batch: CrmEntry[], repair: boolean): Promise<CustAudit[]> {
+  const crm = createClient(CRM_SUPABASE_URL, CRM_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  const out: CustAudit[] = [];
+  const key = (f: unknown, l: unknown, b: unknown) =>
+    `${String(f ?? "").trim().toLowerCase()}|${String(l ?? "").trim().toLowerCase()}|${b ?? ""}`;
+
+  for (const e of batch) {
+    const ref = String(e.external_ref);
+    const cust = (e.customer ?? {}) as Record<string, unknown>;
+    const contract = (e.contract ?? {}) as Record<string, unknown>;
+    const kv = (contract.kv_details ?? {}) as Record<string, unknown>;
+    const fam = (Array.isArray(e.family_members) ? (e.family_members as Array<Record<string, unknown>>) : [])
+      .filter((m) => s(m.first_name) || s(m.last_name));
+
+    try {
+      const { data: row, error: cErr } = await crm
+        .from("contracts").select("id, customer_id").eq("details->>external_ref", ref).limit(1).maybeSingle();
+      if (cErr) throw new Error(cErr.message);
+      if (!row) {
+        out.push({ external_ref: ref, status: "missing_contract" });
+        continue;
+      }
+      const { id: contractId, customer_id: customerId } = row as { id: string; customer_id: string };
+
+      const wantedCust = customerFields(cust);
+      const wantedKv = kvFields(kv);
+
+      if (!repair) {
+        const missing: string[] = [];
+        const probe = async (table: string, col: string, val: string, wanted: Record<string, unknown>, prefix: string) => {
+          const cols = Object.keys(wanted);
+          const { data: cur } = await crm.from(table).select(cols.join(", ")).eq(col, val).limit(1).maybeSingle();
+          if (!cur) return;
+          for (const c of cols) {
+            if (isEmptyVal(wanted[c])) continue;
+            if (isEmptyVal((cur as Record<string, unknown>)[c])) missing.push(`${prefix}${c}`);
+          }
+        };
+        await probe("customers", "id", customerId, wantedCust, "customer.");
+        await probe("contract_kv_details", "contract_id", contractId, wantedKv, "kv.");
+        out.push(missing.length
+          ? { external_ref: ref, status: "incomplete", fields: missing }
+          : { external_ref: ref, status: "ok" });
+        continue;
+      }
+
+      const changed: string[] = [];
+      changed.push(...(await patchEmptyFields(crm, "customers", "id", customerId, wantedCust)).map((c) => `customer.${c}`));
+      changed.push(...(await patchEmptyFields(crm, "contract_kv_details", "contract_id", contractId, wantedKv)).map((c) => `kv.${c}`));
+
+      // Angehörige: leere Felder in vorhandenen Zeilen nachtragen
+      if (fam.length) {
+        const { data: rows } = await crm
+          .from("contract_family_members")
+          .select("id, first_name, last_name, birthdate").eq("contract_id", contractId);
+        const byKey = new Map<string, string>();
+        for (const r of (rows ?? []) as Array<Record<string, unknown>>) {
+          byKey.set(key(r.first_name, r.last_name, r.birthdate), String(r.id));
+        }
+        for (const m of fam) {
+          const id = byKey.get(key(m.first_name, m.last_name, m.birthdate));
+          if (!id) continue;
+          const { contract_id: _skip, ...wanted } = famRow(contractId, m);
+          const upd = await patchEmptyFields(crm, "contract_family_members", "id", id, wanted);
+          changed.push(...upd.map((c) => `family.${c}`));
+        }
+      }
+
+      out.push(changed.length
+        ? { external_ref: ref, status: "updated", fields: changed }
+        : { external_ref: ref, status: "ok" });
+    } catch (err) {
+      out.push({ external_ref: ref, status: "error", reason: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  return out;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
