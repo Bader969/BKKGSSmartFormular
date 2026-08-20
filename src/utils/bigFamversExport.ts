@@ -2,6 +2,7 @@ import { PDFDocument, PDFTextField, PDFCheckBox, PDFRadioGroup } from 'pdf-lib';
 import { FormData, FamilyMember } from '@/types/form';
 import { getCountryName, getNationalityName } from './countries';
 import { getAutoSignatures, ensureSignatureFontReady, generateSignatureDataUrl } from './generateSignature';
+import { resolveFormDates } from './dateUtils';
 
 // ---------- Date helpers ----------
 const toDE = (input: string): string => {
