@@ -2,6 +2,7 @@ import { PDFDocument, PDFName, PDFNumber, StandardFonts } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
 import { getNationalityName } from "@/utils/countries";
 import { getAutoSignatures, ensureSignatureFontReady } from "./generateSignature";
+import { resolveFormDates } from "./dateUtils";
 
 /**
  * VIACTIV Beitrittserklärung PDF Export
