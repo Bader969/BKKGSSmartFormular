@@ -24,6 +24,7 @@
 - [JSON Context Awareness](mem://features/data-import-logic/provider-context-awareness) — Dynamic JSON examples based on provider
 - [Import Defaults & Sync](mem://logic/import-defaults-and-sync) — Auto-population of signature date and insurance links
 - [Field Sync Logic](mem://logic/field-synchronization-logic) — Bidirectional sync for KV-Nummer and doctor locations
+- [Manuelle Datums-Overrides](mem://logic/manual-date-overrides) — Automatische Termine überall überschreibbar
 - [Country Code Mapping](mem://logic/country-code-mapping) — Standardized dropdown and ISO code mappings
 - [Dynamic Header Labels](mem://ui/header-dynamic-labels) — Context-aware application header titles
 
