@@ -2,6 +2,7 @@ import { PDFDocument, PDFName, PDFNumber, StandardFonts } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
 import { getNationalityName } from "@/utils/countries";
 import { getAutoSignatures, ensureSignatureFontReady } from "./generateSignature";
+import { resolveFormDates } from "./dateUtils";
 
 /**
  * VIACTIV Beitrittserklärung PDF Export
@@ -113,22 +114,15 @@ const formatDateGermanWithDots = (date: Date): string => {
  * Berechnet Datum Mitgliedschaft: Immer +3 Kalendermonate (1. des Monats)
  * Z.B. heute 23.01.2026 → 01.04.2026
  */
-const getDatumMitgliedschaft = (): string => {
-  const today = new Date();
-  const targetDate = new Date(today.getFullYear(), today.getMonth() + 3, 1);
-  return formatDateGerman(targetDate);
-};
+const getDatumMitgliedschaft = (formData?: FormData): string =>
+  resolveFormDates(formData).beginDate;
 
 /**
  * Berechnet "versichert bis" Datum: Ende des 3. Monats ab jetzt
  * Z.B. heute 23.01.2026 → 31.03.2026
  */
-const getVersichertBis = (): string => {
-  const today = new Date();
-  // Ende des 3. Monats = Tag 0 des 4. Monats (letzter Tag des Vormonats)
-  const endOfThirdMonth = new Date(today.getFullYear(), today.getMonth() + 3, 0);
-  return formatDateGerman(endOfThirdMonth);
-};
+const getVersichertBis = (formData?: FormData): string =>
+  resolveFormDates(formData).endDate;
 
 interface PDFHelpers {
   setTextField: (fieldName: string, value: string) => void;
@@ -326,12 +320,12 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   // === AUTOMATISCH AUSGEFÜLLT ===
   
   // Eintrittsdatum: +3 Kalendermonate (1. des Monats)
-  const datumMitgliedschaft = getDatumMitgliedschaft();
+  const datumMitgliedschaft = getDatumMitgliedschaft(formData);
   console.log("VIACTIV Setting Datum Mitgliedschaft:", datumMitgliedschaft);
   setTextField("Datum Mitgliedschaft", datumMitgliedschaft);
   
   // versichert bis: Ende des 3. Monats
-  const versichertBis = getVersichertBis();
+  const versichertBis = getVersichertBis(formData);
   console.log("VIACTIV Setting versichert bis:", versichertBis);
   setTextField("versichert bis (Datum)", versichertBis);
   
@@ -430,9 +424,8 @@ export const createViactivBeitrittserklaerungPDF = async (formData: FormData): P
   setCheckbox("Familienangehörige sollen mitversichert werden", formData.viactivFamilienangehoerigeMitversichern);
 
   // === DATUM UND UNTERSCHRIFT ===
-  const today = new Date();
   // Unterschriftsdatum mit Punkten: TT.MM.JJJJ
-  const datumHeute = formatDateGermanWithDots(today);
+  const datumHeute = resolveFormDates(formData).today;
   setTextField("Datum und Unterschrift", datumHeute);
 
   // Unterschrift einbetten (Position basierend auf PDF-Analyse)
@@ -463,11 +456,11 @@ export const createViactivBeitrittserklaerungForSpouse = async (formData: FormDa
   // === AUTOMATISCH AUSGEFÜLLT ===
   
   // Eintrittsdatum: +3 Kalendermonate (1. des Monats)
-  const datumMitgliedschaft = getDatumMitgliedschaft();
+  const datumMitgliedschaft = getDatumMitgliedschaft(formData);
   setTextField("Datum Mitgliedschaft", datumMitgliedschaft);
   
   // versichert bis: Ende des 3. Monats
-  const versichertBis = getVersichertBis();
+  const versichertBis = getVersichertBis(formData);
   setTextField("versichert bis (Datum)", versichertBis);
   
   // Immer angekreuzt
@@ -565,8 +558,7 @@ export const createViactivBeitrittserklaerungForSpouse = async (formData: FormDa
   setCheckbox("Familienangehörige sollen mitversichert werden", false);
 
   // === DATUM UND UNTERSCHRIFT ===
-  const today = new Date();
-  const datumHeute = formatDateGermanWithDots(today);
+  const datumHeute = resolveFormDates(formData).today;
   setTextField("Datum und Unterschrift", datumHeute);
 
   // Unterschrift einbetten (Ehegatte unterschreibt mit eigener Unterschrift)
@@ -596,10 +588,10 @@ export const createViactivBeitrittserklaerungForChild = async (
   const { setTextField, setCheckbox } = helpers;
 
   // === AUTOMATISCH AUSGEFÜLLT ===
-  const datumMitgliedschaft = getDatumMitgliedschaft();
+  const datumMitgliedschaft = getDatumMitgliedschaft(formData);
   setTextField("Datum Mitgliedschaft", datumMitgliedschaft);
   
-  const versichertBis = getVersichertBis();
+  const versichertBis = getVersichertBis(formData);
   setTextField("versichert bis (Datum)", versichertBis);
   
   setCheckbox("Mein Versicherungsstatus ist unverändert", true);
@@ -690,8 +682,7 @@ export const createViactivBeitrittserklaerungForChild = async (
   setCheckbox("Familienangehörige sollen mitversichert werden", false);
 
   // === DATUM UND UNTERSCHRIFT ===
-  const today = new Date();
-  const datumHeute = formatDateGermanWithDots(today);
+  const datumHeute = resolveFormDates(formData).today;
   setTextField("Datum und Unterschrift", datumHeute);
 
   // Unterschrift: Hauptmitglied unterschreibt für Kind
@@ -712,8 +703,7 @@ export const exportViactivBeitrittserklaerung = async (formData: FormData): Prom
     const pdfBytes = await createViactivBeitrittserklaerungPDF(formData);
     
     // Dateiname: Viactiv_Nachname, Vorname_BE_Datum.pdf (Datum mit Punkten: TT.MM.JJJJ)
-    const today = new Date();
-    const datumForFilename = formatDateGermanWithDots(today);
+    const datumForFilename = resolveFormDates(formData).today;
     const nachname = formData.mitgliedName || 'Nachname';
     const vorname = formData.mitgliedVorname || 'Vorname';
     const filename = `Viactiv_${nachname}, ${vorname}_BE_${datumForFilename}.pdf`;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FormData, FormMode, Krankenkasse, KRANKENKASSEN_OPTIONS, createInitialFormData } from '@/types/form';
 import { MemberSection } from '@/components/MemberSection';
+import { AutoDateFields } from '@/components/AutoDateFields';
 import { SpouseSection } from '@/components/SpouseSection';
 import { ChildrenSection } from '@/components/ChildrenSection';
 import { SignatureSection } from '@/components/SignatureSection';
@@ -1027,6 +1028,8 @@ const Index = () => {
                   )}
                 </>
               )}
+
+              <div id="sec-termine"><AutoDateFields formData={formData} updateFormData={updateFormData} /></div>
 
               <div id="sec-mitglied"><MemberSection formData={formData} updateFormData={updateFormData} /></div>
               

@@ -2,6 +2,7 @@ import { PDFDocument } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
 import { getAutoSignatures, ensureSignatureFontReady } from "./generateSignature";
 import { generateSignatureDataUrl } from "./generateSignature";
+import { resolveFormDates, type FormDateOverrides } from "./dateUtils";
 
 /**
  * Erzeugt eine Unterschrift aus dem Nachnamen (letztes Wort) des Kontoinhabers
@@ -91,10 +92,8 @@ const formatStartDate = (date: Date): string => {
 };
 
 // Get membership start date (+3 months, 1st of month)
-const getMembershipStartDate = (): Date => {
-  const today = new Date();
-  return new Date(today.getFullYear(), today.getMonth() + 3, 1);
-};
+const getMembershipStartDate = (overrides?: FormDateOverrides): Date =>
+  resolveFormDates(overrides).beginObj;
 
 // Download PDF helper
 const downloadPDF = (pdfBytes: Uint8Array, filename: string) => {
@@ -251,8 +250,7 @@ const createBonusErwachsenePDF = async (
   setTextField("IBAN", formData.viactivBonusIBAN);
 
   // Unterschriftsdatum
-  const today = new Date();
-  setTextField("Datum Unterschrift", formatDateGerman(today));
+  setTextField("Datum Unterschrift", resolveFormDates(formData).today);
 
   // Unterschrift einbetten (Position rechts neben Datum - korrigiert)
   if (signatureData) {
@@ -310,8 +308,7 @@ const createBonusKinderPDF = async (
   setTextField("IBAN", formData.viactivBonusIBAN);
 
   // Unterschriftsdatum
-  const today = new Date();
-  setTextField("Datum Unterschrift", formatDateGerman(today));
+  setTextField("Datum Unterschrift", resolveFormDates(formData).today);
 
   // Unterschrift einbetten (Hauptmitglied unterschreibt für Kind - korrigiert)
   if (signatureData) {
@@ -329,8 +326,9 @@ const generateBonusFilename = (
   nachname: string,
   vorname: string,
   geburtsdatum: string,
+  overrides?: FormDateOverrides,
 ): string => {
-  const startDate = getMembershipStartDate();
+  const startDate = getMembershipStartDate(overrides);
   const startDateStr = formatStartDate(startDate);
   const geburtsdatumStr = formatISOToGerman(geburtsdatum);
   
@@ -363,6 +361,7 @@ export const exportViactivBonusPDFs = async (formData: FormData): Promise<number
       formData.mitgliedName,
       formData.mitgliedVorname,
       formData.mitgliedGeburtsdatum,
+      formData,
     );
     downloadPDF(memberPdfBytes, memberFilename);
     count++;
@@ -388,7 +387,7 @@ export const exportViactivBonusPDFs = async (formData: FormData): Promise<number
           spouse.versichertennummer,
           formData.unterschrift,
         );
-        const spouseFilename = generateBonusFilename(spouse.name, spouse.vorname, spouse.geburtsdatum);
+        const spouseFilename = generateBonusFilename(spouse.name, spouse.vorname, spouse.geburtsdatum, formData);
         downloadPDF(spousePdfBytes, spouseFilename);
       } else if (isChild(spouse.geburtsdatum)) {
         // Unter 15: Kinder-PDF (110€)
@@ -401,7 +400,8 @@ export const exportViactivBonusPDFs = async (formData: FormData): Promise<number
           spouse.name,
           spouse.vorname,
           spouse.geburtsdatum,
-        );
+      formData,
+    );
         downloadPDF(spousePdfBytes, spouseFilename);
       } else {
         // 15+: Erwachsene-PDF (170€)
@@ -417,7 +417,8 @@ export const exportViactivBonusPDFs = async (formData: FormData): Promise<number
           spouse.name,
           spouse.vorname,
           spouse.geburtsdatum,
-        );
+      formData,
+    );
         downloadPDF(spousePdfBytes, spouseFilename);
       }
       count++;
@@ -441,13 +442,13 @@ export const exportViactivBonusPDFs = async (formData: FormData): Promise<number
             kind.versichertennummer,
             formData.unterschrift,
           );
-          const kindFilename = generateBonusFilename(kind.name, kind.vorname, kind.geburtsdatum);
+          const kindFilename = generateBonusFilename(kind.name, kind.vorname, kind.geburtsdatum, formData);
           downloadPDF(kindPdfBytes, kindFilename);
         } 
         // Unter 15 und familienversichert = Kinder-Bonus
         else if (age < 15) {
           const kindPdfBytes = await createBonusKinderPDF(formData, kind, formData.unterschrift);
-          const kindFilename = generateBonusFilename(kind.name, kind.vorname, kind.geburtsdatum);
+          const kindFilename = generateBonusFilename(kind.name, kind.vorname, kind.geburtsdatum, formData);
           downloadPDF(kindPdfBytes, kindFilename);
         }
         // 15+ und familienversichert = Erwachsenen-Bonus
@@ -460,7 +461,7 @@ export const exportViactivBonusPDFs = async (formData: FormData): Promise<number
             kind.versichertennummer,
             formData.unterschrift,
           );
-          const kindFilename = generateBonusFilename(kind.name, kind.vorname, kind.geburtsdatum);
+          const kindFilename = generateBonusFilename(kind.name, kind.vorname, kind.geburtsdatum, formData);
           downloadPDF(kindPdfBytes, kindFilename);
         }
         count++;

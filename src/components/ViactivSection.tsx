@@ -19,7 +19,7 @@ interface ViactivSectionProps {
 }
 
 export const ViactivSection: React.FC<ViactivSectionProps> = ({ formData, updateFormData }) => {
-  const { endDate } = calculateDates();
+  const { endDate } = calculateDates(formData);
   
   // Hilfsfunktion für Altersberechnung
   const calculateAge = (geburtsdatum: string): number => {

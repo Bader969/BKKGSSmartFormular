@@ -6,7 +6,7 @@ import {
   generateSignatureDataUrl,
   resolveBigSignatureLastName,
 } from './generateSignature';
-import { getBeginDate, formatDateGerman } from './dateUtils';
+import { resolveFormDates, formatDateGerman } from './dateUtils';
 
 // Convert ISO YYYY-MM-DD or DD.MM.YYYY -> DDMMJJ (6-digit, two-digit year)
 const toDDMMJJ = (input: string): string => {
@@ -128,7 +128,7 @@ const buildPlusbonusPdfsForPerson = async (
     : [[]];
   const multi = chunks.length > 1;
 
-  const beginnStr = formatDateGerman(getBeginDate());
+  const beginnStr = resolveFormDates(formData).beginDate;
   const gebStr = toGermanDate(person.geburtsdatum);
 
   for (let partIdx = 0; partIdx < chunks.length; partIdx++) {

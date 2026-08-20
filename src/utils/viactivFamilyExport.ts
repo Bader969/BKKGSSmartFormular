@@ -2,6 +2,7 @@ import { PDFDocument } from "pdf-lib";
 import { FormData, FamilyMember } from "@/types/form";
 import { getNationalityName, getCountryName } from "@/utils/countries";
 import { getAutoSignatures, ensureSignatureFontReady } from "./generateSignature";
+import { resolveFormDates } from "./dateUtils";
 
 /**
  * VIACTIV Familienversicherung PDF Export
@@ -32,11 +33,8 @@ const formatDateGermanWithDots = (date: Date): string => {
  * Berechnet "versichert bis" Datum: Ende des 3. Monats ab jetzt
  * Format: TT.MM.JJJJ (mit Punkten für Familienversicherung)
  */
-const getVersichertBisWithDots = (): string => {
-  const today = new Date();
-  const endOfThirdMonth = new Date(today.getFullYear(), today.getMonth() + 3, 0);
-  return formatDateGermanWithDots(endOfThirdMonth);
-};
+const getVersichertBisWithDots = (formData?: FormData): string =>
+  resolveFormDates(formData).endDate;
 
 interface PDFHelpers {
   setTextField: (fieldName: string, value: string) => void;
@@ -243,7 +241,7 @@ const createViactivFamilyPDF = async (
     
     // Seite 2: Bisherige Versicherung Ehepartner
     // Automatische Synchronisierung: Fallback auf berechnetes Datum und Hauptmitglied-Krankenkasse
-    const ehegatteEndeteAm = ehegatte.bisherigEndeteAm || getVersichertBisWithDots();
+    const ehegatteEndeteAm = ehegatte.bisherigEndeteAm || getVersichertBisWithDots(formData);
     const ehegatteBestandBei = ehegatte.bisherigBestandBei || formData.mitgliedKrankenkasse || "";
     setTextField("EhepartnerinDie bisherige Versicherung endete am", ehegatteEndeteAm);
     setTextField("EhepartnerinDie Versicherung bestand bei Name der Krankenkasse", ehegatteBestandBei);
@@ -328,7 +326,7 @@ const createViactivFamilyPDF = async (
     
     // Bisherige Versicherung Kind
     // Automatische Synchronisierung: Fallback auf berechnetes Datum und Hauptmitglied-Krankenkasse
-    const kindEndeteAm = kind.bisherigEndeteAm || getVersichertBisWithDots();
+    const kindEndeteAm = kind.bisherigEndeteAm || getVersichertBisWithDots(formData);
     const kindBestandBei = kind.bisherigBestandBei || formData.mitgliedKrankenkasse || "";
     setTextField(fields.endete, kindEndeteAm);
     setTextField(fields.bestand, kindBestandBei);
@@ -348,8 +346,7 @@ const createViactivFamilyPDF = async (
   });
 
   // === DATUM UND UNTERSCHRIFT (Seite 2) ===
-  const today = new Date();
-  setTextField("Datum", formatDateGermanWithDots(today));
+  setTextField("Datum", resolveFormDates(formData).today);
 
   // Unterschrift des Mitglieds
   if (formData.unterschrift) {

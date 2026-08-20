@@ -30,15 +30,62 @@ export const getEndDate = (beginDate: Date): Date => {
   return new Date(beginDate.getFullYear(), beginDate.getMonth(), 0);
 };
 
-export const calculateDates = () => {
-  const today = new Date();
-  const beginDate = getBeginDate();
-  const endDate = getEndDate(beginDate);
-  
+/**
+ * Manuelle Überschreibungen der automatischen Termine (leer = Automatik).
+ * Werte immer als ISO-String YYYY-MM-DD.
+ */
+export interface FormDateOverrides {
+  versicherungsbeginnManuell?: string;
+  bisherigeVersicherungEndeManuell?: string;
+  antragsdatumManuell?: string;
+}
+
+const parseIsoDate = (value?: string | null): Date | null => {
+  if (!value) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return isNaN(d.getTime()) ? null : d;
+};
+
+/**
+ * Einziger Auflösungspunkt für alle automatischen Termine.
+ * Ohne manuelle Eingaben identisch zur bisherigen Berechnung
+ * (Beginn = 01. des Monats in 3 Monaten, Ende = Tag davor, Datum = heute).
+ */
+export const resolveFormDates = (overrides?: FormDateOverrides | null) => {
+  const manualBegin = parseIsoDate(overrides?.versicherungsbeginnManuell);
+  const manualEnd = parseIsoDate(overrides?.bisherigeVersicherungEndeManuell);
+  const manualToday = parseIsoDate(overrides?.antragsdatumManuell);
+
+  const beginObj = manualBegin ?? getBeginDate();
+  const endObj = manualEnd ?? getEndDate(beginObj);
+  const todayObj = manualToday ?? new Date();
+
   return {
-    today: formatDateGerman(today),
-    todayForInput: formatDateForInput(today),
-    beginDate: formatDateGerman(beginDate),
-    endDate: formatDateGerman(endDate),
+    beginObj,
+    endObj,
+    todayObj,
+    beginDate: formatDateGerman(beginObj),
+    endDate: formatDateGerman(endObj),
+    today: formatDateGerman(todayObj),
+    beginForInput: formatDateForInput(beginObj),
+    endForInput: formatDateForInput(endObj),
+    todayForInput: formatDateForInput(todayObj),
+    isManual: {
+      begin: !!manualBegin,
+      end: !!manualEnd,
+      today: !!manualToday,
+    },
+  };
+};
+
+export const calculateDates = (overrides?: FormDateOverrides | null) => {
+  const r = resolveFormDates(overrides);
+  return {
+    today: r.today,
+    todayForInput: r.todayForInput,
+    beginDate: r.beginDate,
+    endDate: r.endDate,
   };
 };
