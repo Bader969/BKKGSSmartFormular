@@ -287,7 +287,7 @@ const createFilledPDF = async (
   const pdfDoc = await PDFDocument.load(existingPdfBytes);
   const form = pdfDoc.getForm();
 
-  const { beginDate, endDate } = calculateDates();
+  const { beginDate, endDate } = calculateDates(formData);
   const datumFormatted = formatInputDate(formData.datum);
   const helpers = createPDFHelpers(form);
 
