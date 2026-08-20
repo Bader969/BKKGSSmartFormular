@@ -18,11 +18,9 @@ const formatDateGerman = (date: Date) => {
   return `${d}.${m}.${date.getFullYear()}`;
 };
 
-const calcDates = () => {
-  const today = new Date();
-  const begin = new Date(today.getFullYear(), today.getMonth() + 3, 1);
-  const end = new Date(begin.getFullYear(), begin.getMonth(), 0);
-  return { today: formatDateGerman(today), begin: formatDateGerman(begin), end: formatDateGerman(end) };
+const calcDates = (formData?: FormData) => {
+  const r = resolveFormDates(formData);
+  return { today: r.today, begin: r.beginDate, end: r.endDate };
 };
 
 // ---------- Field helpers ----------
@@ -297,7 +295,7 @@ const buildPdf = async (
   const bytes = await res.arrayBuffer();
   const pdfDoc = await PDFDocument.load(bytes);
   const form = pdfDoc.getForm();
-  const dates = calcDates();
+  const dates = calcDates(formData);
 
   // --- Mitglied ---
   setText(form, '066_page_0', formData.mitgliedName);

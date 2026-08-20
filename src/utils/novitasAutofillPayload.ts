@@ -1,5 +1,5 @@
 import type { FormData, FamilyMember } from '@/types/form';
-import { getBeginDate, getEndDate, formatDateForInput } from './dateUtils';
+import { resolveFormDates, formatDateForInput } from './dateUtils';
 import { deriveNovitasStatus, splitNovitasPersons, type NovitasPerson, type NovitasStatus } from './novitasSplit';
 
 export interface NovitasAutofillPayload {
@@ -68,9 +68,10 @@ export function buildNovitasAutofillPayload(
   formData: FormData,
   person: NovitasPerson,
 ): NovitasAutofillPayload {
-  const today = new Date();
-  const beginn = getBeginDate();
-  const bis = getEndDate(beginn);
+  const dates = resolveFormDates(formData);
+  const today = dates.todayObj;
+  const beginn = dates.beginObj;
+  const bis = dates.endObj;
 
   const isFamilie = formData.novitasMode === 'familie';
   const wantsFragebogen = isFamilie && person.role === 'main';

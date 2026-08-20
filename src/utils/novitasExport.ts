@@ -22,15 +22,12 @@ const formatDateGerman = (date: Date): string => {
 };
 
 // Calculate automatic dates for Novitas (same as BKK GS)
-const calculateNovitasDates = () => {
-  const today = new Date();
-  const beginDate = new Date(today.getFullYear(), today.getMonth() + 3, 1);
-  const endDate = new Date(beginDate.getFullYear(), beginDate.getMonth(), 0);
-  
+const calculateNovitasDates = (formData?: FormData) => {
+  const r = resolveFormDates(formData);
   return {
-    beginDate: formatDateGerman(beginDate),  // e.g., 01.04.2026
-    endDate: formatDateGerman(endDate),      // e.g., 31.03.2026
-    today: formatDateGerman(today),          // e.g., 29.01.2026
+    beginDate: r.beginDate,  // e.g., 01.04.2026
+    endDate: r.endDate,      // e.g., 31.03.2026
+    today: r.today,          // e.g., 29.01.2026
   };
 };
 
@@ -332,7 +329,7 @@ const createNovitasFamilyPDF = async (
   const form = pdfDoc.getForm();
   
   const helpers = createPDFHelpers(form);
-  const dates = calculateNovitasDates();
+  const dates = calculateNovitasDates(formData);
   
   // Fill all fields
   fillBasicFields(formData, helpers, dates);
