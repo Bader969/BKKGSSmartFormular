@@ -398,7 +398,7 @@ const fillHardcodedFields = (
   setCheckbox('Kontrollkästchen 1', true);
 
   // KORREKTUR 2: Beginn Familienversicherung automatisch berechnen
-  const dates = calculateDates();
+  const dates = calculateDates(formData);
   setTextField('Textfeld 1', dates.beginDate);
 
   // KORREKTUR 3: Familienstand Checkboxen
@@ -536,7 +536,7 @@ export const exportDAKFamilienversicherung = async (formData: FormData): Promise
   await ensureSignatureFontReady();
   const _sigs = getAutoSignatures(formData);
   formData = { ...formData, unterschrift: _sigs.member ?? '', unterschriftFamilie: _sigs.family ?? '' };
-  const dates = calculateDates();
+  const dates = calculateDates(formData);
   
   // Calculate number of PDFs needed (max 2 children per PDF)
   const numberOfPDFs = Math.max(1, Math.ceil(formData.kinder.length / 2));

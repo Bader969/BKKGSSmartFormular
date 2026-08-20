@@ -46,7 +46,7 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
     }
     return getDefaultKrankenkasseName(selectedKrankenkasse);
   };
-  const { endDate } = calculateDates();
+  const { endDate } = calculateDates(formData);
   
   const geschlechtOptions = [
     { value: 'm', label: 'Männlich (m)' },
