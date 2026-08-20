@@ -1,7 +1,7 @@
 import React from 'react';
 import { FormField } from './FormField';
 import { FamilyMember, Krankenkasse } from '@/types/form';
-import { calculateDates } from '@/utils/dateUtils';
+import { calculateDates, type FormDateOverrides } from '@/utils/dateUtils';
 import { COUNTRY_OPTIONS, NATIONALITY_OPTIONS } from '@/utils/countries';
 import { normalizeInsuranceNumber } from '@/utils/insuranceNumbers';
 import { 
@@ -19,6 +19,8 @@ interface FamilyMemberFormProps {
   childIndex?: number;
   selectedKrankenkasse?: Krankenkasse;
   mitgliedKrankenkasse?: string;
+  /** Manuelle Termin-Overrides des Antrags (leer = Automatik). */
+  dateOverrides?: FormDateOverrides;
 }
 
 // Helper function to get the default Krankenkasse name
@@ -37,7 +39,8 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
   type,
   childIndex,
   selectedKrankenkasse,
-  mitgliedKrankenkasse
+  mitgliedKrankenkasse,
+  dateOverrides
 }) => {
   // For Novitas: use mitgliedKrankenkasse as default, otherwise use the selected Krankenkasse name
   const getDefaultBeiValue = (): string => {
@@ -46,7 +49,7 @@ export const FamilyMemberForm: React.FC<FamilyMemberFormProps> = ({
     }
     return getDefaultKrankenkasseName(selectedKrankenkasse);
   };
-  const { endDate } = calculateDates(formData);
+  const { endDate } = calculateDates(dateOverrides);
   
   const geschlechtOptions = [
     { value: 'm', label: 'Männlich (m)' },

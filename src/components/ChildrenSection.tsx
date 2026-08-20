@@ -82,6 +82,7 @@ export const ChildrenSection: React.FC<ChildrenSectionProps> = ({ formData, upda
                 childIndex={index + 1}
                 selectedKrankenkasse={formData.selectedKrankenkasse}
                 mitgliedKrankenkasse={formData.mitgliedKrankenkasse}
+                dateOverrides={formData}
               />
 
               {/* BIG Variante B: Beschäftigung & eigene Mitgliedschaft pro Kind */}
