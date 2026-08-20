@@ -275,6 +275,12 @@ export interface FormData {
   
   // Beginn der Familienversicherung (automatisch berechnet)
   beginnFamilienversicherung: string;
+
+  // Manuelle Überschreibungen der automatischen Termine (ISO YYYY-MM-DD,
+  // leer = Automatik). Gilt für alle Krankenkassen.
+  versicherungsbeginnManuell?: string;
+  bisherigeVersicherungEndeManuell?: string;
+  antragsdatumManuell?: string;
   
   // Datum (heutiges Datum)
   datum: string;
@@ -426,6 +432,9 @@ export const createInitialFormData = (): FormData => {
     telefon: '',
     email: '',
     beginnFamilienversicherung: formatDate(threeMonthsLater),
+    versicherungsbeginnManuell: '',
+    bisherigeVersicherungEndeManuell: '',
+    antragsdatumManuell: '',
     datum: formatDateForInput(today),
     ort: '',
     ehegatte: createEmptyFamilyMember(),
