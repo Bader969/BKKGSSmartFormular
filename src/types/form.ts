@@ -447,6 +447,9 @@ export const createInitialFormData = (): FormData => {
     kinder: [],
     unterschrift: '',
     unterschriftFamilie: '',
+    unterschriftManuell: '',
+    unterschriftFamilieManuell: '',
+
     rundumSicherPaket: createEmptyRundumSicherPaket(),
     mitgliedVersichertennummer: '',
     // VIACTIV-spezifische Felder
