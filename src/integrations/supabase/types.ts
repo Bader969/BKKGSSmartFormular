@@ -143,6 +143,8 @@ export type Database = {
           applicant_vorname: string | null
           created_at: string
           crm_synced_at: string | null
+          crm_target: string | null
+          crm_target_synced_at: string | null
           exported_at: string | null
           id: string
           intake_meta: Json
@@ -167,6 +169,8 @@ export type Database = {
           applicant_vorname?: string | null
           created_at?: string
           crm_synced_at?: string | null
+          crm_target?: string | null
+          crm_target_synced_at?: string | null
           exported_at?: string | null
           id?: string
           intake_meta?: Json
@@ -191,6 +195,8 @@ export type Database = {
           applicant_vorname?: string | null
           created_at?: string
           crm_synced_at?: string | null
+          crm_target?: string | null
+          crm_target_synced_at?: string | null
           exported_at?: string | null
           id?: string
           intake_meta?: Json
