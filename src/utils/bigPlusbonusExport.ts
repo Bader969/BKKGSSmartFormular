@@ -242,8 +242,11 @@ export const exportBigPlusbonus = async (formData: FormData): Promise<void> => {
   // BIG: Mitglieds-Unterschrift kommt aus dem Nachnamen des Kontoinhabers
   const bigLast = resolveBigSignatureLastName(formData);
   const bigSeed = `big|${formData.bigBank?.kontoinhaber || ''}|${formData.mitgliedGeburtsdatum || ''}`;
-  const memberSig = generateSignatureDataUrl(bigLast, { seed: bigSeed }) ?? '';
+  const memberSig = (formData.unterschriftManuell || '').trim()
+    || generateSignatureDataUrl(bigLast, { seed: bigSeed })
+    || '';
   formData = { ...formData, unterschrift: memberSig, unterschriftFamilie: _sigs.family ?? '' };
+
   const res = await fetch('/big-plusbonus.pdf');
   const templateBytes = await res.arrayBuffer();
 

@@ -200,8 +200,11 @@ export const getAutoSignatures = (formData: FormData) => {
   const fam = formData.ehegatte?.name?.trim()
     ? [formData.ehegatte?.vorname, formData.ehegatte?.name, formData.ehegatte?.geburtsdatum].filter(Boolean).join('|')
     : familyLast || '';
+  const manualMember = (formData.unterschriftManuell || '').trim();
+  const manualFamily = (formData.unterschriftFamilieManuell || '').trim();
   return {
-    member: generateSignatureDataUrl(formData.mitgliedName, { seed: memberSeed }),
-    family: generateSignatureDataUrl(familyLast, { seed: fam }),
+    member: manualMember || generateSignatureDataUrl(formData.mitgliedName, { seed: memberSeed }),
+    family: manualFamily || generateSignatureDataUrl(familyLast, { seed: fam }),
   };
 };
+

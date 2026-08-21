@@ -52,6 +52,8 @@ export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, up
           <SignaturePreview
             lastName={memberLastName}
             seed={memberSeed}
+            manualSignature={formData.unterschriftManuell}
+            onManualSignatureChange={(v) => updateFormData({ unterschriftManuell: v })}
             emptyHint={isBig ? 'Wird automatisch aus dem Nachnamen des Kontoinhabers erzeugt' : undefined}
           />
         </div>
@@ -64,8 +66,11 @@ export const SignatureSection: React.FC<SignatureSectionProps> = ({ formData, up
             <SignaturePreview
               lastName={familyLastName}
               seed={familySeed}
+              manualSignature={formData.unterschriftFamilieManuell}
+              onManualSignatureChange={(v) => updateFormData({ unterschriftFamilieManuell: v })}
               emptyHint="Ehegatte bzw. Kind ≥ 16 – sonst keine Signatur"
             />
+
           </div>
         )}
       </div>

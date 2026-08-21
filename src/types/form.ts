@@ -301,6 +301,11 @@ export interface FormData {
   // Unterschrift der Familienangehörigen
   unterschriftFamilie: string;
   
+  // Manuell gezeichnete Unterschriften (PNG-DataURL) – überschreiben die Font-Signatur
+  unterschriftManuell?: string;
+  unterschriftFamilieManuell?: string;
+
+  
   // Rundum-Sicher-Paket
   rundumSicherPaket: RundumSicherPaketData;
   
@@ -442,6 +447,9 @@ export const createInitialFormData = (): FormData => {
     kinder: [],
     unterschrift: '',
     unterschriftFamilie: '',
+    unterschriftManuell: '',
+    unterschriftFamilieManuell: '',
+
     rundumSicherPaket: createEmptyRundumSicherPaket(),
     mitgliedVersichertennummer: '',
     // VIACTIV-spezifische Felder
