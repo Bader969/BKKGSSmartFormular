@@ -351,6 +351,9 @@ export interface FormData {
 
   // Novitas BKK: Kunde wünscht Bonus in Höhe von 400€ (300€ + 100€)
   novitasBonus400: boolean;
+
+  // Ziel-CRM für die automatische Übertragung ('' = automatisch über VP)
+  crmTarget: '' | 'blitzvox' | 'beitplus';
 }
 
 export const createEmptyArztDaten = (): ArztDaten => ({
@@ -486,5 +489,6 @@ export const createInitialFormData = (): FormData => {
     vertriebspartner: '',
     novitasMode: 'familie',
     novitasBonus400: false,
+    crmTarget: '',
   };
 };

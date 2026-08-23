@@ -272,11 +272,12 @@ Deno.serve(async (req) => {
     };
 
     if (action === "save") {
-      const { application_id, krankenkasse, payload, vertriebspartner, applicant_name, applicant_vorname, antragsform } = body as {
+      const { application_id, krankenkasse, payload, vertriebspartner, applicant_name, applicant_vorname, antragsform, crm_target } = body as {
         application_id?: string;
         krankenkasse?: string;
         payload?: unknown;
         vertriebspartner?: string;
+        crm_target?: string;
         applicant_name?: string;
         applicant_vorname?: string;
         antragsform?: string;
@@ -290,6 +291,7 @@ Deno.serve(async (req) => {
         applicant_name: typeof applicant_name === "string" ? applicant_name.slice(0, 120) : null,
         applicant_vorname: typeof applicant_vorname === "string" ? applicant_vorname.slice(0, 120) : null,
         antragsform: typeof antragsform === "string" ? antragsform.slice(0, 80) : null,
+        crm_target: crm_target === "blitzvox" || crm_target === "beitplus" ? crm_target : null,
       };
 
       const ctHex = bytesToHex(ct);
@@ -354,7 +356,7 @@ Deno.serve(async (req) => {
     if (action === "list") {
       const { data, error } = await admin
         .from("applications")
-        .select("id, user_id, krankenkasse, status, pdf_count, exported_at, last_opened_at, created_at, updated_at, vertriebspartner, applicant_name, applicant_vorname, antragsform, parent_application_id, person_role, person_index, source, crm_synced_at")
+        .select("id, user_id, krankenkasse, status, pdf_count, exported_at, last_opened_at, created_at, updated_at, vertriebspartner, applicant_name, applicant_vorname, antragsform, parent_application_id, person_role, person_index, source, crm_synced_at, crm_target")
         .order("updated_at", { ascending: false })
         .limit(500);
       if (error) return json(500, { error: "db_list_failed" });
