@@ -864,7 +864,38 @@ const Index = () => {
                   />
                 )}
               </div>
+
+              {/* Ziel-CRM: automatisch über VP, manuell überschreibbar */}
+              <div className="mt-4">
+                <Label className="text-sm font-medium">Ziel-CRM</Label>
+                <p className="text-xs text-muted-foreground mt-0.5 mb-2">
+                  Bestimmt, in welches CRM dieser Antrag automatisch übertragen wird.
+                </p>
+                <Select
+                  value={formData.crmTarget || 'auto'}
+                  onValueChange={(value) =>
+                    updateFormData({ crmTarget: value === 'auto' ? '' : (value as 'blitzvox' | 'beitplus') })
+                  }
+                >
+                  <SelectTrigger className="w-full sm:w-72">
+                    <SelectValue placeholder="CRM auswählen…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">
+                      Automatisch{autoCrmTarget ? ` (${CRM_TARGET_LABEL[autoCrmTarget]})` : ' – kein CRM zugeordnet'}
+                    </SelectItem>
+                    <SelectItem value="blitzvox">{CRM_TARGET_LABEL.blitzvox}</SelectItem>
+                    <SelectItem value="beitplus">{CRM_TARGET_LABEL.beitplus}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {effectiveCrmTarget
+                    ? `Übertragung nach: ${CRM_TARGET_LABEL[effectiveCrmTarget]}`
+                    : 'Kein CRM zugeordnet – es findet keine Übertragung statt.'}
+                </p>
+              </div>
             </div>
+
           </div>
           
           {/* Formular-Sektionen nur anzeigen wenn Krankenkasse gewählt */}
