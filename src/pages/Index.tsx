@@ -39,6 +39,7 @@ import { Link } from 'react-router-dom';
 import { useApplicationPersistence } from '@/hooks/useApplicationPersistence';
 import { useUserRole } from '@/hooks/useUserRole';
 import { VERTRIEBSPARTNER_OPTIONS, VP_STORAGE_KEY, CUSTOM_VP_VALUE } from '@/utils/vertriebspartner';
+import { crmTargetForVp, CRM_TARGET_LABEL } from '@/utils/crmVp';
 import { randomPoliceBetrag, parseEuro } from '@/utils/bigRandom';
 import { Input } from '@/components/ui/input';
 import { normalizeInsuranceNumber } from '@/utils/insuranceNumbers';
@@ -72,6 +73,9 @@ const Index = () => {
       setVpMode('custom');
     }
   }, [formData.vertriebspartner]);
+
+  const autoCrmTarget = crmTargetForVp(formData.vertriebspartner);
+  const effectiveCrmTarget = formData.crmTarget || autoCrmTarget;
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
