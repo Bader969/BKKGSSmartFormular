@@ -458,6 +458,46 @@ type DirectResult = {
 
 type CrmClient = ReturnType<typeof createClient>;
 
+/** Fehlt eine Zugangsart für das Ziel-CRM, wird hier eine sprechende Meldung geliefert. */
+function crmCredentialsMissing(target: CrmTarget): string | null {
+  if (target === "blitzvox") {
+    return CRM_SUPABASE_URL && CRM_SERVICE_ROLE_KEY
+      ? null
+      : "CRM_SUPABASE_URL / CRM_SERVICE_ROLE_KEY fehlen.";
+  }
+  if (BEITPLUS_SERVICE_ROLE_KEY) return BEITPLUS_URL ? null : "BEITPLUS_CRM_SUPABASE_URL fehlt.";
+  if (BEITPLUS_EMAIL && BEITPLUS_PASSWORD) return BEITPLUS_URL ? null : "BEITPLUS_CRM_SUPABASE_URL fehlt.";
+  return "BEITPLUS_CRM_EMAIL / BEITPLUS_CRM_PASSWORD fehlen.";
+}
+
+const clientCache = new Map<CrmTarget, CrmClient>();
+
+/**
+ * Client für das Ziel-CRM. BlitzVox: Service-Role. BeitPlus (Lovable-Projekt):
+ * Service-Role falls hinterlegt, sonst Anmeldung als CRM-Admin (RLS greift).
+ */
+async function crmClientFor(target: CrmTarget): Promise<CrmClient> {
+  const cached = clientCache.get(target);
+  if (cached) return cached;
+
+  let client: CrmClient;
+  if (target === "blitzvox") {
+    client = createClient(CRM_SUPABASE_URL, CRM_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  } else if (BEITPLUS_SERVICE_ROLE_KEY) {
+    client = createClient(BEITPLUS_URL, BEITPLUS_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  } else {
+    client = createClient(BEITPLUS_URL, BEITPLUS_ANON_KEY, { auth: { persistSession: false } });
+    const { error } = await client.auth.signInWithPassword({
+      email: BEITPLUS_EMAIL,
+      password: BEITPLUS_PASSWORD,
+    });
+    if (error) throw new Error(`beitplus_login_failed:${error.message}`);
+  }
+  clientCache.set(target, client);
+  return client;
+}
+
+
 const isEmptyVal = (v: unknown) => v === null || v === undefined || (typeof v === "string" && v.trim() === "");
 
 /** Patcht nur Felder, die im CRM leer sind. Bei ungültiger Anrede (Enum) ohne salutation erneut. */
