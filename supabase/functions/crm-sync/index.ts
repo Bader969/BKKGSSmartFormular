@@ -9,11 +9,26 @@ const CRM_IMPORT_SECRET = Deno.env.get("CRM_IMPORT_SECRET") ?? "";
 const CRM_IMPORT_URL = Deno.env.get("CRM_IMPORT_URL") ??
   "https://acvuxtmkzhjzecrfvhfp.supabase.co/functions/v1/gkv-import";
 /** Secret kann inkl. "/rest/v1/" hinterlegt sein – für createClient muss die Basis-URL rein. */
-const CRM_SUPABASE_URL = (Deno.env.get("CRM_SUPABASE_URL") ?? "")
-  .trim()
-  .replace(/\/+$/, "")
-  .replace(/\/rest\/v1$/, "");
+const baseUrl = (v: string) => v.trim().replace(/\/+$/, "").replace(/\/rest\/v1$/, "");
+const CRM_SUPABASE_URL = baseUrl(Deno.env.get("CRM_SUPABASE_URL") ?? "");
 const CRM_SERVICE_ROLE_KEY = Deno.env.get("CRM_SERVICE_ROLE_KEY") ?? "";
+
+/** BeitPlus CRM (Lovable-Projekt) – Zugriff per Admin-Login unter RLS. */
+const BEITPLUS_URL = baseUrl(
+  Deno.env.get("BEITPLUS_CRM_SUPABASE_URL") ?? "https://cfruyzidaiwwfoexbfyq.supabase.co",
+);
+const BEITPLUS_ANON_KEY = Deno.env.get("BEITPLUS_CRM_ANON_KEY") ??
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmcnV5emlkYWl3d2ZvZXhiZnlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyMTk2MjEsImV4cCI6MjA5Nzc5NTYyMX0.oXEOeqJmc2hfNqsiMVTsKOYx8HtZSkpPMyW9eS7OgXo";
+const BEITPLUS_EMAIL = Deno.env.get("BEITPLUS_CRM_EMAIL") ?? "";
+const BEITPLUS_PASSWORD = Deno.env.get("BEITPLUS_CRM_PASSWORD") ?? "";
+const BEITPLUS_SERVICE_ROLE_KEY = Deno.env.get("BEITPLUS_CRM_SERVICE_ROLE_KEY") ?? "";
+
+type CrmTarget = "blitzvox" | "beitplus";
+const CRM_TARGET_LABEL: Record<CrmTarget, string> = {
+  blitzvox: "BlitzVox CRM",
+  beitplus: "BeitPlus CRM",
+};
+
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
