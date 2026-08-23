@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { FormData } from "@/types/form";
 import { deriveAntragsform } from "@/utils/antragsform";
+import { crmTargetForVp } from "@/utils/crmVp";
 
 type SaveArgs = { applicationId?: string | null; formData: FormData };
 
@@ -27,7 +28,18 @@ export function useApplicationPersistence() {
         applicant_name: formData.mitgliedName ?? "",
         applicant_vorname: formData.mitgliedVorname ?? "",
         antragsform: deriveAntragsform(formData),
+        crm_target: formData.crmTarget || crmTargetForVp(formData.vertriebspartner) || undefined,
       });
+      // Automatische CRM-Übertragung (nicht blockierend – Speichern gilt auch bei
+      // CRM-Fehlern als erfolgreich).
+      const target = formData.crmTarget || crmTargetForVp(formData.vertriebspartner);
+      if (target && res.application?.id) {
+        void supabase.functions
+          .invoke("crm-sync", {
+            body: { action: "direct-push", application_ids: [res.application.id], crm_target: target },
+          })
+          .catch(() => undefined);
+      }
       return res.application;
     } finally {
       setSaving(false);
@@ -55,6 +67,7 @@ export function useApplicationPersistence() {
       emailed_at: string | null;
       whatsapp_sent_at: string | null;
       crm_synced_at: string | null;
+      crm_target: string | null;
     }>;
     isAdmin: boolean;
     userEmails: Record<string, string>;
