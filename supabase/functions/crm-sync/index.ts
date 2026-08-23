@@ -588,8 +588,7 @@ const famRow = (contractId: string, m: Record<string, unknown>) => ({
   abweichende_anschrift: m.abweichende_anschrift ?? null,
 });
 
-async function writeEntriesDirect(batch: CrmEntry[]): Promise<DirectResult[]> {
-  const crm = createClient(CRM_SUPABASE_URL, CRM_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+async function writeEntriesDirect(crm: CrmClient, batch: CrmEntry[]): Promise<DirectResult[]> {
   const out: DirectResult[] = [];
 
   // Berater einmalig laden – full_name im CRM kann Leerzeichen/Groß-Kleinschreibung abweichen
@@ -731,8 +730,7 @@ type FamAudit = {
   reason?: string;
 };
 
-async function auditFamilyMembers(batch: CrmEntry[], repair: boolean): Promise<FamAudit[]> {
-  const crm = createClient(CRM_SUPABASE_URL, CRM_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+async function auditFamilyMembers(crm: CrmClient, batch: CrmEntry[], repair: boolean): Promise<FamAudit[]> {
   const out: FamAudit[] = [];
   const key = (f: unknown, l: unknown, b: unknown) =>
     `${String(f ?? "").trim().toLowerCase()}|${String(l ?? "").trim().toLowerCase()}|${b ?? ""}`;
@@ -791,8 +789,7 @@ type CustAudit = {
   reason?: string;
 };
 
-async function auditCustomers(batch: CrmEntry[], repair: boolean): Promise<CustAudit[]> {
-  const crm = createClient(CRM_SUPABASE_URL, CRM_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+async function auditCustomers(crm: CrmClient, batch: CrmEntry[], repair: boolean): Promise<CustAudit[]> {
   const out: CustAudit[] = [];
   const key = (f: unknown, l: unknown, b: unknown) =>
     `${String(f ?? "").trim().toLowerCase()}|${String(l ?? "").trim().toLowerCase()}|${b ?? ""}`;
