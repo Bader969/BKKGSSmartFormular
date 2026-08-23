@@ -893,19 +893,21 @@ Deno.serve(async (req) => {
       action?: "preview" | "push" | "export-sql" | "direct-push" | "audit-family" | "repair-family"
         | "audit-customers" | "repair-customers";
       application_ids?: string[];
+      crm_target?: string;
       dry_run?: boolean;
     };
     const action = body.action ?? "preview";
     const ids = Array.isArray(body.application_ids)
       ? body.application_ids.filter((x) => typeof x === "string").slice(0, 500)
       : [];
+    const onlyTarget = resolveTarget(body.crm_target ?? null, null);
     const isCrmMaintenance = action === "audit-family" || action === "repair-family" ||
       action === "audit-customers" || action === "repair-customers";
     if (!ids.length && !isCrmMaintenance) return json(400, { error: "no_applications" });
 
     let q = admin
       .from("applications")
-      .select("id, user_id, krankenkasse, created_at, vertriebspartner, parent_application_id, payload_encrypted, payload_iv, crm_synced_at")
+      .select("id, user_id, krankenkasse, created_at, vertriebspartner, parent_application_id, payload_encrypted, payload_iv, crm_synced_at, crm_target")
       .is("parent_application_id", null);
     if (ids.length) q = q.in("id", ids);
     if (!isAdmin) q = q.eq("user_id", user.id);
@@ -915,8 +917,18 @@ Deno.serve(async (req) => {
     const results: Array<Record<string, unknown>> = [];
     const batch: CrmEntry[] = [];
     const appEntryCount = new Map<string, number>();
+    const appTarget = new Map<string, CrmTarget>();
 
     for (const app of apps ?? []) {
+      const target = resolveTarget(
+        (app as { crm_target?: string | null }).crm_target ?? null,
+        app.vertriebspartner,
+      );
+      if (!target) {
+        results.push({ application_id: app.id, status: "skipped", reason: "no_crm_target", vp: app.vertriebspartner });
+        continue;
+      }
+      if (onlyTarget && target !== onlyTarget) continue;
       if (!advisorForVp(app.vertriebspartner)) {
         results.push({ application_id: app.id, status: "skipped", reason: "vp_not_eligible", vp: app.vertriebspartner });
         continue;
@@ -929,21 +941,46 @@ Deno.serve(async (req) => {
         continue;
       }
       const entries = buildEntries(
-        { id: app.id, krankenkasse: app.krankenkasse, created_at: app.created_at, vertriebspartner: app.vertriebspartner },
+        {
+          id: app.id,
+          krankenkasse: app.krankenkasse,
+          created_at: app.created_at,
+          vertriebspartner: app.vertriebspartner,
+          crm_target: target,
+        },
         payload,
       );
       appEntryCount.set(app.id, entries.length);
+      appTarget.set(app.id, target);
       batch.push(...entries);
       results.push({
         application_id: app.id,
         status: "prepared",
+        crm_target: target,
         entries: entries.length,
         already_synced_at: app.crm_synced_at ?? null,
       });
     }
 
+    /** Einträge nach Ziel-CRM gruppieren. */
+    const groups = new Map<CrmTarget, CrmEntry[]>();
+    for (const e of batch) {
+      const t = (e.crm_target as CrmTarget | null) ?? null;
+      if (!t) continue;
+      const arr = groups.get(t) ?? [];
+      arr.push(e);
+      groups.set(t, arr);
+    }
+
     if (action === "preview" || body.dry_run) {
-      return json(200, { ok: true, mode: "preview", entries: batch.length, results, payload_sample: batch.slice(0, 2) });
+      return json(200, {
+        ok: true,
+        mode: "preview",
+        entries: batch.length,
+        by_target: Object.fromEntries([...groups].map(([t, v]) => [t, v.length])),
+        results,
+        payload_sample: batch.slice(0, 2),
+      });
     }
 
     if (action === "export-sql") {
@@ -951,10 +988,17 @@ Deno.serve(async (req) => {
     }
 
     if (action === "audit-family" || action === "repair-family") {
-      if (!CRM_SUPABASE_URL || !CRM_SERVICE_ROLE_KEY) {
-        return json(400, { error: "crm_credentials_missing", message: "CRM_SUPABASE_URL / CRM_SERVICE_ROLE_KEY fehlen." });
+      const audit: FamAudit[] = [];
+      const credErrors: Array<{ crm_target: CrmTarget; message: string }> = [];
+      for (const [target, entries] of groups) {
+        const missing = crmCredentialsMissing(target);
+        if (missing) { credErrors.push({ crm_target: target, message: `${CRM_TARGET_LABEL[target]}: ${missing}` }); continue; }
+        const crm = await crmClientFor(target);
+        audit.push(...(await auditFamilyMembers(crm, entries, action === "repair-family")));
       }
-      const audit = await auditFamilyMembers(batch, action === "repair-family");
+      if (!audit.length && credErrors.length) {
+        return json(400, { error: "crm_credentials_missing", message: credErrors.map((c) => c.message).join(" · ") });
+      }
       const summary = {
         checked: audit.length,
         ok: audit.filter((a) => a.status === "ok").length,
@@ -962,9 +1006,10 @@ Deno.serve(async (req) => {
         inserted: audit.reduce((n, a) => n + (a.inserted ?? 0), 0),
         missing_contract: audit.filter((a) => a.status === "missing_contract").length,
         errors: audit.filter((a) => a.status === "error"),
+        credential_errors: credErrors,
       };
       return json(200, {
-        ok: !summary.errors.length,
+        ok: !summary.errors.length && !credErrors.length,
         mode: action,
         ...summary,
         details: audit.filter((a) => a.status !== "ok").slice(0, 50),
@@ -972,10 +1017,17 @@ Deno.serve(async (req) => {
     }
 
     if (action === "audit-customers" || action === "repair-customers") {
-      if (!CRM_SUPABASE_URL || !CRM_SERVICE_ROLE_KEY) {
-        return json(400, { error: "crm_credentials_missing", message: "CRM_SUPABASE_URL / CRM_SERVICE_ROLE_KEY fehlen." });
+      const audit: CustAudit[] = [];
+      const credErrors: Array<{ crm_target: CrmTarget; message: string }> = [];
+      for (const [target, entries] of groups) {
+        const missing = crmCredentialsMissing(target);
+        if (missing) { credErrors.push({ crm_target: target, message: `${CRM_TARGET_LABEL[target]}: ${missing}` }); continue; }
+        const crm = await crmClientFor(target);
+        audit.push(...(await auditCustomers(crm, entries, action === "repair-customers")));
       }
-      const audit = await auditCustomers(batch, action === "repair-customers");
+      if (!audit.length && credErrors.length) {
+        return json(400, { error: "crm_credentials_missing", message: credErrors.map((c) => c.message).join(" · ") });
+      }
       const updated = audit.filter((a) => a.status === "updated");
       const fieldCounts: Record<string, number> = {};
       for (const a of [...updated, ...audit.filter((x) => x.status === "incomplete")]) {
@@ -990,9 +1042,10 @@ Deno.serve(async (req) => {
         salutation_filled: fieldCounts["customer.salutation"] ?? 0,
         fields: fieldCounts,
         errors: audit.filter((a) => a.status === "error"),
+        credential_errors: credErrors,
       };
       return json(200, {
-        ok: !summary.errors.length,
+        ok: !summary.errors.length && !credErrors.length,
         mode: action,
         ...summary,
         details: audit.filter((a) => a.status !== "ok").slice(0, 50),
@@ -1000,12 +1053,30 @@ Deno.serve(async (req) => {
     }
 
     if (action === "direct-push") {
-      if (!CRM_SUPABASE_URL || !CRM_SERVICE_ROLE_KEY) {
-        return json(400, { error: "crm_credentials_missing", message: "CRM_SUPABASE_URL / CRM_SERVICE_ROLE_KEY fehlen." });
-      }
       if (!batch.length) return json(200, { ok: true, entries: 0, results });
 
-      const written = await writeEntriesDirect(batch);
+      const written: DirectResult[] = [];
+      const credErrors: Array<{ crm_target: CrmTarget; message: string }> = [];
+      for (const [target, entries] of groups) {
+        const missing = crmCredentialsMissing(target);
+        if (missing) {
+          credErrors.push({ crm_target: target, message: `${CRM_TARGET_LABEL[target]}: ${missing}` });
+          for (const e of entries) {
+            written.push({ external_ref: String(e.external_ref), status: "error", reason: `credentials_missing:${target}` });
+          }
+          continue;
+        }
+        try {
+          const crm = await crmClientFor(target);
+          written.push(...(await writeEntriesDirect(crm, entries)));
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          for (const e of entries) {
+            written.push({ external_ref: String(e.external_ref), status: "error", reason });
+          }
+        }
+      }
+
       const created = written.filter((w) => w.status === "created").length;
       const skipped = written.filter((w) => w.status === "skipped").length;
       const failed = written.filter((w) => w.status === "error");
@@ -1013,15 +1084,18 @@ Deno.serve(async (req) => {
 
       for (const app of apps ?? []) {
         if (!appEntryCount.has(app.id)) continue;
+        const target = appTarget.get(app.id)!;
         const appRefs = written.filter((w) => w.external_ref.startsWith(`${app.id}:`));
         const appFailed = appRefs.filter((w) => w.status === "error");
         if (!appFailed.length) {
-          await admin.from("applications").update({ crm_synced_at: now }).eq("id", app.id);
+          await admin.from("applications")
+            .update({ crm_synced_at: now, crm_target: target, crm_target_synced_at: now })
+            .eq("id", app.id);
           await admin.from("application_events").insert({
             application_id: app.id,
             user_id: user.id,
             event_type: "crm_synced",
-            meta: { entries: appRefs.length, mode: "direct" },
+            meta: { entries: appRefs.length, mode: "direct", crm_target: target },
           });
         }
         await admin.from("crm_sync_log").insert({
@@ -1029,7 +1103,7 @@ Deno.serve(async (req) => {
           actor_id: user.id,
           status: appFailed.length ? "error" : "ok",
           entries: appRefs.length,
-          response: { mode: "direct", details: appRefs },
+          response: { mode: "direct", crm_target: target, details: appRefs },
           error: appFailed.length ? appFailed.map((f) => f.reason).join("; ").slice(0, 500) : null,
         });
       }
@@ -1038,13 +1112,16 @@ Deno.serve(async (req) => {
         ok: !failed.length,
         mode: "direct-push",
         entries: batch.length,
+        by_target: Object.fromEntries([...groups].map(([t, v]) => [t, v.length])),
         created,
         skipped,
         failed: failed.length,
         errors: failed.slice(0, 20),
+        credential_errors: credErrors,
         results,
       });
     }
+
 
     if (!CRM_IMPORT_SECRET) {
       return json(400, { error: "crm_secret_missing", message: "CRM_IMPORT_SECRET ist nicht konfiguriert." });
