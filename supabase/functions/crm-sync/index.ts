@@ -59,7 +59,7 @@ async function decryptPayload(ctHex: string, ivHex: string): Promise<Record<stri
 }
 
 // ---------------------------------------------------------------- VP mapping
-const VP_ADVISOR: Record<string, string> = {
+const BLITZVOX_VP_ADVISOR: Record<string, string> = {
   "AD Blitzvox": "Adam",
   "AM Blitzvox": "Ammar",
   "BA Blitzvox": "Bashar Yahia",
@@ -69,13 +69,38 @@ const VP_ADVISOR: Record<string, string> = {
   "HZ Blitzvox": "Hamza",
   "JA Blitzvox": "Jamil",
 };
-const NORM_VP_ADVISOR: Record<string, string> = Object.fromEntries(
-  Object.entries(VP_ADVISOR).map(([k, v]) => [k.trim().toLowerCase().replace(/\s+/g, " "), v]),
+const BEITPLUS_VP_ADVISOR: Record<string, string> = {
+  "Gheith Abojamil": "Gheith Abojamil",
+};
+const normVp = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ");
+const NORM_BLITZVOX: Record<string, string> = Object.fromEntries(
+  Object.entries(BLITZVOX_VP_ADVISOR).map(([k, v]) => [normVp(k), v]),
+);
+const NORM_BEITPLUS: Record<string, string> = Object.fromEntries(
+  Object.entries(BEITPLUS_VP_ADVISOR).map(([k, v]) => [normVp(k), v]),
 );
 const advisorForVp = (vp?: string | null): string | null => {
   if (!vp) return null;
-  return NORM_VP_ADVISOR[vp.trim().toLowerCase().replace(/\s+/g, " ")] ?? null;
+  const key = normVp(vp);
+  return NORM_BLITZVOX[key] ?? NORM_BEITPLUS[key] ?? null;
 };
+/** Ziel-CRM aus dem Vertriebspartner ableiten. */
+const crmTargetForVp = (vp?: string | null): CrmTarget | null => {
+  if (!vp) return null;
+  const key = normVp(vp);
+  if (NORM_BLITZVOX[key]) return "blitzvox";
+  if (NORM_BEITPLUS[key]) return "beitplus";
+  if (key.includes("blitzvox")) return "blitzvox";
+  if (key.includes("beitplus") || key.includes("beit plus")) return "beitplus";
+  return null;
+};
+/** Explizites Ziel am Antrag hat Vorrang, sonst VP-Ableitung. */
+const resolveTarget = (explicit: string | null, vp: string | null): CrmTarget | null => {
+  const e = (explicit ?? "").trim().toLowerCase();
+  if (e === "blitzvox" || e === "beitplus") return e as CrmTarget;
+  return crmTargetForVp(vp);
+};
+
 
 const KK_LABEL: Record<string, string> = {
   bkk_gs: "BKK GILDEMEISTER SEIDENSTICKER",
