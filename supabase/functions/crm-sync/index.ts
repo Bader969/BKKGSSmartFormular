@@ -193,8 +193,10 @@ function buildEntries(app: {
   krankenkasse: string;
   created_at: string;
   vertriebspartner: string | null;
+  crm_target?: string | null;
 }, payload: Record<string, unknown>): CrmEntry[] {
   const advisor = advisorForVp(app.vertriebspartner);
+  const target = resolveTarget(app.crm_target ?? null, app.vertriebspartner);
   const currentKasse = KK_LABEL[s(payload.selectedKrankenkasse) || app.krankenkasse] ??
     (s(payload.selectedKrankenkasse) || app.krankenkasse);
   const previousKasse = nn(s(payload.mitgliedKrankenkasse));
@@ -210,12 +212,14 @@ function buildEntries(app: {
   const common = {
     source: "gkv-antragsportal",
     application_id: app.id,
+    crm_target: target,
     vp_code: app.vertriebspartner ?? null,
     advisor_name: advisor,
     created_at: app.created_at,
     lead_source: "sonstiges",
     lead_source_detail: "GKV-Kampagne",
   };
+
 
   const kinder = Array.isArray(payload.kinder) ? (payload.kinder as Array<Record<string, unknown>>) : [];
   const ehegatte = (payload.ehegatte ?? null) as Record<string, unknown> | null;
