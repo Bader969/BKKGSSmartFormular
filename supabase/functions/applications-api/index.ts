@@ -291,8 +291,8 @@ Deno.serve(async (req) => {
         applicant_name: typeof applicant_name === "string" ? applicant_name.slice(0, 120) : null,
         applicant_vorname: typeof applicant_vorname === "string" ? applicant_vorname.slice(0, 120) : null,
         antragsform: typeof antragsform === "string" ? antragsform.slice(0, 80) : null,
-        crm_target: crm_target === "blitzvox" || crm_target === "beitplus" ? crm_target : null,
-      };
+      } as Record<string, unknown>;
+      if (crm_target === "blitzvox" || crm_target === "beitplus") meta.crm_target = crm_target;
 
       const ctHex = bytesToHex(ct);
       const ivHex = bytesToHex(iv);
@@ -342,8 +342,8 @@ Deno.serve(async (req) => {
         parentId: parentRow.id,
         userId: user.id,
         krankenkasse,
-        vertriebspartner: meta.vertriebspartner,
-        antragsform: meta.antragsform,
+        vertriebspartner: meta.vertriebspartner as string | null,
+        antragsform: meta.antragsform as string | null,
         ctHex,
         ivHex,
         hash,
