@@ -601,12 +601,12 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
   const tooLarge = totalSize > 24 * 1024 * 1024;
 
   const validateGroup = (g: SendGroup): string | null => {
-    if (!to.trim()) return 'Bitte Empfänger angeben.';
-    if (!g.subject.trim()) return `Betreff für "${g.label}" fehlt.`;
+    if (!whatsappOnly && !to.trim()) return 'Bitte Empfänger angeben.';
+    if (!whatsappOnly && !g.subject.trim()) return `Betreff für "${g.label}" fehlt.`;
     const active = g.attachmentIndices.map((i) => attachments[i]).filter((a) => a && a.include);
     if (!active.length) return `Mindestens ein Anhang für "${g.label}" erforderlich.`;
     const size = active.reduce((s, a) => s + a.blob.size, 0);
-    if (size > 24 * 1024 * 1024) return `"${g.label}" überschreitet 24 MB.`;
+    if (!whatsappOnly && size > 24 * 1024 * 1024) return `"${g.label}" überschreitet 24 MB.`;
     return null;
   };
 
@@ -614,34 +614,38 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
   const sendGroup = async (g: SendGroup): Promise<void> => {
     console.info('[SendEmail] → Start Gruppe:', g.id, g.label);
     const active = g.attachmentIndices.map((i) => attachments[i]).filter((a) => a && a.include);
-    const encoded = await Promise.all(
-      active.map(async (a) => ({
-        filename: a.filename,
-        mimeType: a.blob.type || 'application/pdf',
-        base64: await blobToBase64(a.blob),
-      })),
-    );
-    const { data, error } = await supabase.functions.invoke('send-application-email', {
-      body: {
-        application_id: applicationId,
-        to: to.trim(),
-        cc: cc.trim() || undefined,
-        bcc: bcc.trim() || undefined,
-        subject: g.subject.trim(),
-        body: g.body,
-        attachments: encoded,
-        person_role: g.personRole,
-        person_index: g.personIndex ?? null,
-        person_label: g.label,
-      },
-    });
-    if (error) throw new Error(error.message);
-    if (data?.error === 'gmail_scope_missing') {
-      throw new Error('Gmail-Verbindung erlaubt kein Senden. Bitte Verbindung mit Scope "gmail.send" neu autorisieren.');
+    if (whatsappOnly) {
+      console.info('[SendEmail] Nur-WhatsApp-Modus: E-Mail übersprungen für', g.label);
+    } else {
+      const encoded = await Promise.all(
+        active.map(async (a) => ({
+          filename: a.filename,
+          mimeType: a.blob.type || 'application/pdf',
+          base64: await blobToBase64(a.blob),
+        })),
+      );
+      const { data, error } = await supabase.functions.invoke('send-application-email', {
+        body: {
+          application_id: applicationId,
+          to: to.trim(),
+          cc: cc.trim() || undefined,
+          bcc: bcc.trim() || undefined,
+          subject: g.subject.trim(),
+          body: g.body,
+          attachments: encoded,
+          person_role: g.personRole,
+          person_index: g.personIndex ?? null,
+          person_label: g.label,
+        },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error === 'gmail_scope_missing') {
+        throw new Error('Gmail-Verbindung erlaubt kein Senden. Bitte Verbindung mit Scope "gmail.send" neu autorisieren.');
+      }
+      if (data?.error) throw new Error(data.error);
+      console.info('[SendEmail] ✓ Gruppe gesendet:', g.id, g.label, 'gmail_id:', data?.gmail_id);
+      toast.success(`E-Mail gesendet: ${g.label}`);
     }
-    if (data?.error) throw new Error(data.error);
-    console.info('[SendEmail] ✓ Gruppe gesendet:', g.id, g.label, 'gmail_id:', data?.gmail_id);
-    toast.success(`E-Mail gesendet: ${g.label}`);
 
     if (sendToWhatsApp) {
       const isViactiv = formData.selectedKrankenkasse === 'viactiv';
