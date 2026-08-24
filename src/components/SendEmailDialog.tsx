@@ -959,20 +959,38 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
         </div>
 
         <DialogFooter>
-          <div className="mr-auto flex items-center gap-2">
-            <Checkbox
-              id="wa-send"
-              checked={sendToWhatsApp}
-              onCheckedChange={(v) => setSendToWhatsApp(!!v)}
-            />
-            <Label htmlFor="wa-send" className="text-sm cursor-pointer">
-              Auch per WhatsApp an Gruppe senden
-            </Label>
+          <div className="mr-auto flex flex-col gap-2 items-start">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="wa-send"
+                checked={sendToWhatsApp}
+                onCheckedChange={(v) => setSendToWhatsApp(!!v)}
+                disabled={whatsappOnly}
+              />
+              <Label htmlFor="wa-send" className="text-sm cursor-pointer">
+                Auch per WhatsApp an Gruppe senden
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="wa-only"
+                checked={whatsappOnly}
+                onCheckedChange={(v) => {
+                  const on = !!v;
+                  setWhatsappOnly(on);
+                  if (on) setSendToWhatsApp(true);
+                }}
+              />
+              <Label htmlFor="wa-only" className="text-sm cursor-pointer">
+                Nur per WhatsApp senden (keine E-Mail)
+                {novitasNoBonus && <span className="text-muted-foreground"> — Novitas ohne 400 €</span>}
+              </Label>
+            </div>
           </div>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>Abbrechen</Button>
-          <Button onClick={handleSend} disabled={sending || loadingAttachments || tooLarge} className="gap-2">
+          <Button onClick={handleSend} disabled={sending || loadingAttachments || (!whatsappOnly && tooLarge)} className="gap-2">
             {sending && <Loader2 className="h-4 w-4 animate-spin" />}
-            {sending ? 'Sende…' : 'Senden'}
+            {sending ? 'Sende…' : whatsappOnly ? 'Nur WhatsApp senden' : 'Senden'}
           </Button>
         </DialogFooter>
       </DialogContent>
