@@ -121,21 +121,43 @@ function todayDdMmYyyy(): string {
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
 }
 
+/** Geburtsdatum immer als TT.MM.JJJJ ausgeben (akzeptiert ISO oder deutsches Format). */
+function toDdMmYyyy(value?: string): string {
+  const v = (value || '').trim();
+  if (!v) return '';
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (iso) return `${iso[3]}.${iso[2]}.${iso[1]}`;
+  return v;
+}
+
+/** Fügt "(Vorname Nachname)" vor der Dateiendung ein — idempotent. */
+function withPersonSuffix(filename: string, vorname: string, name: string): string {
+  const full = `${(vorname || '').trim()} ${(name || '').trim()}`.trim();
+  if (!full) return filename;
+  if (filename.toLowerCase().includes(`(${full.toLowerCase()})`)) return filename;
+  const dot = filename.lastIndexOf('.');
+  if (dot <= 0) return `${filename}(${full})`;
+  return `${filename.slice(0, dot)}(${full})${filename.slice(dot)}`;
+}
+
 function buildWaTextLines(
-  person: { vorname: string; name: string },
+  person: { vorname: string; name: string; geburtsdatum?: string },
   kk: string,
   vertriebspartner: string,
   opts?: { bonus400?: boolean },
 ): string[] {
   const lines: string[] = [];
+  lines.push(todayDdMmYyyy());
   const fullName = `${(person.vorname || '').trim()} ${(person.name || '').trim()}`.trim();
   if (fullName) lines.push(fullName);
-  lines.push(todayDdMmYyyy());
+  const geb = toDdMmYyyy(person.geburtsdatum);
+  if (geb) lines.push(geb);
   const kkLabel = WA_KK_LABEL[kk] || kk;
   if (kkLabel) lines.push(opts?.bonus400 ? `${kkLabel} 400€` : kkLabel);
   if (vertriebspartner && vertriebspartner.trim()) lines.push(vertriebspartner.trim());
   return lines;
 }
+
 
 async function runAllExports(formData: FormData): Promise<void> {
   const kk = formData.selectedKrankenkasse;
@@ -659,7 +681,12 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
               application_id: applicationId,
               chatId: WA_CHAT_ID,
               pdfBase64,
-              pdfFilename: waFilenameOverride || summary.filename,
+              pdfFilename: withPersonSuffix(
+                waFilenameOverride || summary.filename,
+                g.person.vorname,
+                g.person.name,
+              ),
+
               textLines,
               person_role: g.personRole,
               person_index: g.personIndex ?? null,
