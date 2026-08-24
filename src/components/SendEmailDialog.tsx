@@ -25,6 +25,8 @@ import { exportViactivBeitrittserklaerung } from '@/utils/viactivExport';
 import { exportViactivFamilienversicherung } from '@/utils/viactivFamilyExport';
 import { exportViactivBonusPDFs } from '@/utils/viactivBonusExport';
 import { exportNovitasFamilienversicherung } from '@/utils/novitasExport';
+import { splitNovitasPersons } from '@/utils/novitasSplit';
+
 import { exportDAKFamilienversicherung } from '@/utils/dakExport';
 import { exportFilledPDF, exportRundumSicherPaketOnly } from '@/utils/pdfExport';
 
