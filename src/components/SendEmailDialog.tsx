@@ -681,7 +681,12 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
               application_id: applicationId,
               chatId: WA_CHAT_ID,
               pdfBase64,
-              pdfFilename: waFilenameOverride || summary.filename,
+              pdfFilename: withPersonSuffix(
+                waFilenameOverride || summary.filename,
+                g.person.vorname,
+                g.person.name,
+              ),
+
               textLines,
               person_role: g.personRole,
               person_index: g.personIndex ?? null,
