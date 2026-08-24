@@ -337,6 +337,46 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
       }
     }
 
+    // Novitas BKK Variante B: Ehegatte/Kinder mit eigener Mitgliedschaft (Jobcenter-Regel)
+    if (formData.selectedKrankenkasse === 'novitas') {
+      const own = splitNovitasPersons(formData).filter((p) => p.role !== 'main' && p.ownMembership);
+      for (const p of own) {
+        const src =
+          p.role === 'ehegatte' ? formData.ehegatte : (formData.kinder || [])[(p.index ?? 1) - 1];
+        if (!src) continue;
+        const gid = p.role === 'ehegatte' ? 'spouse' : `kind-${(p.index ?? 1) - 1}`;
+        const groupSpecific = attachments
+          .map((a, i) => ((a.kind === 'group' || a.kind === 'photo-group') && a.groupId === gid ? i : -1))
+          .filter((i) => i >= 0);
+        const attIdx = Array.from(new Set([...sharedIndices, ...groupSpecific]));
+        const pHasPhotos = attIdx.some((i) => {
+          const a = attachments[i];
+          return a && a.include && (a.kind === 'photo-shared' || a.kind === 'photo-group');
+        });
+        const pVars = buildTemplateVarsForPerson(
+          formData,
+          { vorname: src.vorname, name: src.name, geburtsdatum: src.geburtsdatum },
+          bearbeiter,
+          undefined,
+          { hasPhotos: pHasPhotos },
+        );
+        result.push({
+          id: gid,
+          label:
+            p.role === 'ehegatte'
+              ? `Ehegatte — ${src.vorname} ${src.name}`.trim()
+              : `Kind ${p.index} — ${src.vorname} ${src.name}`.trim(),
+          person: { vorname: src.vorname, name: src.name, geburtsdatum: src.geburtsdatum },
+          antragsform: pVars.antragsform,
+          subject: groupSubjects[gid] ?? applyTemplate(subjTpl, pVars),
+          body: applyTemplate(body || DEFAULT_BODY_TEMPLATE, pVars),
+          attachmentIndices: attIdx,
+          personRole: p.role,
+          personIndex: p.role === 'kind' ? p.index : undefined,
+        });
+      }
+    }
+
     // VIACTIV Variante B: Ehegatte + Kinder mit eigener Mitgliedschaft
     if (formData.selectedKrankenkasse === 'viactiv' && formData.viactivFamilienangehoerigeMitversichern) {
       const persons: Array<{ id: string; label: string; vorname: string; name: string; geb: string; role: 'ehegatte' | 'kind'; index?: number }> = [];
