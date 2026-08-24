@@ -208,6 +208,14 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
   const [subjTpl, setSubjTpl] = useState<string>(DEFAULT_SUBJECT_TEMPLATE);
   const [groupSubjects, setGroupSubjects] = useState<Record<string, string>>({});
   const [sendToWhatsApp, setSendToWhatsApp] = useState<boolean>(true);
+  // Novitas ohne 400€-Bonus: standardmäßig nur WhatsApp (keine E-Mail)
+  const novitasNoBonus =
+    formData.selectedKrankenkasse === 'novitas' && !formData.novitasBonus400;
+  const [whatsappOnly, setWhatsappOnly] = useState<boolean>(novitasNoBonus);
+  useEffect(() => {
+    setWhatsappOnly(novitasNoBonus);
+    if (novitasNoBonus) setSendToWhatsApp(true);
+  }, [novitasNoBonus, open]);
 
   const vars = useMemo(() => buildTemplateVars(formData, bearbeiter), [formData, bearbeiter]);
 
