@@ -829,6 +829,11 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           </DialogTitle>
           <DialogDescription>
             Betreff, Empfänger und Nachricht sind vorausgefüllt und vor dem Versand frei änderbar.
+            <span className="block mt-1 text-xs">
+              {isBeitplus
+                ? 'Versand über antraege@beitplus.de (BeitPlus-Postfach) · WhatsApp an 4917676897062'
+                : 'Versand über Gmail · WhatsApp an BlitzVox-Gruppe'}
+            </span>
           </DialogDescription>
         </DialogHeader>
 
