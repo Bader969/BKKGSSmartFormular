@@ -1,4 +1,4 @@
-import { FormData, Krankenkasse, FamilyMember, createEmptyFamilyMember } from '@/types/form';
+import { FormData, Krankenkasse, FamilyMember, createEmptyFamilyMember, createEmptyArbeitgeberDaten } from '@/types/form';
 import { findInsuranceNumberAlias, normalizeInsuranceNumber } from '@/utils/insuranceNumbers';
 
 const useExtractedNumber = (extracted: unknown, current = '') => {
