@@ -438,10 +438,32 @@ const Index = () => {
         if (!formData.telefon || !formData.email) { toast.error('Telefon und E-Mail sind Pflicht.'); return; }
         if (!formData.mitgliedGeburtsdatum) { toast.error('Bitte Geburtsdatum des Mitglieds eingeben.'); return; }
         if (!formData.bigMitgliedBeschaeftigt) {
-          toast.error('Bitte Beschäftigungsstatus des Hauptmitglieds (beschäftigt/arbeitslos) auswählen.');
+          toast.error('Bitte Beschäftigungsstatus des Hauptmitglieds auswählen.');
           return;
         }
       }
+      // Arbeitgeber bzw. Jobcenter/Agentur für Arbeit — Name + Anschrift Pflicht,
+      // sobald ein Beschäftigungsstatus gewählt wurde.
+      if (formData.bigBeschaeftigungsstatus) {
+        const agComplete = (ag?: ArbeitgeberDaten) =>
+          !!(ag && ag.name?.trim() && ag.strasse?.trim() && ag.hausnummer?.trim() && ag.plz?.trim() && ag.ort?.trim());
+        const mainAg = formData.bigArbeitgeber ?? formData.viactivArbeitgeber;
+        if (!agComplete(mainAg)) {
+          toast.error('Bitte Name und Anschrift des Arbeitgebers bzw. Jobcenters für das Hauptmitglied vollständig eingeben.');
+          return;
+        }
+        if (formData.bigFamilienversicherung) {
+          const missing = bigOwnMembershipPersons.find((p) => {
+            const person = p.role === 'ehegatte' ? formData.ehegatte : formData.kinder[p.index];
+            return !agComplete(person?.bigArbeitgeber ?? mainAg);
+          });
+          if (missing) {
+            toast.error(`Bitte Arbeitgeber/Jobcenter-Angaben für ${missing.label} vollständig eingeben.`);
+            return;
+          }
+        }
+      }
+
       if (!formData.mitgliedGeburtsdatum) {
         toast.error('Bitte Geburtsdatum des Mitglieds eingeben (wird für den Dateinamen benötigt).');
         return;
