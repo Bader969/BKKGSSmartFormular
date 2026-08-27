@@ -65,3 +65,10 @@ type: feature
 - `bigNeedsFamversPdf(formData)` (in `src/utils/bigFamversExport.ts`) entscheidet, ob überhaupt ein FamVers-PDF erzeugt wird: nur wenn mindestens ein Kind ohne eigene Mitgliedschaft (z. B. <15) ODER ein Ehegatte ohne eigene Mitgliedschaft vorhanden ist.
 - Beispiel arbeitslos (SGB II): Ehegatte + Kinder ≥15 haben alle eigene Mitgliedschaft → nur Plusbonus-Anträge, KEIN Familienversicherungs-Antrag.
 - Gilt für Export (`Index.tsx`), E-Mail-Versand (`SendEmailDialog.tsx`) und Antragsform/Betreff (`antragsform.ts`).
+
+## Arbeitgeber / Jobcenter (BIG)
+- `formData.bigBeschaeftigungsstatus` ('beschaeftigt' | 'ausbildung' | 'al_geld_2' | 'al_geld_1') wird im Varianten-Block gewählt und auf `bigMitgliedBeschaeftigt` ('beschaeftigt' | 'arbeitslos') abgebildet (AL-Geld I/II → arbeitslos). Die Ableitung der eigenen Mitgliedschaften bleibt unverändert.
+- `formData.bigArbeitgeber` (Fallback `viactivArbeitgeber`) und pro `FamilyMember.bigArbeitgeber`: Name + Anschrift (Straße, Hausnr., PLZ, Ort) des Arbeitgebers bzw. — bei Leistungsbezug — des Jobcenters / der Agentur für Arbeit. Kein "Beschäftigt seit".
+- UI: `src/components/BigEmployerSection.tsx`, in `Index.tsx` im BIG-Zweig: ein Block für das Hauptmitglied (auch Variante A / Einzelperson) plus je ein Block pro Person mit eigener Mitgliedschaft (Ehegatte/Kinder ≥15) inkl. "Angaben vom Hauptmitglied übernehmen". Labels/Hinweise richten sich nach dem Status.
+- Pflicht: sobald ein Beschäftigungsstatus gewählt ist, müssen Name + vollständige Anschrift vorliegen (Export-Validierung in `Index.tsx`).
+- Die BIG-PDFs haben keine Arbeitgeber-AcroFields — die Daten gehen ausschließlich in das BIG-Online-Autofill: `BigAutofillPayload.arbeitgeber` (personenbezogen mit Fallback auf Hauptmitglied, gebaut in `ApplicationDetailDrawer.tsx`) und Fill-Muster im Bookmarklet. `BIG_BOOKMARKLET_VERSION` = 2026-08-27-1, Version wird im Overlay und auf `/big-autofill-setup` angezeigt.

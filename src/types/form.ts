@@ -32,6 +32,9 @@ export interface FamilyMember {
   // Rentenversicherungsnummer. Optional – fallen sonst auf Hauptmitglied zurück.
   rentenversicherungsnummer?: string;
   novitasArbeitgeber?: ArbeitgeberDaten;
+  // BIG direkt: Name/Anschrift Arbeitgeber bzw. Jobcenter für Personen mit eigener Mitgliedschaft
+  bigArbeitgeber?: ArbeitgeberDaten;
+
   novitasArbeitsentgelt?: string;
   novitasBank?: { kontoinhaber: string; iban: string };
 }
@@ -346,6 +349,15 @@ export interface FormData {
   // Mitgliedschaft ('arbeitslos') erhält.
   bigMitgliedBeschaeftigt: 'beschaeftigt' | 'arbeitslos' | '';
 
+  // BIG: feinerer Beschäftigungsstatus (analog Novitas). Wird auf
+  // `bigMitgliedBeschaeftigt` abgebildet.
+  bigBeschaeftigungsstatus?: '' | 'beschaeftigt' | 'ausbildung' | 'al_geld_2' | 'al_geld_1';
+
+  // BIG: Name + Anschrift des Arbeitgebers bzw. Jobcenters/Agentur für Arbeit
+  // (Hauptmitglied). Pro eigener Mitgliedschaft siehe FamilyMember.bigArbeitgeber.
+  bigArbeitgeber?: ArbeitgeberDaten;
+
+
   // Vertriebspartner (intern, für Antragsliste — wird nicht in PDFs gerendert)
   vertriebspartner: string;
 
@@ -486,6 +498,9 @@ export const createInitialFormData = (): FormData => {
     bigFamilienversicherung: false,
     bigHoeheEuroSelfRandom: '',
     bigMitgliedBeschaeftigt: '',
+    bigBeschaeftigungsstatus: '',
+    bigArbeitgeber: createEmptyArbeitgeberDaten(),
+
     vertriebspartner: '',
     novitasMode: 'familie',
     novitasBonus400: false,

@@ -15,9 +15,12 @@
 // URI verpackt (siehe `buildBookmarkletHref`).
 //
 // WICHTIG: Keine ES-Module-Imports, kein TS. Nur Vanilla-JS.
+export const BIG_BOOKMARKLET_VERSION = "2026-08-27-1";
+
 const BOOKMARKLET_BODY = /* js */ `
 (async function(){
   var LOG_PREFIX = "[BIG-Autofill]";
+  var BOOKMARKLET_VERSION = "2026-08-27-1";
   function log(){ try { console.log.apply(console, [LOG_PREFIX].concat([].slice.call(arguments))); } catch(_){} }
 
   function showOverlay(html){
@@ -295,6 +298,15 @@ const BOOKMARKLET_BODY = /* js */ `
   results.push(fill(["bic","swift"], bank.bic, "BIC"));
   results.push(fill(["kreditinstitut","bankname"], bank.kreditinstitut, "Kreditinstitut"));
 
+  // Arbeitgeber bzw. Jobcenter / Agentur für Arbeit
+  var ag = data.arbeitgeber || {};
+  results.push(fill(["arbeitgeber","firma","dienststelle","jobcenter","agentur arbeit","behoerde","behörde","arbeitgeber name"], ag.name, "Arbeitgeber/Jobcenter Name"));
+  results.push(fill(["arbeitgeber strasse","arbeitgeber straße","strasse arbeitgeber","straße arbeitgeber"], ag.strasse, "Arbeitgeber Straße"));
+  results.push(fill(["arbeitgeber hausnummer","hausnummer arbeitgeber"], ag.hausnummer, "Arbeitgeber Hausnummer"));
+  results.push(fill(["arbeitgeber plz","plz arbeitgeber"], ag.plz, "Arbeitgeber PLZ"));
+  results.push(fill(["arbeitgeber ort","ort arbeitgeber"], ag.ort, "Arbeitgeber Ort"));
+
+
   // Ehegatte / Kinder → als Info (Formular hat oft mehrstufige Screens)
   var famInfo = "";
   if (data.ehegatte && (data.ehegatte.vorname || data.ehegatte.nachname)){
@@ -313,6 +325,7 @@ const BOOKMARKLET_BODY = /* js */ `
   if (missing.length) html += "<br><br><b>Nicht gefunden:</b><br>" + missing.map(function(x){return "• "+x;}).join("<br>");
   if (skipped.length) html += "<br><br><span style='opacity:.7'><b>Kein Wert vorhanden:</b><br>" + skipped.map(function(x){return "• "+x;}).join("<br>") + "</span>";
   if (famInfo) html += "<br><br><b>Familie (bitte manuell übertragen):</b><br>" + famInfo;
+  html += "<br><br><small style='opacity:.7'>Bookmarklet-Version: " + BOOKMARKLET_VERSION + "</small>";
   html += "<br><br><span style='opacity:.7;font-size:11px'>Der BIG-Antrag ist ein mehrstufiger Assistent — die meisten „nicht gefundenen" Felder existieren erst auf den folgenden Schritten. Nach jedem „Weiter" das Bookmarklet erneut klicken.</span>";
 
   showOverlay(html);
@@ -345,6 +358,16 @@ export interface BigAutofillPayload {
   telefon: string;
   email: string;
   bank: { kontoinhaber: string; iban: string; bic: string; kreditinstitut: string };
+  /** Arbeitgeber bzw. Jobcenter/Agentur für Arbeit (Name + Anschrift). */
+  arbeitgeber?: {
+    status?: string;
+    name: string;
+    strasse: string;
+    hausnummer: string;
+    plz: string;
+    ort: string;
+  };
   ehegatte?: { vorname: string; nachname: string; geburtsdatum: string } | null;
   kinder?: Array<{ vorname: string; nachname: string; geburtsdatum: string }>;
 }
+

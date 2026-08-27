@@ -213,6 +213,26 @@ export function ApplicationDetailDrawer({
         telefon: baseTelefon,
         email: baseEmail,
         bank: baseBank,
+        arbeitgeber: (() => {
+          const mainAg = ((f.bigArbeitgeber ?? f.viactivArbeitgeber) as Record<string, string> | undefined) ?? {};
+          let ag = mainAg;
+          if (isSub && application.person_role === "ehegatte") {
+            ag = (eh.bigArbeitgeber as unknown as Record<string, string> | undefined) ?? mainAg;
+          } else if (isSub && application.person_role === "kind") {
+            const idx = (application.person_index ?? 1) - 1;
+            const k = (kinder[idx] as unknown as Record<string, unknown> | undefined) ?? {};
+            ag = (k.bigArbeitgeber as Record<string, string> | undefined) ?? mainAg;
+          }
+          return {
+            status: String(f.bigBeschaeftigungsstatus ?? ""),
+            name: String(ag.name ?? ""),
+            strasse: String(ag.strasse ?? ""),
+            hausnummer: String(ag.hausnummer ?? ""),
+            plz: String(ag.plz ?? ""),
+            ort: String(ag.ort ?? ""),
+          };
+        })(),
+
         ehegatte: !isSub && eh && (eh.vorname || eh.name)
           ? { vorname: String(eh.vorname ?? ""), nachname: String(eh.name ?? ""), geburtsdatum: String(eh.geburtsdatum ?? "") }
           : null,

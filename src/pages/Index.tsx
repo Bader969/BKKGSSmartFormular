@@ -10,7 +10,9 @@ import { ViactivSection } from '@/components/ViactivSection';
 import { BigPlusbonusSection } from '@/components/BigPlusbonusSection';
 import { NovitasEmployerBank, type NovitasEmployerBankValue } from '@/components/NovitasEmployerBank';
 import { splitNovitasPersons } from '@/utils/novitasSplit';
-import { createEmptyArbeitgeberDaten, VIACTIV_BESCHAEFTIGUNG_OPTIONS } from '@/types/form';
+import { createEmptyArbeitgeberDaten, VIACTIV_BESCHAEFTIGUNG_OPTIONS, type ArbeitgeberDaten } from '@/types/form';
+import { BigEmployerSection } from '@/components/BigEmployerSection';
+
 import { FormField } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { FileDown, FileText, AlertCircle, Users, User, Building2, LogOut, ShieldCheck, Sparkles, ChevronRight, Save, Archive, Settings } from 'lucide-react';
@@ -253,7 +255,29 @@ const Index = () => {
     JSON.stringify(formData.kinder.map(k => [k.geburtsdatum, k.beschaeftigung])),
   ]);
 
+  // BIG: Personen mit eigener Mitgliedschaft (Ehegatte / Kinder ≥15) — für die
+  // Arbeitgeber-/Jobcenter-Blöcke.
+  const bigOwnMembershipPersons: Array<{ role: 'ehegatte' | 'kind'; index: number; label: string }> = [];
+  if (formData.selectedKrankenkasse === 'big_plusbonus' && formData.bigFamilienversicherung) {
+    if (formData.ehegatte?.eigeneMitgliedschaft) {
+      bigOwnMembershipPersons.push({
+        role: 'ehegatte',
+        index: 0,
+        label: [formData.ehegatte.vorname, formData.ehegatte.name].filter(Boolean).join(' ') || 'Ehegatte/-in',
+      });
+    }
+    formData.kinder.forEach((k, i) => {
+      if (!k.eigeneMitgliedschaft) return;
+      bigOwnMembershipPersons.push({
+        role: 'kind',
+        index: i,
+        label: [k.vorname, k.name].filter(Boolean).join(' ') || `Kind ${i + 1}`,
+      });
+    });
+  }
+
   if (authLoading) {
+
     return <div className="min-h-screen flex items-center justify-center text-slate-500">Lädt…</div>;
   }
 
@@ -414,10 +438,32 @@ const Index = () => {
         if (!formData.telefon || !formData.email) { toast.error('Telefon und E-Mail sind Pflicht.'); return; }
         if (!formData.mitgliedGeburtsdatum) { toast.error('Bitte Geburtsdatum des Mitglieds eingeben.'); return; }
         if (!formData.bigMitgliedBeschaeftigt) {
-          toast.error('Bitte Beschäftigungsstatus des Hauptmitglieds (beschäftigt/arbeitslos) auswählen.');
+          toast.error('Bitte Beschäftigungsstatus des Hauptmitglieds auswählen.');
           return;
         }
       }
+      // Arbeitgeber bzw. Jobcenter/Agentur für Arbeit — Name + Anschrift Pflicht,
+      // sobald ein Beschäftigungsstatus gewählt wurde.
+      if (formData.bigBeschaeftigungsstatus) {
+        const agComplete = (ag?: ArbeitgeberDaten) =>
+          !!(ag && ag.name?.trim() && ag.strasse?.trim() && ag.hausnummer?.trim() && ag.plz?.trim() && ag.ort?.trim());
+        const mainAg = formData.bigArbeitgeber ?? formData.viactivArbeitgeber;
+        if (!agComplete(mainAg)) {
+          toast.error('Bitte Name und Anschrift des Arbeitgebers bzw. Jobcenters für das Hauptmitglied vollständig eingeben.');
+          return;
+        }
+        if (formData.bigFamilienversicherung) {
+          const missing = bigOwnMembershipPersons.find((p) => {
+            const person = p.role === 'ehegatte' ? formData.ehegatte : formData.kinder[p.index];
+            return !agComplete(person?.bigArbeitgeber ?? mainAg);
+          });
+          if (missing) {
+            toast.error(`Bitte Arbeitgeber/Jobcenter-Angaben für ${missing.label} vollständig eingeben.`);
+            return;
+          }
+        }
+      }
+
       if (!formData.mitgliedGeburtsdatum) {
         toast.error('Bitte Geburtsdatum des Mitglieds eingeben (wird für den Dateinamen benötigt).');
         return;
@@ -1178,9 +1224,56 @@ const Index = () => {
                       <div id="sec-kinder"><ChildrenSection formData={formData} updateFormData={updateFormData} /></div>
                     </>
                   )}
+                  {/* Arbeitgeber bzw. Jobcenter/Agentur für Arbeit — Hauptmitglied + eigene Mitgliedschaften */}
+                  <div id="sec-big-arbeitgeber" className="space-y-4">
+                    <BigEmployerSection
+                      title="Arbeitgeber bzw. Jobcenter/Agentur für Arbeit — Hauptmitglied"
+                      idPrefix="big-main"
+                      status={formData.bigBeschaeftigungsstatus ?? ''}
+                      value={formData.bigArbeitgeber ?? formData.viactivArbeitgeber ?? createEmptyArbeitgeberDaten()}
+                      onChange={(u) => updateFormData({
+                        bigArbeitgeber: {
+                          ...(formData.bigArbeitgeber ?? formData.viactivArbeitgeber ?? createEmptyArbeitgeberDaten()),
+                          ...u,
+                        },
+                      })}
+                      required={!!formData.bigBeschaeftigungsstatus}
+                    />
+                    {formData.bigFamilienversicherung && bigOwnMembershipPersons.map((p) => {
+                      const person = p.role === 'ehegatte' ? formData.ehegatte : formData.kinder[p.index];
+                      if (!person) return null;
+                      const mainAg = formData.bigArbeitgeber ?? formData.viactivArbeitgeber ?? createEmptyArbeitgeberDaten();
+                      const val = person.bigArbeitgeber ?? createEmptyArbeitgeberDaten();
+                      const write = (ag: ArbeitgeberDaten) => {
+                        if (p.role === 'ehegatte') updateFormData({ ehegatte: { ...formData.ehegatte, bigArbeitgeber: ag } });
+                        else {
+                          const next = [...formData.kinder];
+                          next[p.index] = { ...next[p.index], bigArbeitgeber: ag };
+                          updateFormData({ kinder: next });
+                        }
+                      };
+                      return (
+                        <BigEmployerSection
+                          key={`${p.role}-${p.index}`}
+                          title={`Arbeitgeber bzw. Jobcenter/Agentur für Arbeit — ${p.label} (eigene Mitgliedschaft)`}
+                          idPrefix={`big-${p.role}-${p.index}`}
+                          status={
+                            person.beschaeftigung === 'beschaeftigt'
+                              ? 'beschaeftigt'
+                              : (formData.bigBeschaeftigungsstatus ?? '')
+                          }
+                          value={val}
+                          onChange={(u) => write({ ...val, ...u })}
+                          onCopyFromMain={() => write({ ...mainAg })}
+                          required={!!formData.bigBeschaeftigungsstatus}
+                        />
+                      );
+                    })}
+                  </div>
                   <div id="sec-bigplus"><BigPlusbonusSection formData={formData} updateFormData={updateFormData} mode="main" /></div>
                 </>
               )}
+
 
               <div id="sec-signature"><SignatureSection formData={formData} updateFormData={updateFormData} /></div>
               

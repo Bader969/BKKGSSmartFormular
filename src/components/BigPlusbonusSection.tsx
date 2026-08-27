@@ -66,41 +66,38 @@ export const BigPlusbonusSection: React.FC<Props> = ({ formData, updateFormData,
             </p>
           </div>
         </Label>
-        {formData.bigFamilienversicherung && (
-          <div className="mt-4 p-4 rounded-xl border-2">
-            <Label className="font-medium mb-2 block">
-              Ist das Hauptmitglied beschäftigt oder arbeitslos? <span className="text-destructive">*</span>
-            </Label>
-            <p className="text-xs text-muted-foreground mb-3">
-              Beschäftigt (SGB I, AfA-Leistungsbezieher) → Ehegatte/Kinder werden familienversichert.
-              Arbeitslos (SGB II, Jobcenter-Leistungen) → Ehegatte/Kinder erhalten je einen eigenen
-              Plusbonus-Antrag.
-            </p>
-            <RadioGroup
-              value={formData.bigMitgliedBeschaeftigt}
-              onValueChange={(v) =>
-                updateFormData({ bigMitgliedBeschaeftigt: v as 'beschaeftigt' | 'arbeitslos' })
-              }
-              className="flex flex-wrap gap-4"
-            >
-              <Label
-                htmlFor="big-besch-job"
-                className="flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer hover:border-primary"
-              >
-                <RadioGroupItem value="beschaeftigt" id="big-besch-job" />
-                Beschäftigt (SGB I)
-              </Label>
-              <Label
-                htmlFor="big-besch-al"
-                className="flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer hover:border-primary"
-              >
-                <RadioGroupItem value="arbeitslos" id="big-besch-al" />
-                Arbeitslos (SGB II)
-              </Label>
-            </RadioGroup>
-          </div>
-        )}
+        <div className="mt-4 p-4 rounded-xl border-2">
+          <FormField
+            type="select"
+            id="big-beschaeftigungsstatus"
+            label="Beschäftigungsstatus Hauptmitglied — Ich bin ..."
+            required={formData.bigFamilienversicherung}
+            value={formData.bigBeschaeftigungsstatus ?? ''}
+            onChange={(v) => {
+              const s = v as NonNullable<FormData['bigBeschaeftigungsstatus']>;
+              updateFormData({
+                bigBeschaeftigungsstatus: s,
+                bigMitgliedBeschaeftigt:
+                  s === 'al_geld_1' || s === 'al_geld_2' ? 'arbeitslos' : s ? 'beschaeftigt' : '',
+              });
+            }}
+            options={[
+              { value: 'beschaeftigt', label: 'Pflichtversicherter Arbeitnehmer' },
+              { value: 'ausbildung', label: 'Auszubildender' },
+              { value: 'al_geld_2', label: 'Arbeitslos – Jobcenter (AL-Geld II)' },
+              { value: 'al_geld_1', label: 'Arbeitslos – Agentur für Arbeit (AL-Geld I)' },
+            ]}
+            placeholder="Bitte auswählen"
+          />
+          <p className="text-xs text-muted-foreground mt-2">
+            Beschäftigt/Ausbildung (SGB I) → Ehegatte/Kinder werden familienversichert.
+            Arbeitslos (Jobcenter/Agentur für Arbeit) → Ehegatte und Kinder ab 15 Jahren erhalten je
+            einen eigenen Plusbonus-Antrag. Die zugehörigen Angaben zum Arbeitgeber bzw. zur Behörde
+            werden unten erfasst.
+          </p>
+        </div>
       </FormSection>
+
   );
 
   const mainBlock = (
