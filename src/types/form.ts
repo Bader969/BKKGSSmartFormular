@@ -346,6 +346,15 @@ export interface FormData {
   // Mitgliedschaft ('arbeitslos') erhält.
   bigMitgliedBeschaeftigt: 'beschaeftigt' | 'arbeitslos' | '';
 
+  // BIG: feinerer Beschäftigungsstatus (analog Novitas). Wird auf
+  // `bigMitgliedBeschaeftigt` abgebildet.
+  bigBeschaeftigungsstatus?: '' | 'beschaeftigt' | 'ausbildung' | 'al_geld_2' | 'al_geld_1';
+
+  // BIG: Name + Anschrift des Arbeitgebers bzw. Jobcenters/Agentur für Arbeit
+  // (Hauptmitglied). Pro eigener Mitgliedschaft siehe FamilyMember.bigArbeitgeber.
+  bigArbeitgeber?: ArbeitgeberDaten;
+
+
   // Vertriebspartner (intern, für Antragsliste — wird nicht in PDFs gerendert)
   vertriebspartner: string;
 
