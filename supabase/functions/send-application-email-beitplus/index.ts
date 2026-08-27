@@ -99,6 +99,7 @@ Deno.serve(async (req) => {
     person_index?: number | null;
     person_label?: string | null;
     probe?: boolean;
+    backfill_resend_id?: string;
   };
   try { payload = await req.json(); } catch { return json(400, { error: 'invalid_json' }); }
 
@@ -112,6 +113,54 @@ Deno.serve(async (req) => {
       return json(200, { ok: false, error: (e as Error).message });
     }
   }
+
+  // Nachtrag: bereits über Resend versandte E-Mail im BeitPlus-Postfach eintragen
+  if (payload.backfill_resend_id) {
+    try {
+      const r = await fetch(`https://api.resend.com/emails/${payload.backfill_resend_id}`, {
+        headers: { Authorization: `Bearer ${resendKey}` },
+      });
+      const t = await r.text();
+      if (!r.ok) return json(502, { error: 'resend_lookup_failed', status: r.status, detail: t.slice(0, 300) });
+      const m = JSON.parse(t) as {
+        to?: string[]; cc?: string[]; bcc?: string[];
+        subject?: string; html?: string; text?: string;
+        created_at?: string; last_event?: string;
+      };
+      const c = await beitplusClient();
+      const { data: existing } = await c.client
+        .from('emails')
+        .select('id')
+        .eq('provider_message_id', payload.backfill_resend_id)
+        .limit(1);
+      if (existing?.length) return json(200, { ok: true, already_present: true, email_id: existing[0].id });
+      const { data: ins, error: insErr } = await c.client
+        .from('emails')
+        .insert({
+          direction: 'outbound',
+          status: 'sent',
+          sender_email: FROM_EMAIL,
+          recipient_email: m.to?.[0] ?? '',
+          cc: m.cc?.length ? m.cc : null,
+          bcc: m.bcc?.length ? m.bcc : null,
+          subject: m.subject ?? '',
+          body_html: m.html ?? null,
+          body_text: m.text ?? null,
+          snippet: snippetOf(m.text || (m.html || '').replace(/<[^>]*>/g, ' ')),
+          provider_message_id: payload.backfill_resend_id,
+          sent_by: c.userId,
+          sent_at: m.created_at ?? new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+      if (insErr) return json(500, { error: 'insert_failed', detail: insErr.message });
+      return json(200, { ok: true, email_id: ins.id, recipient: m.to?.[0] ?? null, note: 'Anhänge nicht nachtragbar' });
+    } catch (e) {
+      return json(500, { error: 'backfill_failed', detail: (e as Error).message });
+    }
+  }
+
+
 
 
 
