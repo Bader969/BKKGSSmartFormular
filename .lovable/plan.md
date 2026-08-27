@@ -2,43 +2,53 @@
 
 ## Ziel
 
-Der Versand richtet sich künftig nach dem Ziel-CRM des Antrags:
+Der Versand richtet sich nach dem Ziel-CRM des Antrags:
 
 | Ziel-CRM | E-Mail-Absender | WhatsApp-Empfänger |
 | --- | --- | --- |
 | BlitzVox | Gmail (wie bisher) | BlitzVox-Gruppe (wie bisher) |
-| BeitPlus | antraege@beitplus.de über Resend | 4917676897062 |
+| BeitPlus | antraege@beitplus.de über das bestehende BeitPlus-Postfach | 4917676897062 |
 
-Inhalte, Betreffregeln, Dateinamen mit `(Vorname Nachname)`, die 5-Zeilen-Nachricht, Gruppen-Aufteilung für eigene Mitgliedschaften, "Nur diese senden" und "Nur per WhatsApp" bleiben unverändert. Es ändern sich nur Absender und WhatsApp-Ziel.
+Inhalte, Betreffregeln, Dateinamen mit `(Vorname Nachname)`, die 5-Zeilen-Nachricht, Gruppen-Aufteilung für eigene Mitgliedschaften, "Nur diese senden" und "Nur per WhatsApp" bleiben unverändert.
 
-## Was du vorbereiten musst
+## Bestehende BeitPlus-Einrichtung nutzen statt neu aufsetzen
 
-- Resend-Zugang wird über den Connector-Dialog verbunden (erscheint im Chat).
-- In Resend muss die Domain **beitplus.de** verifiziert sein, sonst weist Resend den Absender `antraege@beitplus.de` ab. Falls noch nicht verifiziert, zeigen wir eine klare Fehlermeldung im Sendedialog an.
+Im BeitPlus-CRM existiert bereits ein vollständiges Postfach: Resend-Versand mit den Absender-Aliassen (u. a. `antraege@beitplus.de`), der Inbound-Webhook, die Tabellen `emails` / `email_attachments` und der Storage-Bucket `email-attachments`. Genau in diese Struktur schreiben wir mit.
+
+Ablauf pro E-Mail bei Ziel-CRM BeitPlus:
+
+1. Anhänge (PDFs und Fotos) werden in den BeitPlus-Bucket `email-attachments` hochgeladen.
+2. Die E-Mail geht mit demselben Resend-Konto ab, Absender `Beit Plus <antraege@beitplus.de>` und `Reply-To` identisch — also exakt wie eine im CRM verfasste E-Mail.
+3. Danach wird im CRM eine Zeile in `emails` angelegt (`direction: outbound`, `status: sent`, `sender_email: antraege@beitplus.de`, Betreff, Text/HTML, Empfänger, `provider_message_id`, `sent_at`) plus die zugehörigen `email_attachments`-Zeilen.
+
+Damit erscheint jede von hier verschickte Antrags-E-Mail im BeitPlus-Postfach unter "Gesendet", inklusive Anhängen — und Antworten der Krankenkasse landen über den bestehenden Inbound-Webhook automatisch im selben Verlauf (gleiche Message-ID-Kette).
+
+Nichts muss im BeitPlus-CRM neu eingerichtet werden. Benötigt wird hier nur derselbe Resend-Zugang als Secret (`RESEND_API_KEY`); die Zugangsdaten zum BeitPlus-Backend sind für die CRM-Übertragung schon hinterlegt.
 
 ## Ablauf im Sendedialog
 
-- Der Dialog erhält das Ziel-CRM des Antrags (aus dem Feld "Ziel-CRM" bzw. automatisch aus dem Vertriebspartner abgeleitet).
-- Sichtbarer Hinweis im Dialog: "Versand über antraege@beitplus.de · WhatsApp an 4917676897062" bzw. "Versand über Gmail · WhatsApp an BlitzVox-Gruppe".
-- Ist kein Ziel-CRM erkennbar, bleibt der bisherige Weg (Gmail + BlitzVox-Gruppe) aktiv.
-- Anhänge (PDF-Dateien und Fotos) gehen bei beiden Wegen identisch mit; Resend unterstützt Anhänge.
+- Der Dialog kennt das Ziel-CRM des Antrags (Feld "Ziel-CRM" bzw. automatisch aus dem Vertriebspartner).
+- Sichtbarer Hinweis: "Versand über antraege@beitplus.de (BeitPlus-Postfach) · WhatsApp an 4917676897062" bzw. "Versand über Gmail · WhatsApp an BlitzVox-Gruppe".
+- Ohne erkennbares Ziel-CRM bleibt der bisherige Weg (Gmail + BlitzVox-Gruppe) aktiv.
+- Fehler (z. B. Resend-Ablehnung) erscheinen als Toast mit Klartextmeldung; das Speichern/der restliche Versand bleibt davon unberührt.
 
 ## Technische Details
 
-- Neue Edge Function `send-application-email-resend`:
-  - JWT-Prüfung wie in `send-application-email`.
-  - Sendet über den Resend-Connector-Gateway (`POST /emails`) mit `from: "BeitPlus Anträge <antraege@beitplus.de>"`, `reply_to` identisch, `to`/`cc`/`bcc`, `subject`, `text` + `html`, `attachments` als `{ filename, content: base64 }`.
-  - Größenprüfung: Resend-Limit ~40 MB Gesamtnachricht; wir begrenzen wie bisher auf 24 MB Anhänge und geben `attachments_too_large` zurück.
-  - Schreibt das gleiche `application_events`-Audit-Event `emailed` (mit `via: 'resend'`) wie die Gmail-Variante, damit Status/Zeitstempel in der Anträge-Liste unverändert funktionieren.
-  - Fehlerfälle (Domain nicht verifiziert, 403) werden mit Resend-Status und -Text zurückgegeben und im Dialog als Toast angezeigt.
+- Neue Edge Function `send-application-email-beitplus`:
+  - JWT-Prüfung wie in `send-application-email`; Body wie bisher (`to/cc/bcc`, `subject`, `body`, `attachments[{filename, mimeType, base64}]`, `application_id`, `person_*`).
+  - Verbindung zum BeitPlus-Supabase über die vorhandenen Secrets (`BEITPLUS_CRM_SUPABASE_URL`, Service-Role bzw. `BEITPLUS_CRM_EMAIL`/`BEITPLUS_CRM_PASSWORD`) — dieselbe Client-Logik wie in `crm-sync`.
+  - Upload der Anhänge nach `email-attachments` unter `outbound/<uuid>/<dateiname>`.
+  - Resend-Versand über `POST https://api.resend.com/emails` mit `RESEND_API_KEY`, `from: "Beit Plus <antraege@beitplus.de>"`, `text` + einfaches HTML (wie die Gmail-Variante), `attachments` als Base64.
+  - Protokollierung in `emails` + `email_attachments` im BeitPlus-CRM (Werte wie oben), zusätzlich das gewohnte Audit-Event `emailed` (mit `via: 'beitplus'`) in `application_events` dieses Projekts, damit Status/Zeitstempel in der Anträge-Liste unverändert funktionieren.
+  - Größenprüfung: max. 24 MB Anhänge, sonst `attachments_too_large`.
 - `src/components/SendEmailDialog.tsx`:
-  - Neues Prop `crmTarget?: CrmTarget | null` (aus `src/utils/crmVp.ts`), in `src/pages/Index.tsx` mit `formData.crmTarget ?? crmTargetForVp(formData.vertriebspartner)` befüllt.
-  - `const emailFn = crmTarget === 'beitplus' ? 'send-application-email-resend' : 'send-application-email'` an allen Aufrufstellen (Alle senden + "Nur diese senden").
-  - `WA_CHAT_ID` wird zu einer Funktion: `beitplus` → `4917676897062@s.whatsapp.net`, sonst `120363309092314738@g.us`. Nur die `chatId` im `send-whatsapp-summary`-Aufruf ändert sich; PDF-Auswahl, Dateiname und Textzeilen bleiben gleich.
-  - Kleiner Info-Text im Dialogkopf über den aktiven Versandweg.
-- `supabase/functions/send-whatsapp-summary/index.ts` bleibt unverändert (Ziel kommt schon per `chatId`).
-- Deployment der neuen Function nach der Umsetzung.
+  - Neues Prop `crmTarget?: CrmTarget | null`, in `src/pages/Index.tsx` mit `formData.crmTarget ?? crmTargetForVp(formData.vertriebspartner)` befüllt.
+  - `const emailFn = crmTarget === 'beitplus' ? 'send-application-email-beitplus' : 'send-application-email'` an beiden Aufrufstellen ("Alle senden" und "Nur diese senden").
+  - `WA_CHAT_ID` wird zur Funktion `waChatId(crmTarget)`: `beitplus` → `4917676897062@s.whatsapp.net`, sonst `120363309092314738@g.us`. PDF-Auswahl, Dateiname und Textzeilen bleiben gleich.
+  - Info-Zeile im Dialogkopf über den aktiven Versandweg.
+- `supabase/functions/send-whatsapp-summary/index.ts` bleibt unverändert (Ziel kommt per `chatId`).
+- Deployment der neuen Function nach der Umsetzung; `RESEND_API_KEY` wird über den Secret-Dialog abgefragt.
 
 ## Nicht Teil der Änderung
 
-Gmail-Versand für BlitzVox, Betreff-/Body-Vorlagen, PDF-Erzeugung, CRM-Übertragung.
+Gmail-Versand für BlitzVox, Betreff-/Body-Vorlagen, PDF-Erzeugung, CRM-Datenübertragung, Inbound-Webhook im BeitPlus-CRM.
