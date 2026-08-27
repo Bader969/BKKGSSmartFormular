@@ -10,7 +10,9 @@ import { ViactivSection } from '@/components/ViactivSection';
 import { BigPlusbonusSection } from '@/components/BigPlusbonusSection';
 import { NovitasEmployerBank, type NovitasEmployerBankValue } from '@/components/NovitasEmployerBank';
 import { splitNovitasPersons } from '@/utils/novitasSplit';
-import { createEmptyArbeitgeberDaten, VIACTIV_BESCHAEFTIGUNG_OPTIONS } from '@/types/form';
+import { createEmptyArbeitgeberDaten, VIACTIV_BESCHAEFTIGUNG_OPTIONS, type ArbeitgeberDaten } from '@/types/form';
+import { BigEmployerSection } from '@/components/BigEmployerSection';
+
 import { FormField } from '@/components/FormField';
 import { Button } from '@/components/ui/button';
 import { FileDown, FileText, AlertCircle, Users, User, Building2, LogOut, ShieldCheck, Sparkles, ChevronRight, Save, Archive, Settings } from 'lucide-react';
