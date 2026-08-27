@@ -1,4 +1,4 @@
-import { FormData, Krankenkasse, FamilyMember, createEmptyFamilyMember } from '@/types/form';
+import { FormData, Krankenkasse, FamilyMember, createEmptyFamilyMember, createEmptyArbeitgeberDaten } from '@/types/form';
 import { findInsuranceNumberAlias, normalizeInsuranceNumber } from '@/utils/insuranceNumbers';
 
 const useExtractedNumber = (extracted: unknown, current = '') => {
@@ -43,6 +43,23 @@ export const applyKrankenkassenMapping = (
         mitgliedHausnummer: extractedData.mitgliedHausnummer || currentFormData.mitgliedHausnummer,
         mitgliedPlz: extractedData.mitgliedPlz || currentFormData.mitgliedPlz,
         ort: extractedData.ort || currentFormData.ort,
+        // Beschäftigungsstatus + Arbeitgeber bzw. Jobcenter/Agentur für Arbeit
+        bigBeschaeftigungsstatus: extractedData.bigBeschaeftigungsstatus
+          || extractedData.viactivBeschaeftigung
+          || currentFormData.bigBeschaeftigungsstatus,
+        bigMitgliedBeschaeftigt: (() => {
+          const st = extractedData.bigBeschaeftigungsstatus || extractedData.viactivBeschaeftigung;
+          if (st === 'beschaeftigt' || st === 'ausbildung') return 'beschaeftigt' as const;
+          if (st === 'al_geld_1' || st === 'al_geld_2') return 'arbeitslos' as const;
+          return currentFormData.bigMitgliedBeschaeftigt;
+        })(),
+        bigArbeitgeber: (extractedData.bigArbeitgeber || extractedData.viactivArbeitgeber)
+          ? {
+              ...createEmptyArbeitgeberDaten(),
+              ...(currentFormData.bigArbeitgeber || {}),
+              ...(extractedData.bigArbeitgeber || extractedData.viactivArbeitgeber),
+            }
+          : currentFormData.bigArbeitgeber,
         bigBank: (() => {
           const ex = extractedData.bigBank || {};
           const cur = currentFormData.bigBank;
