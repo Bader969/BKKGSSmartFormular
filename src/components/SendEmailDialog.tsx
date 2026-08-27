@@ -26,6 +26,7 @@ import { exportViactivFamilienversicherung } from '@/utils/viactivFamilyExport';
 import { exportViactivBonusPDFs } from '@/utils/viactivBonusExport';
 import { exportNovitasFamilienversicherung } from '@/utils/novitasExport';
 import { splitNovitasPersons } from '@/utils/novitasSplit';
+import { crmTargetForVp, type CrmTarget } from '@/utils/crmVp';
 
 import { exportDAKFamilienversicherung } from '@/utils/dakExport';
 import { exportFilledPDF, exportRundumSicherPaketOnly } from '@/utils/pdfExport';
@@ -95,7 +96,10 @@ function baseFilename(formData: FormData): string {
   return parts.join('_') || 'Antrag';
 }
 
-const WA_CHAT_ID = '120363309092314738@g.us';
+const WA_GROUP_CHAT_ID = '120363309092314738@g.us';
+const WA_BEITPLUS_CHAT_ID = '4917676897062@s.whatsapp.net';
+const waChatIdFor = (target?: CrmTarget | null) =>
+  target === 'beitplus' ? WA_BEITPLUS_CHAT_ID : WA_GROUP_CHAT_ID;
 const WA_KK_LABEL: Record<string, string> = {
   big_plusbonus: 'Bigdirekt gesund',
   viactiv: 'VIACTIV',
