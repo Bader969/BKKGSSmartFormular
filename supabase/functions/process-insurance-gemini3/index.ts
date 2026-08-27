@@ -443,6 +443,17 @@ VERSICHERTENKARTE / eGK (PFLICHT wenn ein eGK-Bild vorhanden ist):
 - mitgliedKvNummer: Die Versicherten-/KV-Nummer auf der Karte (Format: 1 Großbuchstabe + 9 Ziffern, z.B. A123456789). Steht meist auf der Vorderseite über/unter dem Namen. NIEMALS leer lassen, wenn auf einem der Bilder eine eGK zu sehen ist.
 - mitgliedKrankenkasse: Name der Krankenkasse wie auf der Karte aufgedruckt (z.B. "AOK Bayern", "Techniker Krankenkasse", "BARMER", "DAK-Gesundheit", "BIG direkt gesund"). Auch das Logo oben links/rechts auswerten.
 
+BESCHÄFTIGUNG / ARBEITGEBER bzw. JOBCENTER (PFLICHT wenn erkennbar — Quellen: Lohn-/Entgeltabrechnung,
+Arbeitsvertrag, Jobcenter-/Bürgergeld-Bescheid, Bescheid der Agentur für Arbeit):
+- bigBeschaeftigungsstatus: pflichtversicherter Arbeitnehmer→"beschaeftigt", Auszubildender/Ausbildungsvertrag→"ausbildung",
+  Jobcenter/Bürgergeld/ALG II/SGB II-Bescheid→"al_geld_2", Agentur für Arbeit/ALG I/SGB III→"al_geld_1".
+- bigArbeitgeber: Name UND vollständige Anschrift (Straße, Hausnummer, PLZ, Ort):
+  * Bei Beschäftigung/Ausbildung: Arbeitgeber laut Kopf der Lohn-/Entgeltabrechnung bzw. Arbeitsvertrag
+    (nicht die Adresse des Arbeitnehmers und nicht das Steuerberater-/Lohnbüro, falls unterscheidbar).
+  * Bei al_geld_2: Name und Anschrift des zuständigen Jobcenters aus dem Bescheid-Kopf/Absender.
+  * Bei al_geld_1: Name und Anschrift der Agentur für Arbeit aus dem Bescheid-Kopf/Absender.
+  * Straße und Hausnummer immer sauber trennen (z.B. "Musterstraße 12a" → strasse "Musterstraße", hausnummer "12a").
+
 SEPA / BANKKARTE (PFLICHT wenn auf Dokument/Bankkarte vorhanden — in "bigBank" einsetzen!):
 - kontoinhaberVorname, kontoinhaberNachname (Name wie auf der Karte; aufteilen in Vor- und Nachname)
 - kreditinstitut (Name der Bank, z.B. "Sparkasse Köln", "DKB", "ING")
