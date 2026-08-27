@@ -209,8 +209,8 @@ Deno.serve(async (req) => {
   const providerId = (parsed as { id?: string } | null)?.id ?? null;
 
   // 3) Gesendet-Eintrag im BeitPlus-Postfach
-  let crm_log_error: string | null = null;
   try {
+    if (!crm) throw new Error(crm_log_error || 'beitplus_not_connected');
     const { data: inserted, error: insErr } = await crm.client
       .from('emails')
       .insert({
