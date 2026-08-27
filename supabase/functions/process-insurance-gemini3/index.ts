@@ -223,6 +223,14 @@ const bigSchema = `{
   "familienstand": "ledig|verheiratet|geschieden|verwitwet",
   "telefon": "",
   "email": "",
+  "bigBeschaeftigungsstatus": "beschaeftigt|ausbildung|al_geld_2|al_geld_1",
+  "bigArbeitgeber": {
+    "name": "",
+    "strasse": "",
+    "hausnummer": "",
+    "plz": "",
+    "ort": ""
+  },
   "bigBank": {
     "kontoinhaberVorname": "",
     "kontoinhaberNachname": "",
