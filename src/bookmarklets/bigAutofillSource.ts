@@ -345,6 +345,16 @@ export interface BigAutofillPayload {
   telefon: string;
   email: string;
   bank: { kontoinhaber: string; iban: string; bic: string; kreditinstitut: string };
+  /** Arbeitgeber bzw. Jobcenter/Agentur für Arbeit (Name + Anschrift). */
+  arbeitgeber?: {
+    status?: string;
+    name: string;
+    strasse: string;
+    hausnummer: string;
+    plz: string;
+    ort: string;
+  };
   ehegatte?: { vorname: string; nachname: string; geburtsdatum: string } | null;
   kinder?: Array<{ vorname: string; nachname: string; geburtsdatum: string }>;
 }
+
