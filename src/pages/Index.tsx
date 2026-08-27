@@ -1178,9 +1178,56 @@ const Index = () => {
                       <div id="sec-kinder"><ChildrenSection formData={formData} updateFormData={updateFormData} /></div>
                     </>
                   )}
+                  {/* Arbeitgeber bzw. Jobcenter/Agentur für Arbeit — Hauptmitglied + eigene Mitgliedschaften */}
+                  <div id="sec-big-arbeitgeber" className="space-y-4">
+                    <BigEmployerSection
+                      title="Arbeitgeber bzw. Jobcenter/Agentur für Arbeit — Hauptmitglied"
+                      idPrefix="big-main"
+                      status={formData.bigBeschaeftigungsstatus ?? ''}
+                      value={formData.bigArbeitgeber ?? formData.viactivArbeitgeber ?? createEmptyArbeitgeberDaten()}
+                      onChange={(u) => updateFormData({
+                        bigArbeitgeber: {
+                          ...(formData.bigArbeitgeber ?? formData.viactivArbeitgeber ?? createEmptyArbeitgeberDaten()),
+                          ...u,
+                        },
+                      })}
+                      required={!!formData.bigBeschaeftigungsstatus}
+                    />
+                    {formData.bigFamilienversicherung && bigOwnMembershipPersons.map((p) => {
+                      const person = p.role === 'ehegatte' ? formData.ehegatte : formData.kinder[p.index];
+                      if (!person) return null;
+                      const mainAg = formData.bigArbeitgeber ?? formData.viactivArbeitgeber ?? createEmptyArbeitgeberDaten();
+                      const val = person.bigArbeitgeber ?? createEmptyArbeitgeberDaten();
+                      const write = (ag: ArbeitgeberDaten) => {
+                        if (p.role === 'ehegatte') updateFormData({ ehegatte: { ...formData.ehegatte, bigArbeitgeber: ag } });
+                        else {
+                          const next = [...formData.kinder];
+                          next[p.index] = { ...next[p.index], bigArbeitgeber: ag };
+                          updateFormData({ kinder: next });
+                        }
+                      };
+                      return (
+                        <BigEmployerSection
+                          key={`${p.role}-${p.index}`}
+                          title={`Arbeitgeber bzw. Jobcenter/Agentur für Arbeit — ${p.label} (eigene Mitgliedschaft)`}
+                          idPrefix={`big-${p.role}-${p.index}`}
+                          status={
+                            person.beschaeftigung === 'beschaeftigt'
+                              ? 'beschaeftigt'
+                              : (formData.bigBeschaeftigungsstatus ?? '')
+                          }
+                          value={val}
+                          onChange={(u) => write({ ...val, ...u })}
+                          onCopyFromMain={() => write({ ...mainAg })}
+                          required={!!formData.bigBeschaeftigungsstatus}
+                        />
+                      );
+                    })}
+                  </div>
                   <div id="sec-bigplus"><BigPlusbonusSection formData={formData} updateFormData={updateFormData} mode="main" /></div>
                 </>
               )}
+
 
               <div id="sec-signature"><SignatureSection formData={formData} updateFormData={updateFormData} /></div>
               
