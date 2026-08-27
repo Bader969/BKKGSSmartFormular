@@ -26,6 +26,7 @@ import { exportViactivFamilienversicherung } from '@/utils/viactivFamilyExport';
 import { exportViactivBonusPDFs } from '@/utils/viactivBonusExport';
 import { exportNovitasFamilienversicherung } from '@/utils/novitasExport';
 import { splitNovitasPersons } from '@/utils/novitasSplit';
+import { crmTargetForVp, type CrmTarget } from '@/utils/crmVp';
 
 import { exportDAKFamilienversicherung } from '@/utils/dakExport';
 import { exportFilledPDF, exportRundumSicherPaketOnly } from '@/utils/pdfExport';
@@ -95,7 +96,10 @@ function baseFilename(formData: FormData): string {
   return parts.join('_') || 'Antrag';
 }
 
-const WA_CHAT_ID = '120363309092314738@g.us';
+const WA_GROUP_CHAT_ID = '120363309092314738@g.us';
+const WA_BEITPLUS_CHAT_ID = '4917676897062@s.whatsapp.net';
+const waChatIdFor = (target?: CrmTarget | null) =>
+  target === 'beitplus' ? WA_BEITPLUS_CHAT_ID : WA_GROUP_CHAT_ID;
 const WA_KK_LABEL: Record<string, string> = {
   big_plusbonus: 'Bigdirekt gesund',
   viactiv: 'VIACTIV',
@@ -194,6 +198,12 @@ type Props = {
 };
 
 export function SendEmailDialog({ open, onOpenChange, formData, applicationId, bearbeiter, onSent }: Props) {
+  // Ziel-CRM des Antrags bestimmt Absender (Gmail vs. BeitPlus-Postfach) und WhatsApp-Empfänger.
+  const crmTarget: CrmTarget | null =
+    (formData.crmTarget as CrmTarget | null | undefined) || crmTargetForVp(formData.vertriebspartner);
+  const isBeitplus = crmTarget === 'beitplus';
+  const emailFn = isBeitplus ? 'send-application-email-beitplus' : 'send-application-email';
+  const waChatId = waChatIdFor(crmTarget);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   const [sending, setSending] = useState(false);
   const [to, setTo] = useState('');
@@ -666,7 +676,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           base64: await blobToBase64(a.blob),
         })),
       );
-      const { data, error } = await supabase.functions.invoke('send-application-email', {
+      const { data, error } = await supabase.functions.invoke(emailFn, {
         body: {
           application_id: applicationId,
           to: to.trim(),
@@ -685,7 +695,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
         throw new Error('Gmail-Verbindung erlaubt kein Senden. Bitte Verbindung mit Scope "gmail.send" neu autorisieren.');
       }
       if (data?.error) throw new Error(data.error);
-      console.info('[SendEmail] ✓ Gruppe gesendet:', g.id, g.label, 'gmail_id:', data?.gmail_id);
+      console.info('[SendEmail] ✓ Gruppe gesendet:', g.id, g.label, 'id:', data?.gmail_id ?? data?.resend_id);
       toast.success(`E-Mail gesendet: ${g.label}`);
     }
 
@@ -733,7 +743,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           const { data: waData, error: waErr } = await supabase.functions.invoke('send-whatsapp-summary', {
             body: {
               application_id: applicationId,
-              chatId: WA_CHAT_ID,
+              chatId: waChatId,
               pdfBase64,
               pdfFilename: withPersonSuffix(
                 waFilenameOverride || summary.filename,
@@ -819,6 +829,11 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           </DialogTitle>
           <DialogDescription>
             Betreff, Empfänger und Nachricht sind vorausgefüllt und vor dem Versand frei änderbar.
+            <span className="block mt-1 text-xs">
+              {isBeitplus
+                ? 'Versand über antraege@beitplus.de (BeitPlus-Postfach) · WhatsApp an 4917676897062'
+                : 'Versand über Gmail · WhatsApp an BlitzVox-Gruppe'}
+            </span>
           </DialogDescription>
         </DialogHeader>
 
