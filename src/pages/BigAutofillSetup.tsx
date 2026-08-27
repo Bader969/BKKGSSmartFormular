@@ -41,6 +41,12 @@ export default function BigAutofillSetup() {
               ⬆ In deine <b>Lesezeichenleiste ziehen</b>. Klicken hier tut nichts — das Lesezeichen
               funktioniert nur auf der BIG-Seite.
             </p>
+            <p className="text-xs text-muted-foreground text-center max-w-md">
+              Aktuelle Version: <b>{BIG_BOOKMARKLET_VERSION}</b>. Zeigt das Overlay auf der BIG-Seite eine
+              ältere oder keine Version, das alte Lesezeichen löschen und diesen Button neu in die
+              Lesezeichenleiste ziehen.
+            </p>
+
           </div>
         </section>
 
