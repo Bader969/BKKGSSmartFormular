@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Bookmark, ExternalLink } from "lucide-react";
-import { buildBookmarkletHref } from "@/bookmarklets/bigAutofillSource";
+import { buildBookmarkletHref, BIG_BOOKMARKLET_VERSION } from "@/bookmarklets/bigAutofillSource";
 
 export default function BigAutofillSetup() {
   const href = buildBookmarkletHref();
