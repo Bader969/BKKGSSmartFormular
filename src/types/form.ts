@@ -32,6 +32,9 @@ export interface FamilyMember {
   // Rentenversicherungsnummer. Optional – fallen sonst auf Hauptmitglied zurück.
   rentenversicherungsnummer?: string;
   novitasArbeitgeber?: ArbeitgeberDaten;
+  // BIG direkt: Name/Anschrift Arbeitgeber bzw. Jobcenter für Personen mit eigener Mitgliedschaft
+  bigArbeitgeber?: ArbeitgeberDaten;
+
   novitasArbeitsentgelt?: string;
   novitasBank?: { kontoinhaber: string; iban: string };
 }
