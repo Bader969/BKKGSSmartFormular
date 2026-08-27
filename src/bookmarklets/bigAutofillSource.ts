@@ -15,9 +15,12 @@
 // URI verpackt (siehe `buildBookmarkletHref`).
 //
 // WICHTIG: Keine ES-Module-Imports, kein TS. Nur Vanilla-JS.
+export const BIG_BOOKMARKLET_VERSION = "2026-08-27-1";
+
 const BOOKMARKLET_BODY = /* js */ `
 (async function(){
   var LOG_PREFIX = "[BIG-Autofill]";
+  var BOOKMARKLET_VERSION = "2026-08-27-1";
   function log(){ try { console.log.apply(console, [LOG_PREFIX].concat([].slice.call(arguments))); } catch(_){} }
 
   function showOverlay(html){
@@ -322,6 +325,7 @@ const BOOKMARKLET_BODY = /* js */ `
   if (missing.length) html += "<br><br><b>Nicht gefunden:</b><br>" + missing.map(function(x){return "• "+x;}).join("<br>");
   if (skipped.length) html += "<br><br><span style='opacity:.7'><b>Kein Wert vorhanden:</b><br>" + skipped.map(function(x){return "• "+x;}).join("<br>") + "</span>";
   if (famInfo) html += "<br><br><b>Familie (bitte manuell übertragen):</b><br>" + famInfo;
+  html += "<br><br><small style='opacity:.7'>Bookmarklet-Version: " + BOOKMARKLET_VERSION + "</small>";
   html += "<br><br><span style='opacity:.7;font-size:11px'>Der BIG-Antrag ist ein mehrstufiger Assistent — die meisten „nicht gefundenen" Felder existieren erst auf den folgenden Schritten. Nach jedem „Weiter" das Bookmarklet erneut klicken.</span>";
 
   showOverlay(html);
