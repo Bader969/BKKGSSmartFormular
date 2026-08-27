@@ -295,6 +295,15 @@ const BOOKMARKLET_BODY = /* js */ `
   results.push(fill(["bic","swift"], bank.bic, "BIC"));
   results.push(fill(["kreditinstitut","bankname"], bank.kreditinstitut, "Kreditinstitut"));
 
+  // Arbeitgeber bzw. Jobcenter / Agentur für Arbeit
+  var ag = data.arbeitgeber || {};
+  results.push(fill(["arbeitgeber","firma","dienststelle","jobcenter","agentur arbeit","behoerde","behörde","arbeitgeber name"], ag.name, "Arbeitgeber/Jobcenter Name"));
+  results.push(fill(["arbeitgeber strasse","arbeitgeber straße","strasse arbeitgeber","straße arbeitgeber"], ag.strasse, "Arbeitgeber Straße"));
+  results.push(fill(["arbeitgeber hausnummer","hausnummer arbeitgeber"], ag.hausnummer, "Arbeitgeber Hausnummer"));
+  results.push(fill(["arbeitgeber plz","plz arbeitgeber"], ag.plz, "Arbeitgeber PLZ"));
+  results.push(fill(["arbeitgeber ort","ort arbeitgeber"], ag.ort, "Arbeitgeber Ort"));
+
+
   // Ehegatte / Kinder → als Info (Formular hat oft mehrstufige Screens)
   var famInfo = "";
   if (data.ehegatte && (data.ehegatte.vorname || data.ehegatte.nachname)){
