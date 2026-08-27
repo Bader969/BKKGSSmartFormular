@@ -122,32 +122,36 @@ Deno.serve(async (req) => {
     escapeHtml(body) +
     '</pre>';
 
-  // 1) BeitPlus-Verbindung + Anhänge in den Postfach-Bucket legen
-  let crm: Awaited<ReturnType<typeof beitplusClient>>;
+  // 1) BeitPlus-Verbindung (optional) + Anhänge in den Postfach-Bucket legen
+  let crm: Awaited<ReturnType<typeof beitplusClient>> | null = null;
+  let crm_log_error: string | null = null;
   try {
     crm = await beitplusClient();
   } catch (e) {
-    console.error('BeitPlus connect failed', (e as Error).message);
-    return json(502, { error: 'beitplus_connect_failed', detail: (e as Error).message });
+    crm_log_error = (e as Error).message;
+    console.error('BeitPlus connect failed (Versand läuft weiter)', crm_log_error);
   }
 
   const folder = `outbound/${crypto.randomUUID()}`;
   const stored: Array<{ path: string; filename: string; contentType: string; size: number }> = [];
   let storageWarning: string | null = null;
 
-  for (const att of attachments) {
-    const bytes = base64ToBytes(att.base64 || '');
-    const path = `${folder}/${safeName(att.filename)}`;
-    const { error: upErr } = await crm.client.storage
-      .from(BUCKET)
-      .upload(path, bytes, { contentType: att.mimeType || 'application/pdf', upsert: true });
-    if (upErr) {
-      storageWarning = upErr.message;
-      console.error('Attachment upload failed', att.filename, upErr.message);
-      continue;
+  if (crm) {
+    for (const att of attachments) {
+      const bytes = base64ToBytes(att.base64 || '');
+      const path = `${folder}/${safeName(att.filename)}`;
+      const { error: upErr } = await crm.client.storage
+        .from(BUCKET)
+        .upload(path, bytes, { contentType: att.mimeType || 'application/pdf', upsert: true });
+      if (upErr) {
+        storageWarning = upErr.message;
+        console.error('Attachment upload failed', att.filename, upErr.message);
+        continue;
+      }
+      stored.push({ path, filename: att.filename, contentType: att.mimeType || 'application/pdf', size: bytes.length });
     }
-    stored.push({ path, filename: att.filename, contentType: att.mimeType || 'application/pdf', size: bytes.length });
   }
+
 
   // 2) Versand über Resend mit dem bestehenden BeitPlus-Absender
   const resendPayload: Record<string, unknown> = {
