@@ -98,8 +98,22 @@ Deno.serve(async (req) => {
     person_role?: string | null;
     person_index?: number | null;
     person_label?: string | null;
+    probe?: boolean;
   };
   try { payload = await req.json(); } catch { return json(400, { error: 'invalid_json' }); }
+
+  // Verbindungstest ohne Versand
+  if (payload.probe) {
+    try {
+      const c = await beitplusClient();
+      const { error: selErr } = await c.client.from('emails').select('id').limit(1);
+      return json(200, { ok: !selErr, mode: BEITPLUS_SERVICE_ROLE_KEY ? 'service_role' : 'login', read_error: selErr?.message ?? null });
+    } catch (e) {
+      return json(200, { ok: false, error: (e as Error).message });
+    }
+  }
+
+
 
   const to = splitList(payload.to);
   const cc = splitList(payload.cc);
