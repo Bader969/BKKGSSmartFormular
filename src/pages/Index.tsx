@@ -255,7 +255,29 @@ const Index = () => {
     JSON.stringify(formData.kinder.map(k => [k.geburtsdatum, k.beschaeftigung])),
   ]);
 
+  // BIG: Personen mit eigener Mitgliedschaft (Ehegatte / Kinder ≥15) — für die
+  // Arbeitgeber-/Jobcenter-Blöcke.
+  const bigOwnMembershipPersons: Array<{ role: 'ehegatte' | 'kind'; index: number; label: string }> = [];
+  if (formData.selectedKrankenkasse === 'big_plusbonus' && formData.bigFamilienversicherung) {
+    if (formData.ehegatte?.eigeneMitgliedschaft) {
+      bigOwnMembershipPersons.push({
+        role: 'ehegatte',
+        index: 0,
+        label: [formData.ehegatte.vorname, formData.ehegatte.name].filter(Boolean).join(' ') || 'Ehegatte/-in',
+      });
+    }
+    formData.kinder.forEach((k, i) => {
+      if (!k.eigeneMitgliedschaft) return;
+      bigOwnMembershipPersons.push({
+        role: 'kind',
+        index: i,
+        label: [k.vorname, k.name].filter(Boolean).join(' ') || `Kind ${i + 1}`,
+      });
+    });
+  }
+
   if (authLoading) {
+
     return <div className="min-h-screen flex items-center justify-center text-slate-500">Lädt…</div>;
   }
 
