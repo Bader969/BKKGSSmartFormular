@@ -184,6 +184,8 @@ Deno.serve(async (req) => {
     console.error('Resend send failed', resp.status, message.slice(0, 500));
     // Fehlversuch im BeitPlus-Postfach protokollieren
     try {
+      if (!crm) throw new Error(crm_log_error || 'beitplus_not_connected');
+
       await crm.client.from('emails').insert({
         direction: 'outbound',
         status: 'failed',
