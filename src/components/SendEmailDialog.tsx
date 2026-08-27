@@ -676,7 +676,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           base64: await blobToBase64(a.blob),
         })),
       );
-      const { data, error } = await supabase.functions.invoke('send-application-email', {
+      const { data, error } = await supabase.functions.invoke(emailFn, {
         body: {
           application_id: applicationId,
           to: to.trim(),
@@ -695,7 +695,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
         throw new Error('Gmail-Verbindung erlaubt kein Senden. Bitte Verbindung mit Scope "gmail.send" neu autorisieren.');
       }
       if (data?.error) throw new Error(data.error);
-      console.info('[SendEmail] ✓ Gruppe gesendet:', g.id, g.label, 'gmail_id:', data?.gmail_id);
+      console.info('[SendEmail] ✓ Gruppe gesendet:', g.id, g.label, 'id:', data?.gmail_id ?? data?.resend_id);
       toast.success(`E-Mail gesendet: ${g.label}`);
     }
 
@@ -743,7 +743,7 @@ export function SendEmailDialog({ open, onOpenChange, formData, applicationId, b
           const { data: waData, error: waErr } = await supabase.functions.invoke('send-whatsapp-summary', {
             body: {
               application_id: applicationId,
-              chatId: WA_CHAT_ID,
+              chatId: waChatId,
               pdfBase64,
               pdfFilename: withPersonSuffix(
                 waFilenameOverride || summary.filename,
