@@ -498,6 +498,9 @@ export const createInitialFormData = (): FormData => {
     bigFamilienversicherung: false,
     bigHoeheEuroSelfRandom: '',
     bigMitgliedBeschaeftigt: '',
+    bigBeschaeftigungsstatus: '',
+    bigArbeitgeber: createEmptyArbeitgeberDaten(),
+
     vertriebspartner: '',
     novitasMode: 'familie',
     novitasBonus400: false,
