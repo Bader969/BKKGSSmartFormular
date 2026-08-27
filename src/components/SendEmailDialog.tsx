@@ -198,6 +198,12 @@ type Props = {
 };
 
 export function SendEmailDialog({ open, onOpenChange, formData, applicationId, bearbeiter, onSent }: Props) {
+  // Ziel-CRM des Antrags bestimmt Absender (Gmail vs. BeitPlus-Postfach) und WhatsApp-Empfänger.
+  const crmTarget: CrmTarget | null =
+    (formData.crmTarget as CrmTarget | null | undefined) || crmTargetForVp(formData.vertriebspartner);
+  const isBeitplus = crmTarget === 'beitplus';
+  const emailFn = isBeitplus ? 'send-application-email-beitplus' : 'send-application-email';
+  const waChatId = waChatIdFor(crmTarget);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   const [sending, setSending] = useState(false);
   const [to, setTo] = useState('');
