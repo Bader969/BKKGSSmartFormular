@@ -194,24 +194,27 @@ export default function Applications() {
       ? `Zeitraum ${dateFrom ? new Date(dateFrom).toLocaleDateString("de-DE") : "…"} – ${dateTo ? new Date(dateTo).toLocaleDateString("de-DE") : "…"}`
       : "Alle Zeiträume";
 
+  const kkLabel = (kk: string) => {
+    const map: Record<string, string> = {
+      big: "Big Direkt Gesund",
+      bigdirekt: "Big Direkt Gesund",
+      "big-direkt": "Big Direkt Gesund",
+      novitas: "Novitas BKK",
+      viactiv: "Viactiv",
+      dak: "DAK",
+    };
+    return map[(kk ?? "").toLowerCase()] ?? kk;
+  };
+
   const handleExportXlsx = () => {
     const data = grouped.map((r) => ({
-      "Nr.": numberMap.get(r.id) ?? "",
-      Typ: r.parent_application_id
-        ? r.person_role === "ehegatte" ? "Ehegatte" : `Kind ${r.person_index ?? ""}`.trim()
-        : "Hauptantrag",
-      Krankenkasse: r.krankenkasse,
-      Status: r.parent_application_id ? "" : (r.status === "exported" ? "Exportiert" : "Entwurf"),
-      PDFs: r.parent_application_id ? "" : r.pdf_count,
-      "E-Mail gesendet": r.emailed_at ? new Date(r.emailed_at).toLocaleString("de-DE") : "",
-      "WhatsApp gesendet": r.whatsapp_sent_at ? new Date(r.whatsapp_sent_at).toLocaleString("de-DE") : "",
-      "CRM übertragen": r.crm_synced_at ? new Date(r.crm_synced_at).toLocaleString("de-DE") : "",
-      Aktualisiert: new Date(r.updated_at).toLocaleString("de-DE"),
+      Krankenkasse: kkLabel(r.krankenkasse),
       Erstellt: new Date(r.created_at).toLocaleString("de-DE"),
       VP: r.vertriebspartner ?? "",
       Bearbeiter: bearbeiterOf(r.user_id),
       Name: r.applicant_name ?? "",
       Vorname: r.applicant_vorname ?? "",
+      Geburtsdatum: r.applicant_geburtsdatum ?? "",
       Antragsform: r.antragsform ?? "",
     }));
     const ws = XLSX.utils.json_to_sheet(data);
@@ -220,6 +223,7 @@ export default function Applications() {
     const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
     XLSX.writeFile(wb, `antraege_${ts}.xlsx`);
   };
+
 
   // --- CRM (Vermittlersuite): Übertragung der gefilterten Hauptanträge ---
   const crmCandidates = useMemo(
