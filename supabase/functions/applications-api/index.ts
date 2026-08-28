@@ -85,6 +85,14 @@ type PersonDesired = {
   applicant_geburtsdatum: string | null;
 };
 
+function mainGebOf(o: unknown): string | null {
+  if (!o || typeof o !== "object") return null;
+  const r = o as Record<string, unknown>;
+  const cand = [r.mitgliedGeburtsdatum, r.geburtsdatum];
+  for (const c of cand) if (typeof c === "string" && c.trim()) return c.trim().slice(0, 20);
+  return null;
+}
+
 function gebOf(o: unknown): string | null {
   if (!o || typeof o !== "object") return null;
   const g = (o as Record<string, unknown>).geburtsdatum;
@@ -299,7 +307,7 @@ Deno.serve(async (req) => {
         applicant_name: typeof applicant_name === "string" ? applicant_name.slice(0, 120) : null,
         applicant_vorname: typeof applicant_vorname === "string" ? applicant_vorname.slice(0, 120) : null,
         antragsform: typeof antragsform === "string" ? antragsform.slice(0, 80) : null,
-        applicant_geburtsdatum: gebOf(payload),
+        applicant_geburtsdatum: mainGebOf(payload),
       } as Record<string, unknown>;
       if (crm_target === "blitzvox" || crm_target === "beitplus") meta.crm_target = crm_target;
 
@@ -378,7 +386,7 @@ Deno.serve(async (req) => {
           const payload = (await decryptPayload(r.payload_encrypted as string, r.payload_iv as string)) as Record<string, unknown>;
           let geb: string | null = null;
           if (!r.parent_application_id) {
-            geb = gebOf(payload);
+            geb = mainGebOf(payload);
           } else if (r.person_role === "ehegatte") {
             geb = gebOf(payload.ehegatte);
           } else if (r.person_role === "kind") {
