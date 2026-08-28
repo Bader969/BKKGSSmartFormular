@@ -197,10 +197,15 @@ Deno.serve(async (req) => {
   const totalB64 = attachments.reduce((s, a) => s + (a.base64?.length || 0), 0);
   if (totalB64 > 32 * 1024 * 1024) return json(413, { error: 'attachments_too_large' });
 
+  // Robustes HTML: manche Postfach-Ansichten filtern <pre>/inline-Styles heraus.
   const bodyHtml =
-    '<pre style="font-family:Arial,sans-serif;font-size:14px;color:#111;white-space:pre-wrap;margin:0">' +
-    escapeHtml(body) +
-    '</pre>';
+    '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#111">' +
+    escapeHtml(body)
+      .split(/\n{2,}/)
+      .map((p) => `<p style="margin:0 0 12px 0">${p.replace(/\n/g, '<br>')}</p>`)
+      .join('') +
+    '</div>';
+
 
   // 1) BeitPlus-Verbindung (optional) + Anhänge in den Postfach-Bucket legen
   let crm: Awaited<ReturnType<typeof beitplusClient>> | null = null;
