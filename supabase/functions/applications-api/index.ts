@@ -75,7 +75,7 @@ async function hashIp(ip: string | null): Promise<string | null> {
   return await sha256Hex(ip + "|" + ENC_SECRET);
 }
 
-type Action = "save" | "list" | "decrypt" | "mark-exported" | "delete" | "events";
+type Action = "save" | "list" | "decrypt" | "mark-exported" | "delete" | "events" | "backfill-geburtsdatum";
 
 type PersonDesired = {
   person_role: "ehegatte" | "kind";
