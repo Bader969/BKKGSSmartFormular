@@ -75,7 +75,7 @@ async function hashIp(ip: string | null): Promise<string | null> {
   return await sha256Hex(ip + "|" + ENC_SECRET);
 }
 
-type Action = "save" | "list" | "decrypt" | "mark-exported" | "delete" | "events";
+type Action = "save" | "list" | "decrypt" | "mark-exported" | "delete" | "events" | "backfill-geburtsdatum";
 
 type PersonDesired = {
   person_role: "ehegatte" | "kind";
@@ -360,6 +360,41 @@ Deno.serve(async (req) => {
       });
 
       return json(200, { application: parentRow });
+    }
+
+    if (action === "backfill-geburtsdatum") {
+      if (!(await checkAdmin())) return json(403, { error: "admin_required" });
+      const { data: rows, error } = await admin
+        .from("applications")
+        .select("id, parent_application_id, person_role, person_index, payload_encrypted, payload_iv, applicant_geburtsdatum")
+        .is("applicant_geburtsdatum", null)
+        .limit(2000);
+      if (error) return json(500, { error: "db_list_failed" });
+
+      let updated = 0;
+      let failed = 0;
+      for (const r of rows ?? []) {
+        try {
+          const payload = (await decryptPayload(r.payload_encrypted as string, r.payload_iv as string)) as Record<string, unknown>;
+          let geb: string | null = null;
+          if (!r.parent_application_id) {
+            geb = gebOf(payload);
+          } else if (r.person_role === "ehegatte") {
+            geb = gebOf(payload.ehegatte);
+          } else if (r.person_role === "kind") {
+            const kinder = Array.isArray(payload.kinder) ? (payload.kinder as unknown[]) : [];
+            const idx = (typeof r.person_index === "number" ? r.person_index : 1) - 1;
+            geb = gebOf(kinder[idx]);
+          }
+          if (!geb) continue;
+          const { error: upErr } = await admin.from("applications").update({ applicant_geburtsdatum: geb }).eq("id", r.id);
+          if (upErr) { failed += 1; continue; }
+          updated += 1;
+        } catch (_e) {
+          failed += 1;
+        }
+      }
+      return json(200, { ok: true, scanned: (rows ?? []).length, updated, failed });
     }
 
     if (action === "list") {

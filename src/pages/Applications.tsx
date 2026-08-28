@@ -196,9 +196,11 @@ export default function Applications() {
 
   const kkLabel = (kk: string) => {
     const map: Record<string, string> = {
-      big: "Big Direkt Gesund",
-      bigdirekt: "Big Direkt Gesund",
-      "big-direkt": "Big Direkt Gesund",
+      big: "BIG direkt gesund",
+      big_plusbonus: "BIG direkt gesund",
+      bigdirekt: "BIG direkt gesund",
+      "big-direkt": "BIG direkt gesund",
+      bkk_gs: "BKK Gildemeister Seidensticker",
       novitas: "Novitas BKK",
       viactiv: "Viactiv",
       dak: "DAK",
