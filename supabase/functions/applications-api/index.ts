@@ -82,7 +82,14 @@ type PersonDesired = {
   person_index: number | null;
   applicant_vorname: string;
   applicant_name: string;
+  applicant_geburtsdatum: string | null;
 };
+
+function gebOf(o: unknown): string | null {
+  if (!o || typeof o !== "object") return null;
+  const g = (o as Record<string, unknown>).geburtsdatum;
+  return typeof g === "string" && g.trim() ? g.trim().slice(0, 20) : null;
+}
 
 function ageInYearsFromString(g: unknown): number | null {
   if (typeof g !== "string" || !g) return null;
