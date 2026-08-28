@@ -14,7 +14,7 @@ Der Excel-Export ("Als Excel exportieren") enthält nur noch relevante Spalten u
 - Aktualisiert (Spalte I)
 
 ## Verbleibende Spalten (neue Reihenfolge)
-1. Krankenkasse
+1. Krankenkasse (ausgeschriebener Name, siehe unten)
 2. Erstellt
 3. VP
 4. Bearbeiter
@@ -22,6 +22,17 @@ Der Excel-Export ("Als Excel exportieren") enthält nur noch relevante Spalten u
 6. Vorname
 7. **Geburtsdatum (NEU)**
 8. Antragsform
+
+## Krankenkassen-Benennung im Export
+Statt der internen Kürzel werden die vollständigen Namen geschrieben:
+- `big` → Big Direkt Gesund
+- `novitas` → Novitas BKK
+- `viactiv` → Viactiv
+- `dak` → DAK
+
+## Zeilen im Export (alle Mitgliedschaften)
+Exportiert werden – bei **allen** Krankenkassen – der Hauptantrag sowie jede weitere Person mit eigener Mitgliedschaft (Ehegatte / Kinder als eigene Zeile mit eigenem Namen und Geburtsdatum). Familienversicherte Personen erscheinen nicht als eigene Zeile. Grundlage bleibt die bestehende Gruppierung der Liste; der Export nutzt genau diese Zeilen (inklusive aktiver Filter).
+
 
 ## Neue Spalte: Geburtsdatum
 Das Geburtsdatum steht aktuell nur im verschlüsselten Payload – die Listenansicht sieht es nicht. Daher:
