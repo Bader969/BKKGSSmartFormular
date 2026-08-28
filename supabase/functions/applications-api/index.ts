@@ -124,7 +124,7 @@ function collectNovitasPersonsWithOwnMembership(payload: Record<string, unknown>
     const vor = typeof eh.vorname === "string" ? eh.vorname.trim() : "";
     const nam = typeof eh.name === "string" ? eh.name.trim() : "";
     if (vor || nam) {
-      out.push({ person_role: "ehegatte", person_index: null, applicant_vorname: vor.slice(0, 120), applicant_name: nam.slice(0, 120) });
+      out.push({ person_role: "ehegatte", person_index: null, applicant_vorname: vor.slice(0, 120), applicant_name: nam.slice(0, 120), applicant_geburtsdatum: gebOf(eh) });
     }
   }
   const kinder = Array.isArray(payload.kinder) ? (payload.kinder as Array<Record<string, unknown>>) : [];
@@ -135,7 +135,7 @@ function collectNovitasPersonsWithOwnMembership(payload: Record<string, unknown>
     if (!vor && !nam) return;
     const age = ageInYearsFromString(k.geburtsdatum);
     if (age == null || age < 16) return;
-    out.push({ person_role: "kind", person_index: i + 1, applicant_vorname: vor.slice(0, 120), applicant_name: nam.slice(0, 120) });
+    out.push({ person_role: "kind", person_index: i + 1, applicant_vorname: vor.slice(0, 120), applicant_name: nam.slice(0, 120), applicant_geburtsdatum: gebOf(k) });
   });
   return out;
 }
@@ -148,7 +148,7 @@ function collectPersonsWithOwnMembership(payload: Record<string, unknown>, krank
     const vor = typeof eh.vorname === "string" ? eh.vorname.trim() : "";
     const nam = typeof eh.name === "string" ? eh.name.trim() : "";
     if (vor || nam) {
-      out.push({ person_role: "ehegatte", person_index: null, applicant_vorname: vor.slice(0, 120), applicant_name: nam.slice(0, 120) });
+      out.push({ person_role: "ehegatte", person_index: null, applicant_vorname: vor.slice(0, 120), applicant_name: nam.slice(0, 120), applicant_geburtsdatum: gebOf(eh) });
     }
   }
   const kinder = Array.isArray(payload.kinder) ? (payload.kinder as Array<Record<string, unknown>>) : [];
@@ -157,7 +157,7 @@ function collectPersonsWithOwnMembership(payload: Record<string, unknown>, krank
       const vor = typeof k.vorname === "string" ? k.vorname.trim() : "";
       const nam = typeof k.name === "string" ? k.name.trim() : "";
       if (vor || nam) {
-        out.push({ person_role: "kind", person_index: i + 1, applicant_vorname: vor.slice(0, 120), applicant_name: nam.slice(0, 120) });
+        out.push({ person_role: "kind", person_index: i + 1, applicant_vorname: vor.slice(0, 120), applicant_name: nam.slice(0, 120), applicant_geburtsdatum: gebOf(k) });
       }
     }
   });
@@ -213,6 +213,7 @@ async function syncSubEntries(args: {
       vertriebspartner,
       applicant_name: p.applicant_name || null,
       applicant_vorname: p.applicant_vorname || null,
+      applicant_geburtsdatum: p.applicant_geburtsdatum,
       antragsform: buildSubAntragsform(antragsform, p),
       parent_application_id: parentId,
       person_role: p.person_role,
@@ -298,6 +299,7 @@ Deno.serve(async (req) => {
         applicant_name: typeof applicant_name === "string" ? applicant_name.slice(0, 120) : null,
         applicant_vorname: typeof applicant_vorname === "string" ? applicant_vorname.slice(0, 120) : null,
         antragsform: typeof antragsform === "string" ? antragsform.slice(0, 80) : null,
+        applicant_geburtsdatum: gebOf(payload),
       } as Record<string, unknown>;
       if (crm_target === "blitzvox" || crm_target === "beitplus") meta.crm_target = crm_target;
 
@@ -363,7 +365,7 @@ Deno.serve(async (req) => {
     if (action === "list") {
       const { data, error } = await admin
         .from("applications")
-        .select("id, user_id, krankenkasse, status, pdf_count, exported_at, last_opened_at, created_at, updated_at, vertriebspartner, applicant_name, applicant_vorname, antragsform, parent_application_id, person_role, person_index, source, crm_synced_at, crm_target")
+        .select("id, user_id, krankenkasse, status, pdf_count, exported_at, last_opened_at, created_at, updated_at, vertriebspartner, applicant_name, applicant_vorname, antragsform, applicant_geburtsdatum, parent_application_id, person_role, person_index, source, crm_synced_at, crm_target")
         .order("updated_at", { ascending: false })
         .limit(500);
       if (error) return json(500, { error: "db_list_failed" });
