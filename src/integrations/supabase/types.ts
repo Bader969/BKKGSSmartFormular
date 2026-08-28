@@ -139,6 +139,7 @@ export type Database = {
       applications: {
         Row: {
           antragsform: string | null
+          applicant_geburtsdatum: string | null
           applicant_name: string | null
           applicant_vorname: string | null
           created_at: string
@@ -165,6 +166,7 @@ export type Database = {
         }
         Insert: {
           antragsform?: string | null
+          applicant_geburtsdatum?: string | null
           applicant_name?: string | null
           applicant_vorname?: string | null
           created_at?: string
@@ -191,6 +193,7 @@ export type Database = {
         }
         Update: {
           antragsform?: string | null
+          applicant_geburtsdatum?: string | null
           applicant_name?: string | null
           applicant_vorname?: string | null
           created_at?: string

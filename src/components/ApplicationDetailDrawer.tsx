@@ -18,6 +18,7 @@ export type ApplicationRow = {
   vertriebspartner: string | null;
   applicant_name: string | null;
   applicant_vorname: string | null;
+  applicant_geburtsdatum?: string | null;
   antragsform: string | null;
   parent_application_id: string | null;
   person_role: string | null;
