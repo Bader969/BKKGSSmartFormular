@@ -99,6 +99,7 @@ Deno.serve(async (req) => {
     person_index?: number | null;
     person_label?: string | null;
     probe?: boolean;
+    repair_invisible_bodies?: boolean;
     backfill_resend_id?: string;
   };
   try { payload = await req.json(); } catch { return json(400, { error: 'invalid_json' }); }
@@ -107,6 +108,27 @@ Deno.serve(async (req) => {
   if (payload.probe) {
     try {
       const c = await beitplusClient();
+      let repaired = 0;
+      if (payload.repair_invisible_bodies) {
+        const { data: affected, error: affectedErr } = await c.client
+          .from('emails')
+          .select('id, body_html')
+          .eq('direction', 'outbound')
+          .eq('sender_email', FROM_EMAIL)
+          .ilike('body_html', '%color:#111%');
+        if (affectedErr) throw new Error(`repair_read_failed:${affectedErr.message}`);
+        for (const row of affected ?? []) {
+          const visibleHtml = String(row.body_html ?? '')
+            .replace(/;?\s*color\s*:\s*#111(?:111)?\s*;?/gi, ';')
+            .replace(/style="\s*;\s*"/gi, '');
+          const { error: updateErr } = await c.client
+            .from('emails')
+            .update({ body_html: visibleHtml })
+            .eq('id', row.id);
+          if (updateErr) throw new Error(`repair_update_failed:${updateErr.message}`);
+          repaired += 1;
+        }
+      }
       const { data: rows, error: selErr } = await c.client
         .from('emails')
         .select('id, subject, sent_at, body_text, body_html')
@@ -116,6 +138,7 @@ Deno.serve(async (req) => {
       return json(200, {
         ok: !selErr,
         mode: BEITPLUS_SERVICE_ROLE_KEY ? 'service_role' : 'login',
+        repaired,
         read_error: selErr?.message ?? null,
         last: (rows ?? []).map((r: Record<string, unknown>) => ({
           id: r.id,
@@ -199,7 +222,7 @@ Deno.serve(async (req) => {
 
   // Robustes HTML: manche Postfach-Ansichten filtern <pre>/inline-Styles heraus.
   const bodyHtml =
-    '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#111">' +
+    '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5">' +
     escapeHtml(body)
       .split(/\n{2,}/)
       .map((p) => `<p style="margin:0 0 12px 0">${p.replace(/\n/g, '<br>')}</p>`)
