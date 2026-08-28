@@ -107,12 +107,29 @@ Deno.serve(async (req) => {
   if (payload.probe) {
     try {
       const c = await beitplusClient();
-      const { error: selErr } = await c.client.from('emails').select('id').limit(1);
-      return json(200, { ok: !selErr, mode: BEITPLUS_SERVICE_ROLE_KEY ? 'service_role' : 'login', read_error: selErr?.message ?? null });
+      const { data: rows, error: selErr } = await c.client
+        .from('emails')
+        .select('id, subject, sent_at, body_text, body_html')
+        .eq('direction', 'outbound')
+        .order('sent_at', { ascending: false })
+        .limit(3);
+      return json(200, {
+        ok: !selErr,
+        mode: BEITPLUS_SERVICE_ROLE_KEY ? 'service_role' : 'login',
+        read_error: selErr?.message ?? null,
+        last: (rows ?? []).map((r: Record<string, unknown>) => ({
+          id: r.id,
+          subject: r.subject,
+          sent_at: r.sent_at,
+          text_len: String(r.body_text ?? '').length,
+          html_len: String(r.body_html ?? '').length,
+        })),
+      });
     } catch (e) {
       return json(200, { ok: false, error: (e as Error).message });
     }
   }
+
 
   // Nachtrag: bereits über Resend versandte E-Mail im BeitPlus-Postfach eintragen
   if (payload.backfill_resend_id) {
