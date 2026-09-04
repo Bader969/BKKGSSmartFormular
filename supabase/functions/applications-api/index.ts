@@ -75,7 +75,35 @@ async function hashIp(ip: string | null): Promise<string | null> {
   return await sha256Hex(ip + "|" + ENC_SECRET);
 }
 
-type Action = "save" | "list" | "decrypt" | "mark-exported" | "delete" | "events" | "backfill-geburtsdatum";
+type Action =
+  | "save"
+  | "list"
+  | "decrypt"
+  | "mark-exported"
+  | "delete"
+  | "events"
+  | "backfill-geburtsdatum"
+  | "export-decrypted"
+  | "rekey";
+
+/** Derives an AES-GCM key from an arbitrary secret string (same scheme as getKey). */
+async function deriveKey(secret: string, usages: KeyUsage[]): Promise<CryptoKey> {
+  const material = await crypto.subtle.digest("SHA-256", enc.encode(secret));
+  return await crypto.subtle.importKey("raw", material, { name: "AES-GCM" }, false, usages);
+}
+
+async function decryptWith(key: CryptoKey, ctHex: string, ivHex: string): Promise<unknown> {
+  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: hexToBytes(ivHex) }, key, hexToBytes(ctHex));
+  return JSON.parse(dec.decode(new Uint8Array(pt)));
+}
+
+async function encryptWith(key: CryptoKey, payload: unknown): Promise<{ ivHex: string; ctHex: string; hash: string }> {
+  const canon = canonicalize(payload);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(canon)));
+  return { ivHex: bytesToHex(iv), ctHex: bytesToHex(ct), hash: await sha256Hex(canon) };
+}
+
 
 type PersonDesired = {
   person_role: "ehegatte" | "kind";
