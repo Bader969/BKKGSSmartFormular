@@ -433,6 +433,118 @@ Deno.serve(async (req) => {
       return json(200, { ok: true, scanned: (rows ?? []).length, updated, failed });
     }
 
+    // Admin: full plaintext export for migration. Paged; never logged.
+    if (action === "export-decrypted") {
+      if (!(await checkAdmin())) return json(403, { error: "admin_required" });
+      const { offset = 0, limit = 50 } = body as { offset?: number; limit?: number };
+      const lim = Math.min(Math.max(1, Number(limit) || 50), 200);
+      const off = Math.max(0, Number(offset) || 0);
+
+      const { count } = await admin.from("applications").select("id", { count: "exact", head: true });
+      const { data: rows, error } = await admin
+        .from("applications")
+        .select(
+          "id, user_id, parent_application_id, person_role, person_index, krankenkasse, status, antragsform, vertriebspartner, applicant_name, applicant_vorname, applicant_geburtsdatum, crm_target, crm_synced_at, source, intake_meta, pdf_count, exported_at, last_opened_at, created_at, updated_at, payload_encrypted, payload_iv, payload_hash",
+        )
+        .order("created_at", { ascending: true })
+        .range(off, off + lim - 1);
+      if (error) return json(500, { error: "db_list_failed" });
+
+      const key = await getKey();
+      const out: Record<string, unknown>[] = [];
+      let failed = 0;
+      for (const r of rows ?? []) {
+        const { payload_encrypted, payload_iv, ...meta } = r as Record<string, unknown>;
+        try {
+          const payload = await decryptWith(key, payload_encrypted as string, payload_iv as string);
+          out.push({ ...meta, payload });
+        } catch (_e) {
+          failed += 1;
+          out.push({ ...meta, payload: null, decrypt_failed: true });
+        }
+      }
+      return json(200, {
+        ok: true,
+        total: count ?? null,
+        offset: off,
+        limit: lim,
+        returned: out.length,
+        failed,
+        next_offset: off + out.length < (count ?? 0) ? off + out.length : null,
+        applications: out,
+      });
+    }
+
+    // Admin: re-encrypt all rows with a new key (secret APPLICATIONS_ENCRYPTION_KEY_NEW).
+    // Run with dry_run first, then set APPLICATIONS_ENCRYPTION_KEY to the new value afterwards.
+    if (action === "rekey") {
+      if (!(await checkAdmin())) return json(403, { error: "admin_required" });
+      const newSecret = Deno.env.get("APPLICATIONS_ENCRYPTION_KEY_NEW");
+      if (!newSecret) return json(400, { error: "new_key_secret_missing" });
+      if (newSecret === ENC_SECRET) return json(400, { error: "new_key_identical" });
+
+      const { dry_run = false, offset = 0, limit = 100 } = body as { dry_run?: boolean; offset?: number; limit?: number };
+      const lim = Math.min(Math.max(1, Number(limit) || 100), 200);
+      const off = Math.max(0, Number(offset) || 0);
+
+      const oldKey = await getKey();
+      const newKey = await deriveKey(newSecret, ["encrypt", "decrypt"]);
+
+      const { count } = await admin.from("applications").select("id", { count: "exact", head: true });
+      const { data: rows, error } = await admin
+        .from("applications")
+        .select("id, payload_encrypted, payload_iv")
+        .order("created_at", { ascending: true })
+        .range(off, off + lim - 1);
+      if (error) return json(500, { error: "db_list_failed" });
+
+      let rekeyed = 0;
+      let already = 0;
+      let failed = 0;
+      for (const r of rows ?? []) {
+        const ctHex = r.payload_encrypted as string;
+        const ivHex = r.payload_iv as string;
+        let payload: unknown;
+        try {
+          payload = await decryptWith(oldKey, ctHex, ivHex);
+        } catch (_e) {
+          // Maybe already migrated to the new key.
+          try {
+            await decryptWith(newKey, ctHex, ivHex);
+            already += 1;
+            continue;
+          } catch (_e2) {
+            failed += 1;
+            continue;
+          }
+        }
+        if (dry_run) { rekeyed += 1; continue; }
+        try {
+          const next = await encryptWith(newKey, payload);
+          const { error: upErr } = await admin
+            .from("applications")
+            .update({ payload_encrypted: next.ctHex, payload_iv: next.ivHex, payload_hash: next.hash })
+            .eq("id", r.id);
+          if (upErr) { failed += 1; continue; }
+          rekeyed += 1;
+        } catch (_e) {
+          failed += 1;
+        }
+      }
+      return json(200, {
+        ok: true,
+        dry_run: !!dry_run,
+        total: count ?? null,
+        offset: off,
+        scanned: (rows ?? []).length,
+        rekeyed,
+        already_new_key: already,
+        failed,
+        next_offset: off + (rows ?? []).length < (count ?? 0) ? off + (rows ?? []).length : null,
+      });
+    }
+
+
     if (action === "list") {
       const { data, error } = await admin
         .from("applications")
